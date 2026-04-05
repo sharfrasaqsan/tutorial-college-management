@@ -1,11 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy, doc, deleteDoc } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, BookOpen, Clock, Users, Calendar, Edit, Trash2 } from "lucide-react";
-import { Class } from "@/types/models";
-import Link from "next/link";
+import { Plus, BookOpen, Clock, Users, Calendar, Edit, Trash2, Ban, CheckCircle, AlertCircle } from "lucide-react";
+import { Class, Teacher, Subject, Grade } from "@/types/models";
 import ClassModal from "@/components/admin/ClassModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import toast from "react-hot-toast";
@@ -22,14 +21,35 @@ export default function ClassesPage() {
   const [classToDelete, setClassToDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [teachers, setTeachers] = useState<Record<string, Teacher>>({});
+  const [subjects, setSubjects] = useState<Record<string, Subject>>({});
+  const [grades, setGrades] = useState<Record<string, Grade>>({});
+
   const loadClasses = async () => {
     setLoading(true);
     try {
-      const q = query(collection(db, "classes"), orderBy("name", "asc"));
-      const snap = await getDocs(q);
-      setClasses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Class)));
+      const [classSnap, teacherSnap, subjectSnap, gradeSnap] = await Promise.all([
+        getDocs(query(collection(db, "classes"), orderBy("name", "asc"))),
+        getDocs(collection(db, "teachers")),
+        getDocs(collection(db, "subjects")),
+        getDocs(collection(db, "grades"))
+      ]);
+
+      const teacherMap: Record<string, Teacher> = {};
+      teacherSnap.docs.forEach(d => teacherMap[d.id] = { id: d.id, ...d.data() } as Teacher);
+      setTeachers(teacherMap);
+
+      const subjectMap: Record<string, Subject> = {};
+      subjectSnap.docs.forEach(d => subjectMap[d.id] = { id: d.id, ...d.data() } as Subject);
+      setSubjects(subjectMap);
+
+      const gradeMap: Record<string, Grade> = {};
+      gradeSnap.docs.forEach(d => gradeMap[d.id] = { id: d.id, ...d.data() } as Grade);
+      setGrades(gradeMap);
+
+      setClasses(classSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Class)));
     } catch (error) {
-      console.error("Error loading classes", error);
+      console.error("Error loading registry", error);
     } finally {
       setLoading(false);
     }
@@ -38,6 +58,17 @@ export default function ClassesPage() {
   useEffect(() => {
     loadClasses();
   }, []);
+
+  const toggleStatus = async (item: Class) => {
+    try {
+      const newStatus = item.status === 'active' ? 'inactive' : 'active';
+      await updateDoc(doc(db, "classes", item.id), { status: newStatus });
+      toast.success(newStatus === 'active' ? "Class session restored." : "Class session suspended.");
+      loadClasses();
+    } catch {
+      toast.error("Process failed.");
+    }
+  };
 
   const handleEdit = (item: Class) => {
     setSelectedClass(item);
@@ -151,54 +182,80 @@ export default function ClassesPage() {
               </div>
             </div>
           ))
-        ) : filteredClasses.length > 0 ? filteredClasses.map((item) => (
-          <div key={item.id} className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-6 flex flex-col group">
-            <div className="flex justify-between items-start mb-4">
-              <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
-                <BookOpen className="w-6 h-6" />
-              </div>
-              <span className={`px-2 py-1 rounded-md text-[10px] uppercase font-bold tracking-wider ${item.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
-                {item.status || 'Active'}
-              </span>
-            </div>
-            
-            <h3 className="font-bold text-lg text-slate-800 mb-1 group-hover:text-primary transition-colors">{item.name}</h3>
-            <p className="text-sm text-slate-500 mb-4">{item.subject} • {item.grade}</p>
-            
-            <div className="space-y-3 mt-auto">
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <Users className="w-4 h-4 text-slate-400" />
-                <span>{item.studentCount || 0} Students Enrolled</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <Calendar className="w-4 h-4 text-slate-400" />
-                <span>{item.dayOfWeek?.charAt(0).toUpperCase() + item.dayOfWeek?.slice(1) || 'Multiple Days'}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-slate-600">
-                <Clock className="w-4 h-4 text-slate-400" />
-                <span>{item.startTime} - {item.endTime}</span>
-              </div>
-            </div>
+        ) : filteredClasses.length > 0 ? filteredClasses.map((item) => {
+          const teacher = teachers[item.teacherId];
+          const subject = subjects[item.subjectId];
+          const grade = grades[item.gradeId];
 
-            <div className="mt-6 pt-6 border-t border-slate-50 flex gap-2">
-              <Link href={`/admin/classes/${item.id}`} className="flex-1 px-3 py-2 bg-slate-50 text-slate-700 rounded-lg text-[10px] font-black uppercase tracking-widest text-center hover:bg-slate-100 transition-colors">
-                Details
-              </Link>
-              <button 
-                onClick={() => handleEdit(item)}
-                className="flex-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition-colors"
-              >
-                Edit
-              </button>
-              <button 
-                onClick={() => confirmDelete(item.id)}
-                className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
+          const isTeacherInactive = teacher?.status === 'inactive';
+          const isSubjectInactive = subject?.status === 'inactive';
+          const isGradeInactive = grade?.status === 'inactive';
+          const isClassInactive = item.status === 'inactive';
+
+          return (
+            <div key={item.id} className={`bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all p-6 flex flex-col group ${isClassInactive ? 'opacity-70 grayscale-[0.3]' : ''}`}>
+              <div className="flex justify-between items-start mb-4">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${isClassInactive ? 'bg-slate-100 text-slate-400' : 'bg-primary/10 text-primary'}`}>
+                  <BookOpen className="w-6 h-6" />
+                </div>
+                <div className="flex flex-col items-end gap-2">
+                    <span className={`px-2.5 py-1 rounded-md text-[10px] uppercase font-black tracking-widest ${isClassInactive ? 'bg-slate-100 text-slate-500' : 'bg-green-100 text-green-700'}`}>
+                      {isClassInactive ? 'Suspended' : 'Active'}
+                    </span>
+                    {(isTeacherInactive || isSubjectInactive || isGradeInactive) && !isClassInactive && (
+                        <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-50 text-amber-600 rounded-md border border-amber-100 animate-pulse">
+                            <AlertCircle className="w-3 h-3" />
+                            <span className="text-[9px] font-black uppercase">Dependency Offline</span>
+                        </div>
+                    )}
+                </div>
+              </div>
+              
+              <h3 className={`font-bold text-lg mb-1 transition-colors ${isClassInactive ? 'text-slate-400' : 'text-slate-800'}`}>{item.name}</h3>
+              <p className="text-xs text-slate-500 mb-4">{item.subject} • {item.grade}</p>
+              
+              <div className="space-y-3 mt-auto">
+                <div className="flex items-center gap-2 text-sm">
+                  <Users className={`w-4 h-4 ${isClassInactive ? 'text-slate-300' : 'text-slate-400'}`} />
+                  <span className={isClassInactive ? 'text-slate-400' : 'text-slate-600'}>{item.studentCount || 0} Students</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className={`w-4 h-4 ${isClassInactive ? 'text-slate-300' : 'text-slate-400'}`} />
+                  <span className={`${isClassInactive ? 'text-slate-400' : 'text-slate-600'} capitalize`}>{item.dayOfWeek}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className={`w-4 h-4 ${isClassInactive ? 'text-slate-300' : 'text-slate-400'}`} />
+                  <span className={isClassInactive ? 'text-slate-400' : 'text-slate-600'}>{item.startTime} - {item.endTime}</span>
+                </div>
+              </div>
+
+              <div className="mt-6 pt-6 border-t border-slate-50 flex gap-2">
+                <button 
+                  onClick={() => toggleStatus(item)}
+                  title={isClassInactive ? "Restore Session" : "Suspend Session"}
+                  className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${isClassInactive ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-slate-50 text-slate-400 hover:text-amber-600 hover:bg-amber-50'}`}
+                >
+                   {isClassInactive ? <CheckCircle className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}
+                   {isClassInactive ? 'Restore' : 'Suspend'}
+                </button>
+                <div className="flex gap-1">
+                    <button 
+                        onClick={() => handleEdit(item)}
+                        className="p-2 text-slate-400 hover:text-blue-600 transition-colors hover:bg-blue-50 rounded-lg"
+                    >
+                        <Edit className="w-4 h-4" />
+                    </button>
+                    <button 
+                        onClick={() => confirmDelete(item.id)}
+                        className="p-2 text-slate-400 hover:text-red-500 transition-colors hover:bg-red-50 rounded-lg"
+                    >
+                        <Trash2 className="w-4 h-4" />
+                    </button>
+                </div>
+              </div>
             </div>
-          </div>
-        )) : (
+          );
+        }) : (
           <div className="col-span-full py-20 text-center bg-white rounded-2xl border border-dashed border-slate-200">
             <p className="text-slate-500">No classes found matching your criteria.</p>
             <button className="mt-4 text-sm font-medium text-primary hover:underline">Clear search filters</button>

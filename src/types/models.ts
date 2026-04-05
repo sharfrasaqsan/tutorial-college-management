@@ -35,14 +35,16 @@ export interface Class {
   id: string;
   name: string;
   subject: string;
+  subjectId: string;
   grade: string;
+  gradeId: string;
   teacherId: string;
   dayOfWeek: string;
   startTime: string;
   endTime: string;
   room: string;
   studentCount?: number;
-  status?: 'active' | 'inactive';
+  status: 'active' | 'inactive';
 }
 
 export interface Payment {
@@ -92,11 +94,14 @@ export interface Subject {
   subjectCode: string;
   studentCount?: number;
   color?: string;
+  status: 'active' | 'inactive';
 }
 
 export interface Grade {
   id: string;
   name: string;
+  level: string;
   studentCount?: number;
   classCount?: number;
+  status: 'active' | 'inactive';
 }

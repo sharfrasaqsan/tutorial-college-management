@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy, doc, deleteDoc } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, Search, Filter, Edit, Eye, Trash2 } from "lucide-react";
+import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle } from "lucide-react";
 import { Teacher } from "@/types/models";
 import Link from "next/link";
 import TeacherModal from "@/components/admin/TeacherModal";
@@ -48,6 +48,18 @@ export default function TeachersPage() {
   const handleAdd = () => {
     setSelectedTeacher(null);
     setIsModalOpen(true);
+  };
+
+  const toggleStatus = async (teacher: Teacher) => {
+    try {
+      const newStatus = teacher.status === 'active' ? 'inactive' : 'active';
+      await updateDoc(doc(db, "teachers", teacher.id), { status: newStatus });
+      await updateDoc(doc(db, "users", teacher.id), { status: newStatus });
+      toast.success(newStatus === 'active' ? "Faculty member active." : "Faculty member suspended.");
+      loadTeachers();
+    } catch {
+      toast.error("Failed to update status.");
+    }
   };
 
   const confirmDelete = (id: string) => {
@@ -150,7 +162,7 @@ export default function TeachersPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredTeachers.length > 0 ? filteredTeachers.map((teacher) => (
-                  <tr key={teacher.id} className="hover:bg-slate-50/50 transition-colors">
+                  <tr key={teacher.id} className={`hover:bg-slate-50/50 transition-colors ${teacher.status === 'inactive' ? 'opacity-60 bg-slate-100/30' : ''}`}>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold overflow-hidden border border-slate-200 relative">
@@ -166,7 +178,7 @@ export default function TeachersPage() {
                           )}
                         </div>
                         <div>
-                          <p className="font-semibold text-slate-800">{teacher.name}</p>
+                          <p className={`font-semibold ${teacher.status === 'inactive' ? 'text-slate-500' : 'text-slate-800'}`}>{teacher.name}</p>
                           <p className="text-xs text-slate-500">Employee ID: {teacher.employeeId || 'N/A'}</p>
                         </div>
                       </div>
@@ -174,7 +186,7 @@ export default function TeachersPage() {
                     <td className="px-6 py-4">
                       <div className="flex flex-wrap gap-1">
                         {teacher.subjects && teacher.subjects.length > 0 ? teacher.subjects.map(sub => (
-                          <span key={sub} className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-blue-100 text-blue-700 uppercase">
+                          <span key={sub} className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${teacher.status === 'inactive' ? 'bg-slate-100 text-slate-400' : 'bg-blue-100 text-blue-700'}`}>
                             {sub}
                           </span>
                         )) : (
@@ -183,7 +195,7 @@ export default function TeachersPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                       <p className="text-slate-700 font-medium">{teacher.phone}</p>
+                       <p className={`${teacher.status === 'inactive' ? 'text-slate-400' : 'text-slate-700'} font-medium`}>{teacher.phone}</p>
                        <p className="text-[10px] text-slate-500">{teacher.email}</p>
                     </td>
                     <td className="px-6 py-4">
@@ -199,18 +211,25 @@ export default function TeachersPage() {
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Link href={`/admin/teachers/${teacher.id}`} className="p-2 text-slate-400 hover:text-primary transition-colors">
+                        <button 
+                          onClick={() => toggleStatus(teacher)}
+                          title={teacher.status === 'active' ? "Deactivate Instructor" : "Re-activate Instructor"}
+                          className={`p-2 transition-colors rounded-lg ${teacher.status === 'active' ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-amber-600 hover:text-green-600 hover:bg-green-50'}`}
+                        >
+                          {teacher.status === 'active' ? <Ban className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                        </button>
+                        <Link href={`/admin/teachers/${teacher.id}`} className="p-2 text-slate-400 hover:text-primary transition-colors hover:bg-slate-100 rounded-lg">
                           <Eye className="w-4 h-4" />
                         </Link>
                         <button 
                           onClick={() => handleEdit(teacher)}
-                          className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
+                          className="p-2 text-slate-400 hover:text-blue-600 transition-colors hover:bg-blue-50 rounded-lg"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button 
                           onClick={() => confirmDelete(teacher.id)}
-                          className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                          className="p-2 text-slate-400 hover:text-red-500 transition-colors hover:bg-red-50 rounded-lg"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

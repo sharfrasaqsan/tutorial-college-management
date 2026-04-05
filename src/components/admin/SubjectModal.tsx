@@ -15,6 +15,7 @@ const subjectSchema = z.object({
   name: z.string().min(3, "Subject name must be at least 3 characters"),
   subjectCode: z.string().min(2, "Subject code is required"),
   color: z.string().min(4, "Please select a color style"),
+  status: z.enum(["active", "inactive"]),
 });
 
 type SubjectForm = z.infer<typeof subjectSchema>;
@@ -46,7 +47,8 @@ export default function SubjectModal({ isOpen, onClose, onSuccess, initialData }
   } = useForm<SubjectForm>({
     resolver: zodResolver(subjectSchema),
     defaultValues: {
-        color: "bg-emerald-100 text-emerald-600"
+        color: "bg-emerald-100 text-emerald-600",
+        status: "active"
     }
   });
 
@@ -62,6 +64,7 @@ export default function SubjectModal({ isOpen, onClose, onSuccess, initialData }
         name: "",
         subjectCode: "",
         color: "bg-emerald-100 text-emerald-600",
+        status: "active"
       });
     }
   }, [initialData, reset, isOpen]);

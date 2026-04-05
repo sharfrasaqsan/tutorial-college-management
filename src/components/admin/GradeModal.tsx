@@ -14,6 +14,7 @@ import { Grade } from "@/types/models";
 const gradeSchema = z.object({
   name: z.string().min(1, "Grade name is required"),
   level: z.string().min(1, "Academic level category is required"),
+  status: z.enum(["active", "inactive"]),
 });
 
 type GradeForm = z.infer<typeof gradeSchema>;
@@ -35,18 +36,23 @@ export default function GradeModal({ isOpen, onClose, onSuccess, initialData }: 
     formState: { errors },
   } = useForm<GradeForm>({
     resolver: zodResolver(gradeSchema),
+    defaultValues: {
+        status: "active"
+    }
   });
 
   useEffect(() => {
     if (initialData) {
       reset({
         name: initialData.name,
-        level: (initialData as any).level || "",
+        level: initialData.level || "",
+        status: initialData.status,
       });
     } else {
       reset({
         name: "",
         level: "",
+        status: "active",
       });
     }
   }, [initialData, reset, isOpen]);

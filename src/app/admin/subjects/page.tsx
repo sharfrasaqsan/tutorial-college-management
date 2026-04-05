@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy, doc, deleteDoc } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, BookType, Hash, Search, Filter, BookOpen, Edit, Trash2 } from "lucide-react";
+import { Plus, BookType, Hash, Search, Filter, BookOpen, Edit, Trash2, Ban, CheckCircle } from "lucide-react";
 import { Subject } from "@/types/models";
 import SubjectModal from "@/components/admin/SubjectModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
@@ -37,6 +37,17 @@ export default function SubjectsPage() {
   useEffect(() => {
     loadSubjects();
   }, []);
+
+  const toggleStatus = async (item: Subject) => {
+    try {
+        const newStatus = item.status === 'active' ? 'inactive' : 'active';
+        await updateDoc(doc(db, "subjects", item.id), { status: newStatus });
+        toast.success(newStatus === 'active' ? "Subject restored." : "Subject suspended.");
+        loadSubjects();
+    } catch {
+        toast.error("Failed to update subject status.");
+    }
+  };
 
   const handleEdit = (subject: Subject) => {
     setSelectedSubject(subject);
@@ -132,12 +143,19 @@ export default function SubjectsPage() {
         {loading ? (
              [1, 2, 3, 4].map(i => <div key={i} className="h-40 bg-white rounded-2xl animate-pulse"></div>)
           ) : filteredSubjects.length > 0 ? filteredSubjects.map((item) => (
-          <div key={item.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all hover:-translate-y-1">
+          <div key={item.id} className={`bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all hover:-translate-y-1 ${item.status === 'inactive' ? 'opacity-60 grayscale-[0.5]' : ''}`}>
             <div className="flex justify-between items-start mb-4">
-              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${item.color || 'bg-slate-100 text-slate-600'}`}>
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${item.status === 'inactive' ? 'bg-slate-100 text-slate-400' : (item.color || 'bg-slate-100 text-slate-600')}`}>
                   <BookType className="w-6 h-6" />
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-1">
+                 <button 
+                  onClick={() => toggleStatus(item)}
+                  title={item.status === 'active' ? "Mark Unavailable" : "Mark Available"}
+                  className={`p-2 transition-all rounded-lg ${item.status === 'active' ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-amber-600 hover:text-green-600 hover:bg-green-50'}`}
+                 >
+                  {item.status === 'active' ? <Ban className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                 </button>
                  <button 
                   onClick={() => handleEdit(item)}
                   className="p-2 text-slate-400 hover:text-blue-600 transition-all hover:bg-blue-50 rounded-lg"
@@ -152,7 +170,8 @@ export default function SubjectsPage() {
                  </button>
               </div>
             </div>
-            <h3 className="text-lg font-bold text-slate-800 mb-1">{item.name}</h3>
+            <h3 className={`text-lg font-bold mb-1 ${item.status === 'inactive' ? 'text-slate-400' : 'text-slate-800'}`}>{item.name}</h3>
+            {item.status === 'inactive' && <p className="text-[10px] font-black uppercase text-amber-600 mb-2 tracking-tighter">Temporarily Unavailable</p>}
             <div className="flex items-center gap-2 text-xs font-bold text-slate-400 mb-4 tracking-widest uppercase">
                 <Hash className="w-3 h-3 text-primary" /> {item.subjectCode || 'No Code'}
             </div>

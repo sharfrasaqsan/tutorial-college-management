@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy, doc, deleteDoc } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, Search, Filter, Edit, Eye, Trash2 } from "lucide-react";
+import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle } from "lucide-react";
 import { Student } from "@/types/models";
 import Link from "next/link";
 import StudentModal from "@/components/admin/StudentModal";
@@ -38,6 +38,17 @@ export default function StudentsPage() {
   useEffect(() => {
     loadStudents();
   }, []);
+
+  const toggleStatus = async (student: Student) => {
+    try {
+      const newStatus = student.status === 'active' ? 'inactive' : 'active';
+      await updateDoc(doc(db, "students", student.id), { status: newStatus || 'active' });
+      toast.success(newStatus === 'active' ? "Student account restored." : "Student account suspended.");
+      loadStudents();
+    } catch {
+      toast.error("Status update failed.");
+    }
+  };
 
   const handleEdit = (student: Student) => {
     setSelectedStudent(student);
@@ -148,42 +159,49 @@ export default function StudentsPage() {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredStudents.length > 0 ? filteredStudents.map((student) => (
-                  <tr key={student.id} className="hover:bg-slate-50/50 transition-colors">
+                  <tr key={student.id} className={`hover:bg-slate-50/50 transition-colors ${student.status === 'inactive' ? 'opacity-60 bg-slate-50/30' : ''}`}>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${student.status === 'inactive' ? 'bg-slate-200 text-slate-500' : 'bg-primary/10 text-primary'}`}>
                           {student.name.charAt(0)}
                         </div>
                         <div>
-                          <p className="font-semibold text-slate-800">{student.name}</p>
+                          <p className={`font-semibold ${student.status === 'inactive' ? 'text-slate-500' : 'text-slate-800'}`}>{student.name}</p>
                           <p className="text-xs text-slate-500">ID: {student.id.substring(0,6).toUpperCase()}</p>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-slate-700">{student.phone}</p>
+                      <p className={`${student.status === 'inactive' ? 'text-slate-400' : 'text-slate-700'}`}>{student.phone}</p>
                       <p className="text-xs text-slate-500">{student.parentName}</p>
                     </td>
                     <td className="px-6 py-4 text-slate-600">{student.schoolName}</td>
                     <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-md text-xs font-semibold ${student.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>
-                        {student.status.toUpperCase()}
+                      <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${student.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {student.status === 'active' ? 'Active' : 'Suspended'}
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Link href={`/admin/students/${student.id}`} className="p-2 text-slate-400 hover:text-primary transition-colors">
+                        <button 
+                          onClick={() => toggleStatus(student)}
+                          title={student.status === 'active' ? "Suspend Account" : "Restore Account"}
+                          className={`p-2 transition-colors rounded-lg ${student.status === 'active' ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-amber-600 hover:text-green-600 hover:bg-green-50'}`}
+                        >
+                          {student.status === 'active' ? <Ban className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                        </button>
+                        <Link href={`/admin/students/${student.id}`} className="p-2 text-slate-400 hover:text-primary transition-colors hover:bg-slate-100 rounded-lg">
                           <Eye className="w-4 h-4" />
                         </Link>
                         <button 
                           onClick={() => handleEdit(student)}
-                          className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
+                          className="p-2 text-slate-400 hover:text-blue-600 transition-colors hover:bg-blue-50 rounded-lg"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button 
                           onClick={() => confirmDelete(student.id)}
-                          className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                          className="p-2 text-slate-400 hover:text-red-500 transition-colors hover:bg-red-50 rounded-lg"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

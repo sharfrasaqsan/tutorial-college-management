@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy, doc, deleteDoc } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Layers, Plus, Search, Filter, Calendar, User, Edit, Trash2 } from "lucide-react";
+import { Layers, Plus, Search, Filter, Calendar, User, Edit, Trash2, Ban, CheckCircle } from "lucide-react";
 import { Grade } from "@/types/models";
 import GradeModal from "@/components/admin/GradeModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
@@ -37,6 +37,17 @@ export default function GradesPage() {
   useEffect(() => {
     loadGrades();
   }, []);
+
+  const toggleStatus = async (item: Grade) => {
+    try {
+        const newStatus = item.status === 'active' ? 'inactive' : 'active';
+        await updateDoc(doc(db, "grades", item.id), { status: newStatus });
+        toast.success(newStatus === 'active' ? "Grade parameters restored." : "Grade parameters suspended.");
+        loadGrades();
+    } catch {
+        toast.error("Process failed.");
+    }
+  };
 
   const handleEdit = (grade: Grade) => {
     setSelectedGrade(grade);
@@ -145,14 +156,14 @@ export default function GradesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredGrades.length > 0 ? filteredGrades.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
+                 {filteredGrades.length > 0 ? filteredGrades.map((item) => (
+                  <tr key={item.id} className={`hover:bg-slate-50/50 transition-colors ${item.status === 'inactive' ? 'opacity-60 bg-slate-100/30' : ''}`}>
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold ${item.status === 'inactive' ? 'bg-slate-200 text-slate-500' : 'bg-primary/10 text-primary'}`}>
                            <Layers className="w-4 h-4" />
                         </div>
-                        <p className="font-bold text-slate-800">{item.name}</p>
+                        <p className={`font-bold ${item.status === 'inactive' ? 'text-slate-400' : 'text-slate-800'}`}>{item.name}</p>
                       </div>
                     </td>
                     <td className="px-6 py-5">
@@ -168,11 +179,18 @@ export default function GradesPage() {
                       </div>
                     </td>
                     <td className="px-6 py-5">
-                      <span className="px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider bg-green-100 text-green-700">
-                        Active
+                      <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${item.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {item.status === 'active' ? 'Active' : 'Suspended'}
                       </span>
                     </td>
                     <td className="px-6 py-5 text-right flex items-center justify-end gap-2">
+                        <button 
+                          onClick={() => toggleStatus(item)}
+                          title={item.status === 'active' ? "Suspend Grade" : "Restore Grade"}
+                          className={`p-2 transition-colors rounded-lg ${item.status === 'active' ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-amber-600 hover:text-green-600 hover:bg-green-50'}`}
+                        >
+                          {item.status === 'active' ? <Ban className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                        </button>
                         <button 
                           onClick={() => handleEdit(item)}
                           className="p-2 text-slate-400 hover:text-blue-600 transition-all hover:bg-blue-50 rounded-lg"
