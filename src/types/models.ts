@@ -1,0 +1,94 @@
+export interface Student {
+  id: string;
+  name: string;
+  phone: string;
+  parentName: string;
+  parentPhone?: string;
+  schoolName: string;
+  status: 'active' | 'inactive';
+  grade?: string;
+  createdAt?: unknown;
+}
+
+export interface Teacher {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  subjects: string[]; // List of subject names or IDs
+  grades: string[];   // List of grade names or IDs
+  employeeId?: string;
+  photoURL?: string;
+  assignedClasses?: string[];
+  status: 'active' | 'inactive';
+}
+
+export interface Class {
+  id: string;
+  name: string;
+  subject: string;
+  grade: string;
+  teacherId: string;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  room: string;
+  studentCount?: number;
+  status?: 'active' | 'inactive';
+}
+
+export interface Payment {
+  id: string;
+  studentId: string;
+  studentName: string;
+  amount: number;
+  month: string;
+  method: string;
+  description: string;
+  status: string;
+  createdAt: unknown;
+}
+
+export interface Salary {
+  id: string;
+  teacherId: string;
+  teacherName: string;
+  month: string;
+  basicAmount: number;
+  netAmount: number;
+  status: string;
+  createdAt: unknown;
+}
+
+export interface AttendanceRecord {
+  id: string;
+  classId: string;
+  date: string;
+  records: Record<string, boolean>;
+  createdAt: unknown;
+}
+
+export interface TimetableSlot {
+  id: string;
+  classId: string;
+  teacherId: string;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  room: string;
+}
+
+export interface Subject {
+  id: string;
+  name: string;
+  subjectCode: string;
+  studentCount?: number;
+  color?: string;
+}
+
+export interface Grade {
+  id: string;
+  name: string;
+  studentCount?: number;
+  classCount?: number;
+}
