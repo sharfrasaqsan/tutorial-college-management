@@ -1,14 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { collection, addDoc, getDocs, orderBy, serverTimestamp, query } from "firebase/firestore";
+import { collection, addDoc, getDocs, orderBy, serverTimestamp, query, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Loader2, User, Phone, MapPin, GraduationCap } from "lucide-react";
-import { Grade } from "@/types/models";
-import { useEffect } from "react";
+import { Grade, Student } from "@/types/models";
 import toast from "react-hot-toast";
 import Modal from "@/components/ui/Modal";
 
@@ -26,13 +25,14 @@ const studentSchema = z.object({
 
 type StudentForm = z.infer<typeof studentSchema>;
 
-interface AddStudentModalProps {
+interface StudentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialData?: Student | null;
 }
 
-export default function AddStudentModal({ isOpen, onClose, onSuccess }: AddStudentModalProps) {
+export default function StudentModal({ isOpen, onClose, onSuccess, initialData }: StudentModalProps) {
   const [loading, setLoading] = useState(false);
   const [grades, setGrades] = useState<Grade[]>([]);
 
@@ -62,27 +62,71 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }: AddStude
     }
   });
 
+  // Re-sync form when initialData changes or modal opens
+  useEffect(() => {
+    if (initialData) {
+      reset({
+        name: initialData.name,
+        phone: initialData.phone,
+        parentName: initialData.parentName,
+        parentPhone: initialData.parentPhone || "",
+        schoolName: initialData.schoolName,
+        address: initialData.address,
+        grade: initialData.grade || "",
+        gender: (initialData as any).gender || "male",
+        status: initialData.status,
+      });
+    } else {
+      reset({
+        name: "",
+        phone: "",
+        parentName: "",
+        parentPhone: "",
+        schoolName: "",
+        address: "",
+        grade: "",
+        gender: "male",
+        status: "active",
+      });
+    }
+  }, [initialData, reset, isOpen]);
+
   const onSubmit = async (data: StudentForm) => {
     setLoading(true);
     try {
-      await addDoc(collection(db, "students"), {
-        ...data,
-        createdAt: serverTimestamp(),
-      });
-      toast.success("Student successfully added!");
+      if (initialData) {
+        // Update
+        const studentRef = doc(db, "students", initialData.id);
+        await updateDoc(studentRef, {
+          ...data,
+          updatedAt: serverTimestamp(),
+        });
+        toast.success("Student profile updated!");
+      } else {
+        // Create
+        await addDoc(collection(db, "students"), {
+          ...data,
+          createdAt: serverTimestamp(),
+        });
+        toast.success("Student successfully registered!");
+      }
       reset();
       onSuccess();
       onClose();
     } catch (error) {
-      console.error("Error adding student:", error);
-      toast.error("Failed to add student. Please try again.");
+      console.error("Error saving student:", error);
+      toast.error(`Error: ${initialData ? 'Update' : 'Creation'} failed.`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Register New Student">
+    <Modal 
+        isOpen={isOpen} 
+        onClose={onClose} 
+        title={initialData ? "Modify Student Profile" : "Register New Student"}
+    >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Basic Info */}
@@ -208,7 +252,7 @@ export default function AddStudentModal({ isOpen, onClose, onSuccess }: AddStude
             disabled={loading}
             className="w-full sm:w-auto px-8 py-2.5 bg-primary text-white rounded-xl text-sm font-black hover:bg-primary-dark transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Complete Registration"}
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Update Record" : "Complete Registration")}
           </button>
         </div>
       </form>

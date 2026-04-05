@@ -11,6 +11,8 @@ export interface Student {
   parentName: string;
   parentPhone?: string;
   schoolName: string;
+  address: string;
+  gender: 'male' | 'female' | 'other';
   status: 'active' | 'inactive';
   grade?: string;
   createdAt?: FirestoreTimestamp;

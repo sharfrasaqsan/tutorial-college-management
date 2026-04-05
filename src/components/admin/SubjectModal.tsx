@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Loader2, BookType, Palette } from "lucide-react";
 import toast from "react-hot-toast";
 import Modal from "@/components/ui/Modal";
+import { Subject } from "@/types/models";
 
 const subjectSchema = z.object({
   name: z.string().min(3, "Subject name must be at least 3 characters"),
@@ -18,13 +19,14 @@ const subjectSchema = z.object({
 
 type SubjectForm = z.infer<typeof subjectSchema>;
 
-interface AddSubjectModalProps {
+interface SubjectModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialData?: Subject | null;
 }
 
-export default function AddSubjectModal({ isOpen, onClose, onSuccess }: AddSubjectModalProps) {
+export default function SubjectModal({ isOpen, onClose, onSuccess, initialData }: SubjectModalProps) {
   const [loading, setLoading] = useState(false);
 
   const colors = [
@@ -48,28 +50,56 @@ export default function AddSubjectModal({ isOpen, onClose, onSuccess }: AddSubje
     }
   });
 
+  useEffect(() => {
+    if (initialData) {
+      reset({
+        name: initialData.name,
+        subjectCode: initialData.subjectCode,
+        color: initialData.color || "bg-emerald-100 text-emerald-600",
+      });
+    } else {
+      reset({
+        name: "",
+        subjectCode: "",
+        color: "bg-emerald-100 text-emerald-600",
+      });
+    }
+  }, [initialData, reset, isOpen]);
+
   const onSubmit = async (data: SubjectForm) => {
     setLoading(true);
     try {
-      await addDoc(collection(db, "subjects"), {
-        ...data,
-        studentCount: 0,
-        createdAt: serverTimestamp(),
-      });
-      toast.success("New subject category added!");
+      if (initialData) {
+        await updateDoc(doc(db, "subjects", initialData.id), {
+          ...data,
+          updatedAt: serverTimestamp(),
+        });
+        toast.success("Subject definition updated!");
+      } else {
+        await addDoc(collection(db, "subjects"), {
+          ...data,
+          studentCount: 0,
+          createdAt: serverTimestamp(),
+        });
+        toast.success("New subject category added!");
+      }
       reset();
       onSuccess();
       onClose();
     } catch (error) {
-      console.error("Error adding subject:", error);
-      toast.error("Failed to add subject category.");
+      console.error("Error saving subject:", error);
+      toast.error("Process failed. Please verify connection.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Define Curricular Subject">
+    <Modal 
+        isOpen={isOpen} 
+        onClose={onClose} 
+        title={initialData ? "Modify Subject Definition" : "Define Curricular Subject"}
+    >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -129,7 +159,7 @@ export default function AddSubjectModal({ isOpen, onClose, onSuccess }: AddSubje
             disabled={loading}
             className="w-full sm:w-auto px-8 py-2.5 bg-primary text-white rounded-xl text-sm font-black hover:bg-primary-dark transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Subject"}
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Save Changes" : "Create Subject")}
           </button>
         </div>
       </form>

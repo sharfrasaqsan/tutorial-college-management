@@ -1,18 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, Search, Filter, Edit, Eye } from "lucide-react";
+import { Plus, Search, Filter, Edit, Eye, Trash2 } from "lucide-react";
 import { Student } from "@/types/models";
 import Link from "next/link";
-import AddStudentModal from "@/components/admin/AddStudentModal";
+import StudentModal from "@/components/admin/StudentModal";
+import toast from "react-hot-toast";
 
 export default function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
   const loadStudents = async () => {
     setLoading(true);
@@ -31,6 +33,29 @@ export default function StudentsPage() {
     loadStudents();
   }, []);
 
+  const handleEdit = (student: Student) => {
+    setSelectedStudent(student);
+    setIsModalOpen(true);
+  };
+
+  const handleAdd = () => {
+    setSelectedStudent(null);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm("Are you sure you want to delete this student? This action cannot be undone.")) {
+      try {
+        await deleteDoc(doc(db, "students", id));
+        toast.success("Student record deleted.");
+        loadStudents();
+      } catch (error) {
+        console.error("Error deleting student:", error);
+        toast.error("Failed to delete student.");
+      }
+    }
+  };
+
   const filteredStudents = students.filter(s => 
     s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.phone.includes(searchTerm)
@@ -44,17 +69,21 @@ export default function StudentsPage() {
           <p className="text-sm text-slate-500">Manage all student enrollments and records.</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleAdd}
           className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-dark transition-colors flex items-center gap-2 shadow-sm shadow-primary/20"
         >
           <Plus className="w-4 h-4" /> Add Student
         </button>
       </div>
 
-      <AddStudentModal 
+      <StudentModal 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedStudent(null);
+        }} 
         onSuccess={loadStudents}
+        initialData={selectedStudent}
       />
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
@@ -119,8 +148,17 @@ export default function StudentsPage() {
                         <Link href={`/admin/students/${student.id}`} className="p-2 text-slate-400 hover:text-primary transition-colors">
                           <Eye className="w-4 h-4" />
                         </Link>
-                        <button className="p-2 text-slate-400 hover:text-slate-700 transition-colors">
+                        <button 
+                          onClick={() => handleEdit(student)}
+                          className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
+                        >
                           <Edit className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(student.id)}
+                          className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>

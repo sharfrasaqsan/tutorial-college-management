@@ -1,18 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, BookOpen, Clock, Users, Calendar } from "lucide-react";
+import { Plus, BookOpen, Clock, Users, Calendar, Edit, Trash2 } from "lucide-react";
 import { Class } from "@/types/models";
 import Link from "next/link";
-import AddClassModal from "@/components/admin/AddClassModal";
+import ClassModal from "@/components/admin/ClassModal";
+import toast from "react-hot-toast";
 
 export default function ClassesPage() {
   const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedClass, setSelectedClass] = useState<Class | null>(null);
 
   const loadClasses = async () => {
     setLoading(true);
@@ -31,6 +33,28 @@ export default function ClassesPage() {
     loadClasses();
   }, []);
 
+  const handleEdit = (item: Class) => {
+    setSelectedClass(item);
+    setIsModalOpen(true);
+  };
+
+  const handleAdd = () => {
+    setSelectedClass(null);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm("Are you sure? Terminating this class session will remove its current schedule.")) {
+      try {
+        await deleteDoc(doc(db, "classes", id));
+        toast.success("Class schedule removed.");
+        loadClasses();
+      } catch (error) {
+        toast.error("Failed to terminate class.");
+      }
+    }
+  };
+
   const filteredClasses = classes.filter(c => 
     c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.subject?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -44,17 +68,21 @@ export default function ClassesPage() {
           <p className="text-sm text-slate-500">Monitor and schedule academic sessions.</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleAdd}
           className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-dark transition-colors flex items-center gap-2 shadow-sm shadow-primary/20"
         >
           <Plus className="w-4 h-4" /> Create Class
         </button>
       </div>
 
-      <AddClassModal 
+      <ClassModal 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        onClose={() => {
+            setIsModalOpen(false);
+            setSelectedClass(null);
+        }} 
         onSuccess={loadClasses}
+        initialData={selectedClass}
       />
 
       <div className="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center bg-slate-50/50">
@@ -125,11 +153,20 @@ export default function ClassesPage() {
             </div>
 
             <div className="mt-6 pt-6 border-t border-slate-50 flex gap-2">
-              <Link href={`/admin/classes/${item.id}`} className="flex-1 px-3 py-2 bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold text-center hover:bg-slate-100 transition-colors">
+              <Link href={`/admin/classes/${item.id}`} className="flex-1 px-3 py-2 bg-slate-50 text-slate-700 rounded-lg text-[10px] font-black uppercase tracking-widest text-center hover:bg-slate-100 transition-colors">
                 Details
               </Link>
-              <button className="flex-1 px-3 py-2 bg-primary/5 text-primary rounded-lg text-xs font-semibold hover:bg-primary/10 transition-colors">
-                Manage
+              <button 
+                onClick={() => handleEdit(item)}
+                className="flex-1 px-3 py-2 bg-blue-50 text-blue-700 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition-colors"
+              >
+                Edit
+              </button>
+              <button 
+                onClick={() => handleDelete(item.id)}
+                className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
               </button>
             </div>
           </div>

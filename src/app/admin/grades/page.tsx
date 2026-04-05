@@ -1,17 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Layers, Plus, Search, Filter, Calendar, User, Edit } from "lucide-react";
+import { Layers, Plus, Search, Filter, Calendar, User, Edit, Trash2 } from "lucide-react";
 import { Grade } from "@/types/models";
-import AddGradeModal from "@/components/admin/AddGradeModal";
+import GradeModal from "@/components/admin/GradeModal";
+import toast from "react-hot-toast";
 
 export default function GradesPage() {
   const [grades, setGrades] = useState<Grade[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedGrade, setSelectedGrade] = useState<Grade | null>(null);
 
   const loadGrades = async () => {
     setLoading(true);
@@ -30,6 +32,28 @@ export default function GradesPage() {
     loadGrades();
   }, []);
 
+  const handleEdit = (grade: Grade) => {
+    setSelectedGrade(grade);
+    setIsModalOpen(true);
+  };
+
+  const handleAdd = () => {
+    setSelectedGrade(null);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm("Are you sure? Removing this grade level may disrupt linked student and class records.")) {
+      try {
+        await deleteDoc(doc(db, "grades", id));
+        toast.success("Grade level removed.");
+        loadGrades();
+      } catch (error) {
+        toast.error("Failed to delete record.");
+      }
+    }
+  };
+
   const filteredGrades = grades.filter(g => 
     g.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -42,17 +66,21 @@ export default function GradesPage() {
           <p className="text-sm text-slate-500">Configure academic levels and their requirements.</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleAdd}
           className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-dark transition-colors flex items-center gap-2 shadow-sm shadow-primary/20"
         >
           <Plus className="w-4 h-4" /> Add Grade Level
         </button>
       </div>
 
-      <AddGradeModal 
+      <GradeModal 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        onClose={() => {
+            setIsModalOpen(false);
+            setSelectedGrade(null);
+        }} 
         onSuccess={loadGrades}
+        initialData={selectedGrade}
       />
 
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
@@ -116,10 +144,19 @@ export default function GradesPage() {
                         Active
                       </span>
                     </td>
-                    <td className="px-6 py-5 text-right">
-                       <button className="p-2 text-slate-400 hover:text-slate-800 transition-all hover:bg-slate-100 rounded-lg">
-                        <Edit className="w-4 h-4" />
-                       </button>
+                    <td className="px-6 py-5 text-right flex items-center justify-end gap-2">
+                        <button 
+                          onClick={() => handleEdit(item)}
+                          className="p-2 text-slate-400 hover:text-blue-600 transition-all hover:bg-blue-50 rounded-lg"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(item.id)}
+                          className="p-2 text-slate-400 hover:text-red-500 transition-all hover:bg-red-50 rounded-lg"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                     </td>
                   </tr>
                 )) : (

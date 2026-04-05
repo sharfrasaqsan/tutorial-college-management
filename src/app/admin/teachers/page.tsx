@@ -1,18 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, Search, Filter, Edit, Eye } from "lucide-react";
+import { Plus, Search, Filter, Edit, Eye, Trash2 } from "lucide-react";
 import { Teacher } from "@/types/models";
 import Link from "next/link";
-import AddTeacherModal from "@/components/admin/AddTeacherModal";
+import TeacherModal from "@/components/admin/TeacherModal";
+import toast from "react-hot-toast";
 
 export default function TeachersPage() {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
 
   const loadTeachers = async () => {
     setLoading(true);
@@ -31,6 +33,30 @@ export default function TeachersPage() {
     loadTeachers();
   }, []);
 
+  const handleEdit = (teacher: Teacher) => {
+    setSelectedTeacher(teacher);
+    setIsModalOpen(true);
+  };
+
+  const handleAdd = () => {
+    setSelectedTeacher(null);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm("Are you sure you want to delete this faculty member? Their profile and system access record will be removed.")) {
+        try {
+            await deleteDoc(doc(db, "teachers", id));
+            await deleteDoc(doc(db, "users", id));
+            toast.success("Teacher records removed.");
+            loadTeachers();
+        } catch (error) {
+            console.error("Error deleting teacher:", error);
+            toast.error("Failed to delete record.");
+        }
+    }
+  };
+
   const filteredTeachers = teachers.filter(t => 
     t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     t.subjects?.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -44,17 +70,21 @@ export default function TeachersPage() {
           <p className="text-sm text-slate-500">Manage faculty members and their assignments.</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleAdd}
           className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-dark transition-colors flex items-center gap-2 shadow-sm shadow-primary/20"
         >
           <Plus className="w-4 h-4" /> Add Teacher
         </button>
       </div>
 
-      <AddTeacherModal 
+      <TeacherModal 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        onClose={() => {
+            setIsModalOpen(false);
+            setSelectedTeacher(null);
+        }} 
         onSuccess={loadTeachers}
+        initialData={selectedTeacher}
       />
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
@@ -139,8 +169,17 @@ export default function TeachersPage() {
                         <Link href={`/admin/teachers/${teacher.id}`} className="p-2 text-slate-400 hover:text-primary transition-colors">
                           <Eye className="w-4 h-4" />
                         </Link>
-                        <button className="p-2 text-slate-400 hover:text-slate-700 transition-colors">
+                        <button 
+                          onClick={() => handleEdit(teacher)}
+                          className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
+                        >
                           <Edit className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(teacher.id)}
+                          className="p-2 text-slate-400 hover:text-red-500 transition-colors"
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>

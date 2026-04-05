@@ -1,17 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, doc, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, BookType, Hash, Search, Filter, BookOpen } from "lucide-react";
+import { Plus, BookType, Hash, Search, Filter, BookOpen, Edit, Trash2 } from "lucide-react";
 import { Subject } from "@/types/models";
-import AddSubjectModal from "@/components/admin/AddSubjectModal";
+import SubjectModal from "@/components/admin/SubjectModal";
+import toast from "react-hot-toast";
 
 export default function SubjectsPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
 
   const loadSubjects = async () => {
     setLoading(true);
@@ -30,6 +32,28 @@ export default function SubjectsPage() {
     loadSubjects();
   }, []);
 
+  const handleEdit = (subject: Subject) => {
+    setSelectedSubject(subject);
+    setIsModalOpen(true);
+  };
+
+  const handleAdd = () => {
+    setSelectedSubject(null);
+    setIsModalOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm("Are you sure? Removing this subject will remove it from all future class selections.")) {
+      try {
+        await deleteDoc(doc(db, "subjects", id));
+        toast.success("Subject removed.");
+        loadSubjects();
+      } catch (error) {
+        toast.error("Deletion failed.");
+      }
+    }
+  };
+
   const filteredSubjects = subjects.filter(s => 
     s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.subjectCode?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -43,17 +67,21 @@ export default function SubjectsPage() {
           <p className="text-sm text-slate-500">Manage all academic subjects and curriculum details.</p>
         </div>
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={handleAdd}
           className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-dark transition-colors flex items-center gap-2 shadow-sm shadow-primary/20"
         >
           <Plus className="w-4 h-4" /> Add New Subject
         </button>
       </div>
 
-      <AddSubjectModal 
+      <SubjectModal 
         isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
+        onClose={() => {
+            setIsModalOpen(false);
+            setSelectedSubject(null);
+        }} 
         onSuccess={loadSubjects}
+        initialData={selectedSubject}
       />
 
       <div className="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center bg-slate-50/50">
@@ -77,8 +105,24 @@ export default function SubjectsPage() {
              [1, 2, 3, 4].map(i => <div key={i} className="h-40 bg-white rounded-2xl animate-pulse"></div>)
           ) : filteredSubjects.length > 0 ? filteredSubjects.map((item) => (
           <div key={item.id} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all hover:-translate-y-1">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${item.color || 'bg-slate-100 text-slate-600'}`}>
-                <BookType className="w-6 h-6" />
+            <div className="flex justify-between items-start mb-4">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${item.color || 'bg-slate-100 text-slate-600'}`}>
+                  <BookType className="w-6 h-6" />
+              </div>
+              <div className="flex gap-2">
+                 <button 
+                  onClick={() => handleEdit(item)}
+                  className="p-2 text-slate-400 hover:text-blue-600 transition-all hover:bg-blue-50 rounded-lg"
+                 >
+                  <Edit className="w-4 h-4" />
+                 </button>
+                 <button 
+                  onClick={() => handleDelete(item.id)}
+                  className="p-2 text-slate-400 hover:text-red-500 transition-all hover:bg-red-50 rounded-lg"
+                 >
+                  <Trash2 className="w-4 h-4" />
+                 </button>
+              </div>
             </div>
             <h3 className="text-lg font-bold text-slate-800 mb-1">{item.name}</h3>
             <div className="flex items-center gap-2 text-xs font-bold text-slate-400 mb-4 tracking-widest uppercase">

@@ -4,10 +4,10 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { collection, addDoc, getDocs, query, orderBy, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Loader2, BookOpen, Calendar, Clock, MapPin } from "lucide-react";
-import { Teacher, Grade, Subject } from "@/types/models";
+import { Teacher, Grade, Subject, Class } from "@/types/models";
 import toast from "react-hot-toast";
 import Modal from "@/components/ui/Modal";
 
@@ -25,13 +25,14 @@ const classSchema = z.object({
 
 type ClassForm = z.infer<typeof classSchema>;
 
-interface AddClassModalProps {
+interface ClassModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialData?: Class | null;
 }
 
-export default function AddClassModal({ isOpen, onClose, onSuccess }: AddClassModalProps) {
+export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: ClassModalProps) {
   const [loading, setLoading] = useState(false);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
@@ -69,37 +70,78 @@ export default function AddClassModal({ isOpen, onClose, onSuccess }: AddClassMo
     }
   });
 
+  useEffect(() => {
+    if (initialData) {
+      reset({
+        name: initialData.name,
+        subjectId: (initialData as any).subjectId || "",
+        gradeId: (initialData as any).gradeId || "",
+        teacherId: initialData.teacherId,
+        dayOfWeek: initialData.dayOfWeek,
+        startTime: initialData.startTime,
+        endTime: initialData.endTime,
+        room: initialData.room,
+        status: initialData.status || "active",
+      });
+    } else {
+      reset({
+        name: "",
+        subjectId: "",
+        gradeId: "",
+        teacherId: "",
+        dayOfWeek: "monday",
+        startTime: "",
+        endTime: "",
+        room: "",
+        status: "active",
+      });
+    }
+  }, [initialData, reset, isOpen]);
+
   const onSubmit = async (data: ClassForm) => {
     setLoading(true);
     try {
-      // Find names for denormalization to keep dashboard quick
       const selectedTeacher = teachers.find(t => t.id === data.teacherId);
       const selectedSubject = subjects.find(s => s.id === data.subjectId);
       const selectedGrade = grades.find(g => g.id === data.gradeId);
 
-      await addDoc(collection(db, "classes"), {
+      const classData = {
         ...data,
         teacherName: selectedTeacher?.name || "",
         subjectName: selectedSubject?.name || "",
         gradeName: selectedGrade?.name || "",
-        studentCount: 0,
-        createdAt: serverTimestamp(),
-      });
+        updatedAt: serverTimestamp(),
+      };
 
-      toast.success("Class successfully scheduled!");
+      if (initialData) {
+        await updateDoc(doc(db, "classes", initialData.id), classData);
+        toast.success("Class schedule updated!");
+      } else {
+        await addDoc(collection(db, "classes"), {
+          ...classData,
+          studentCount: 0,
+          createdAt: serverTimestamp(),
+        });
+        toast.success("New class successfully scheduled!");
+      }
+
       reset();
       onSuccess();
       onClose();
     } catch (error) {
-      console.error("Error adding class:", error);
-      toast.error("Failed to schedule class. Please try again.");
+      console.error("Error saving class:", error);
+      toast.error("Failed to save class schedule.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Schedule New Academic Class">
+    <Modal 
+        isOpen={isOpen} 
+        onClose={onClose} 
+        title={initialData ? "Adjust Class Schedule" : "Schedule New Academic Class"}
+    >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Module Selection */}
@@ -229,7 +271,7 @@ export default function AddClassModal({ isOpen, onClose, onSuccess }: AddClassMo
             disabled={loading}
             className="w-full sm:w-auto px-8 py-2.5 bg-primary text-white rounded-xl text-sm font-black hover:bg-primary-dark transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Authorize Class"}
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Apply Adjustment" : "Authorize Class")}
           </button>
         </div>
       </form>

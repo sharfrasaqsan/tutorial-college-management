@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Loader2, Info } from "lucide-react";
 import toast from "react-hot-toast";
 import Modal from "@/components/ui/Modal";
+import { Grade } from "@/types/models";
 
 const gradeSchema = z.object({
   name: z.string().min(1, "Grade name is required"),
@@ -17,13 +18,14 @@ const gradeSchema = z.object({
 
 type GradeForm = z.infer<typeof gradeSchema>;
 
-interface AddGradeModalProps {
+interface GradeModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  initialData?: Grade | null;
 }
 
-export default function AddGradeModal({ isOpen, onClose, onSuccess }: AddGradeModalProps) {
+export default function GradeModal({ isOpen, onClose, onSuccess, initialData }: GradeModalProps) {
   const [loading, setLoading] = useState(false);
 
   const {
@@ -35,29 +37,55 @@ export default function AddGradeModal({ isOpen, onClose, onSuccess }: AddGradeMo
     resolver: zodResolver(gradeSchema),
   });
 
+  useEffect(() => {
+    if (initialData) {
+      reset({
+        name: initialData.name,
+        level: (initialData as any).level || "",
+      });
+    } else {
+      reset({
+        name: "",
+        level: "",
+      });
+    }
+  }, [initialData, reset, isOpen]);
+
   const onSubmit = async (data: GradeForm) => {
     setLoading(true);
     try {
-      await addDoc(collection(db, "grades"), {
-        ...data,
-        studentCount: 0,
-        classCount: 0,
-        createdAt: serverTimestamp(),
-      });
-      toast.success("Grade level initialized!");
+      if (initialData) {
+        await updateDoc(doc(db, "grades", initialData.id), {
+          ...data,
+          updatedAt: serverTimestamp(),
+        });
+        toast.success("Grade Configuration Updated!");
+      } else {
+        await addDoc(collection(db, "grades"), {
+          ...data,
+          studentCount: 0,
+          classCount: 0,
+          createdAt: serverTimestamp(),
+        });
+        toast.success("Grade Level Initialized!");
+      }
       reset();
       onSuccess();
       onClose();
     } catch (error) {
-      console.error("Error adding grade:", error);
-      toast.error("Failed to initialize grade level.");
+      console.error("Error saving grade:", error);
+      toast.error(`Operation Failed: ${error instanceof Error ? error.message : 'Unknown Error'}`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Configure Academic Level">
+    <Modal 
+        isOpen={isOpen} 
+        onClose={onClose} 
+        title={initialData ? "Edit Academic Configuration" : "New Grade Level"}
+    >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="space-y-4">
             <div className="space-y-1">
@@ -88,7 +116,7 @@ export default function AddGradeModal({ isOpen, onClose, onSuccess }: AddGradeMo
             <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex gap-3 text-amber-700">
                <Info className="w-5 h-5 flex-shrink-0" />
                <p className="text-xs font-medium leading-relaxed">
-                 Initializing a grade level allows you to categorize classes and enrollments correctly. You cannot delete a grade once it has active enrollments.
+                 {initialData ? "Modifying this level will affect all future categorizations using this grade." : "Initializing a grade level allows you to categorize classes and enrollments correctly. You cannot delete a grade once it has active enrollments."}
                </p>
             </div>
         </div>
@@ -106,7 +134,7 @@ export default function AddGradeModal({ isOpen, onClose, onSuccess }: AddGradeMo
             disabled={loading}
             className="w-full sm:w-auto px-8 py-2.5 bg-primary text-white rounded-xl text-sm font-black hover:bg-primary-dark transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Initialize Level"}
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Save Changes" : "Initialize Level")}
           </button>
         </div>
       </form>
