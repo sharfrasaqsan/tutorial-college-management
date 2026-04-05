@@ -7,6 +7,7 @@ import { Plus, Search, Filter, Edit, Eye, Trash2 } from "lucide-react";
 import { Student } from "@/types/models";
 import Link from "next/link";
 import StudentModal from "@/components/admin/StudentModal";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 import toast from "react-hot-toast";
 
 export default function StudentsPage() {
@@ -15,6 +16,11 @@ export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  
+  // Delete State
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [studentToDelete, setStudentToDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadStudents = async () => {
     setLoading(true);
@@ -43,16 +49,25 @@ export default function StudentsPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this student? This action cannot be undone.")) {
-      try {
-        await deleteDoc(doc(db, "students", id));
-        toast.success("Student record deleted.");
+  const confirmDelete = (id: string) => {
+    setStudentToDelete(id);
+    setIsDeleteOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!studentToDelete) return;
+    setDeleting(true);
+    try {
+        await deleteDoc(doc(db, "students", studentToDelete));
+        toast.success("Student record purged.");
+        setIsDeleteOpen(false);
+        setStudentToDelete(null);
         loadStudents();
-      } catch (error) {
+    } catch (error) {
         console.error("Error deleting student:", error);
-        toast.error("Failed to delete student.");
-      }
+        toast.error("Process failed.");
+    } finally {
+        setDeleting(false);
     }
   };
 
@@ -84,6 +99,18 @@ export default function StudentsPage() {
         }} 
         onSuccess={loadStudents}
         initialData={selectedStudent}
+      />
+
+      <ConfirmModal 
+        isOpen={isDeleteOpen}
+        onClose={() => {
+            setIsDeleteOpen(false);
+            setStudentToDelete(null);
+        }}
+        onConfirm={handleDelete}
+        loading={deleting}
+        title="Delete Student Record"
+        message="This action will permanently remove all enrollment data, attendance history, and payment logs associated with this student from the cloud. This cannot be undone."
       />
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
@@ -155,7 +182,7 @@ export default function StudentsPage() {
                           <Edit className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => handleDelete(student.id)}
+                          onClick={() => confirmDelete(student.id)}
                           className="p-2 text-slate-400 hover:text-red-500 transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />

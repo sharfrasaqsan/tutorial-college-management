@@ -7,6 +7,8 @@ import { Plus, Search, Filter, Edit, Eye, Trash2 } from "lucide-react";
 import { Teacher } from "@/types/models";
 import Link from "next/link";
 import TeacherModal from "@/components/admin/TeacherModal";
+import ConfirmModal from "@/components/ui/ConfirmModal";
+import NextImage from "next/image";
 import toast from "react-hot-toast";
 
 export default function TeachersPage() {
@@ -15,6 +17,11 @@ export default function TeachersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+
+  // Delete State
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [teacherToDelete, setTeacherToDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadTeachers = async () => {
     setLoading(true);
@@ -43,17 +50,26 @@ export default function TeachersPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Are you sure you want to delete this faculty member? Their profile and system access record will be removed.")) {
-        try {
-            await deleteDoc(doc(db, "teachers", id));
-            await deleteDoc(doc(db, "users", id));
-            toast.success("Teacher records removed.");
-            loadTeachers();
-        } catch (error) {
-            console.error("Error deleting teacher:", error);
-            toast.error("Failed to delete record.");
-        }
+  const confirmDelete = (id: string) => {
+    setTeacherToDelete(id);
+    setIsDeleteOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!teacherToDelete) return;
+    setDeleting(true);
+    try {
+        await deleteDoc(doc(db, "teachers", teacherToDelete));
+        await deleteDoc(doc(db, "users", teacherToDelete));
+        toast.success("Faculty records purged.");
+        setIsDeleteOpen(false);
+        setTeacherToDelete(null);
+        loadTeachers();
+    } catch (error) {
+        console.error("Error deleting teacher:", error);
+        toast.error("Process failed.");
+    } finally {
+        setDeleting(false);
     }
   };
 
@@ -85,6 +101,18 @@ export default function TeachersPage() {
         }} 
         onSuccess={loadTeachers}
         initialData={selectedTeacher}
+      />
+
+      <ConfirmModal 
+        isOpen={isDeleteOpen}
+        onClose={() => {
+            setIsDeleteOpen(false);
+            setTeacherToDelete(null);
+        }}
+        onConfirm={handleDelete}
+        loading={deleting}
+        title="Revoke Faculty Access"
+        message="De-registering this teacher will permanently terminate their system access and remove their profile from the faculty directory. All linked class associations will remain but will require a new instructor assignment."
       />
 
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
@@ -125,9 +153,14 @@ export default function TeachersPage() {
                   <tr key={teacher.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold overflow-hidden border border-slate-200">
+                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold overflow-hidden border border-slate-200 relative">
                           {teacher.photoURL ? (
-                            <img src={teacher.photoURL} alt={teacher.name} className="w-full h-full object-cover" />
+                            <NextImage 
+                                src={teacher.photoURL} 
+                                alt={teacher.name} 
+                                fill 
+                                className="object-cover" 
+                            />
                           ) : (
                             teacher.name.charAt(0)
                           )}
@@ -176,7 +209,7 @@ export default function TeachersPage() {
                           <Edit className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => handleDelete(teacher.id)}
+                          onClick={() => confirmDelete(teacher.id)}
                           className="p-2 text-slate-400 hover:text-red-500 transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />

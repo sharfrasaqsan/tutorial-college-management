@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { Plus, BookType, Hash, Search, Filter, BookOpen, Edit, Trash2 } from "lucide-react";
 import { Subject } from "@/types/models";
 import SubjectModal from "@/components/admin/SubjectModal";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 import toast from "react-hot-toast";
 
 export default function SubjectsPage() {
@@ -14,6 +15,11 @@ export default function SubjectsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+
+  // Delete State
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [subjectToDelete, setSubjectToDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadSubjects = async () => {
     setLoading(true);
@@ -42,15 +48,25 @@ export default function SubjectsPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Are you sure? Removing this subject will remove it from all future class selections.")) {
-      try {
-        await deleteDoc(doc(db, "subjects", id));
-        toast.success("Subject removed.");
+  const confirmDelete = (id: string) => {
+    setSubjectToDelete(id);
+    setIsDeleteOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!subjectToDelete) return;
+    setDeleting(true);
+    try {
+        await deleteDoc(doc(db, "subjects", subjectToDelete));
+        toast.success("Subject definition purged.");
+        setIsDeleteOpen(false);
+        setSubjectToDelete(null);
         loadSubjects();
-      } catch (error) {
-        toast.error("Deletion failed.");
-      }
+    } catch (error) {
+        console.error("Error deleting subject:", error);
+        toast.error("Process failed.");
+    } finally {
+        setDeleting(false);
     }
   };
 
@@ -82,6 +98,18 @@ export default function SubjectsPage() {
         }} 
         onSuccess={loadSubjects}
         initialData={selectedSubject}
+      />
+
+      <ConfirmModal 
+        isOpen={isDeleteOpen}
+        onClose={() => {
+            setIsDeleteOpen(false);
+            setSubjectToDelete(null);
+        }}
+        onConfirm={handleDelete}
+        loading={deleting}
+        title="Purge Subject Definition"
+        message="Are you sure you want to remove this subject? All academic linkings and curriculum mappings for this subject will be dissolved. Historical records will be archived but not editable."
       />
 
       <div className="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center bg-slate-50/50">
@@ -117,7 +145,7 @@ export default function SubjectsPage() {
                   <Edit className="w-4 h-4" />
                  </button>
                  <button 
-                  onClick={() => handleDelete(item.id)}
+                  onClick={() => confirmDelete(item.id)}
                   className="p-2 text-slate-400 hover:text-red-500 transition-all hover:bg-red-50 rounded-lg"
                  >
                   <Trash2 className="w-4 h-4" />

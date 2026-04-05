@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { Layers, Plus, Search, Filter, Calendar, User, Edit, Trash2 } from "lucide-react";
 import { Grade } from "@/types/models";
 import GradeModal from "@/components/admin/GradeModal";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 import toast from "react-hot-toast";
 
 export default function GradesPage() {
@@ -14,6 +15,11 @@ export default function GradesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedGrade, setSelectedGrade] = useState<Grade | null>(null);
+
+  // Delete State
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [gradeToDelete, setGradeToDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadGrades = async () => {
     setLoading(true);
@@ -42,15 +48,25 @@ export default function GradesPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Are you sure? Removing this grade level may disrupt linked student and class records.")) {
-      try {
-        await deleteDoc(doc(db, "grades", id));
-        toast.success("Grade level removed.");
+  const confirmDelete = (id: string) => {
+    setGradeToDelete(id);
+    setIsDeleteOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!gradeToDelete) return;
+    setDeleting(true);
+    try {
+        await deleteDoc(doc(db, "grades", gradeToDelete));
+        toast.success("Grade parameter removed.");
+        setIsDeleteOpen(false);
+        setGradeToDelete(null);
         loadGrades();
-      } catch (error) {
-        toast.error("Failed to delete record.");
-      }
+    } catch (error) {
+        console.error("Error deleting grade:", error);
+        toast.error("Process failed.");
+    } finally {
+        setDeleting(false);
     }
   };
 
@@ -81,6 +97,18 @@ export default function GradesPage() {
         }} 
         onSuccess={loadGrades}
         initialData={selectedGrade}
+      />
+
+      <ConfirmModal 
+        isOpen={isDeleteOpen}
+        onClose={() => {
+            setIsDeleteOpen(false);
+            setGradeToDelete(null);
+        }}
+        onConfirm={handleDelete}
+        loading={deleting}
+        title="Remove Grade Parameter"
+        message="Are you sure you want to delete this grade level? This may cause inconsistencies in student reporting and historical class data."
       />
 
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
@@ -152,7 +180,7 @@ export default function GradesPage() {
                           <Edit className="w-4 h-4" />
                         </button>
                         <button 
-                          onClick={() => handleDelete(item.id)}
+                          onClick={() => confirmDelete(item.id)}
                           className="p-2 text-slate-400 hover:text-red-500 transition-all hover:bg-red-50 rounded-lg"
                         >
                           <Trash2 className="w-4 h-4" />

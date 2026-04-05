@@ -7,6 +7,7 @@ import { Plus, BookOpen, Clock, Users, Calendar, Edit, Trash2 } from "lucide-rea
 import { Class } from "@/types/models";
 import Link from "next/link";
 import ClassModal from "@/components/admin/ClassModal";
+import ConfirmModal from "@/components/ui/ConfirmModal";
 import toast from "react-hot-toast";
 
 export default function ClassesPage() {
@@ -15,6 +16,11 @@ export default function ClassesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
+
+  // Delete State
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [classToDelete, setClassToDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadClasses = async () => {
     setLoading(true);
@@ -43,15 +49,25 @@ export default function ClassesPage() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Are you sure? Terminating this class session will remove its current schedule.")) {
-      try {
-        await deleteDoc(doc(db, "classes", id));
-        toast.success("Class schedule removed.");
+  const confirmDelete = (id: string) => {
+    setClassToDelete(id);
+    setIsDeleteOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!classToDelete) return;
+    setDeleting(true);
+    try {
+        await deleteDoc(doc(db, "classes", classToDelete));
+        toast.success("Class schedule dissolved.");
+        setIsDeleteOpen(false);
+        setClassToDelete(null);
         loadClasses();
-      } catch (error) {
-        toast.error("Failed to terminate class.");
-      }
+    } catch (error) {
+        console.error("Error deleting class:", error);
+        toast.error("Process failed.");
+    } finally {
+        setDeleting(false);
     }
   };
 
@@ -83,6 +99,18 @@ export default function ClassesPage() {
         }} 
         onSuccess={loadClasses}
         initialData={selectedClass}
+      />
+
+      <ConfirmModal 
+        isOpen={isDeleteOpen}
+        onClose={() => {
+            setIsDeleteOpen(false);
+            setClassToDelete(null);
+        }}
+        onConfirm={handleDelete}
+        loading={deleting}
+        title="Dissolve Class Session"
+        message="Terminating this class will permanently remove its weekly schedule, room assignment, and link to the instructor. Student enrollment counts will be reset, although individual records will persist."
       />
 
       <div className="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center bg-slate-50/50">
@@ -163,7 +191,7 @@ export default function ClassesPage() {
                 Edit
               </button>
               <button 
-                onClick={() => handleDelete(item.id)}
+                onClick={() => confirmDelete(item.id)}
                 className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
