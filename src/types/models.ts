@@ -1,3 +1,9 @@
+export type FirestoreTimestamp = {
+  seconds: number;
+  nanoseconds: number;
+  toDate: () => Date;
+} | null | undefined;
+
 export interface Student {
   id: string;
   name: string;
@@ -7,7 +13,7 @@ export interface Student {
   schoolName: string;
   status: 'active' | 'inactive';
   grade?: string;
-  createdAt?: unknown;
+  createdAt?: FirestoreTimestamp;
 }
 
 export interface Teacher {
@@ -46,7 +52,7 @@ export interface Payment {
   method: string;
   description: string;
   status: string;
-  createdAt: unknown;
+  createdAt: FirestoreTimestamp;
 }
 
 export interface Salary {
@@ -57,7 +63,7 @@ export interface Salary {
   basicAmount: number;
   netAmount: number;
   status: string;
-  createdAt: unknown;
+  createdAt: FirestoreTimestamp;
 }
 
 export interface AttendanceRecord {
@@ -65,7 +71,7 @@ export interface AttendanceRecord {
   classId: string;
   date: string;
   records: Record<string, boolean>;
-  createdAt: unknown;
+  createdAt: FirestoreTimestamp;
 }
 
 export interface TimetableSlot {

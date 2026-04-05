@@ -108,7 +108,11 @@ export default function PaymentsPage() {
                   <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4 font-mono text-xs text-slate-400 uppercase">{item.id.substring(0,8)}</td>
                     <td className="px-6 py-4 font-bold text-slate-800">{item.studentName}</td>
-                    <td className="px-6 py-4 text-slate-500">{item.createdAt?.toDate ? item.createdAt.toDate().toLocaleDateString() : 'N/A'}</td>
+                    <td className="px-6 py-4 text-slate-500">
+                      {item.createdAt && typeof item.createdAt.toDate === 'function' 
+                        ? item.createdAt.toDate().toLocaleDateString() 
+                        : 'N/A'}
+                    </td>
                     <td className="px-6 py-4 font-black text-slate-900">LKR {item.amount?.toLocaleString()}</td>
                     <td className="px-6 py-4 uppercase text-[10px] font-black text-slate-400">{item.method}</td>
                     <td className="px-6 py-4 text-right">
