@@ -1,0 +1,115 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+import { Users, Search, Filter, BookOpen, Clock, Activity, MessageSquare, Phone } from "lucide-react";
+import { Student, Teacher } from "@/types/models";
+import { useAuth } from "@/context/AuthContext";
+
+export default function MyStudentsPage() {
+  const { user } = useAuth();
+  const [students, setStudents] = useState<Student[]>([]);
+  const [teacherData, setTeacherData] = useState<Teacher | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  useEffect(() => {
+    async function loadData() {
+      if (!user?.uid) return;
+      try {
+        const tSnap = await getDocs(query(collection(db, "teachers"), where("id", "==", user.uid)));
+        if (!tSnap.empty) {
+          const tInfo = { id: tSnap.docs[0].id, ...tSnap.docs[0].data() } as Teacher;
+          setTeacherData(tInfo);
+
+          // Fetch students in the grades the teacher handles
+          if (tInfo.grades && tInfo.grades.length > 0) {
+            const sSnap = await getDocs(query(collection(db, "students"), where("grade", "in", tInfo.grades)));
+            setStudents(sSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student)));
+          }
+        }
+      } catch (error) {
+        console.error("Error loading student data", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [user]);
+
+  const filteredStudents = students.filter(s => 
+    s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    s.phone.includes(searchTerm)
+  );
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-700">
+      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+        <div className="space-y-1">
+            <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-3">
+                <Users className="w-8 h-8 text-indigo-600" /> Student Directory
+            </h2>
+            <p className="text-slate-500 font-medium max-w-lg">Viewing {students.length} students enrolled in your academic levels. You can monitor their profiles and academic contact details.</p>
+        </div>
+        
+        <div className="relative w-full md:w-80">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input 
+            type="text" 
+            placeholder="Search by name or contact..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium shadow-sm"
+          />
+        </div>
+      </div>
+
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 divide-x divide-y divide-slate-50">
+          {loading ? (
+            [1, 2, 3, 4, 5, 6].map(i => <div key={i} className="h-48 bg-slate-50/50 animate-pulse"></div>)
+          ) : filteredStudents.length > 0 ? filteredStudents.map((s) => (
+            <div key={s.id} className="p-8 hover:bg-indigo-50/20 transition-all group flex flex-col items-center text-center">
+                <div className="w-20 h-20 rounded-3xl bg-slate-100 flex items-center justify-center text-slate-500 mb-6 font-black text-2xl group-hover:bg-indigo-600 group-hover:text-white transition-all duration-500 relative">
+                   {s.name.charAt(0)}
+                   {s.status === 'active' && (
+                       <div className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full border-4 border-white"></div>
+                   )}
+                </div>
+                
+                <h4 className="text-lg font-black text-slate-800 mb-1 leading-tight">{s.name}</h4>
+                <p className="text-[10px] font-black uppercase text-indigo-600 tracking-widest bg-indigo-50 px-3 py-1 rounded-full mb-6 border border-indigo-100">{s.grade}</p>
+                
+                <div className="grid grid-cols-2 gap-2 w-full mt-auto">
+                    <div className="bg-slate-50 p-3 rounded-2xl flex flex-col items-center">
+                        <Phone className="w-3.5 h-3.5 text-slate-400 mb-1" />
+                        <span className="text-[10px] font-bold text-slate-600">{s.phone}</span>
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-2xl flex flex-col items-center">
+                        <Activity className="w-3.5 h-3.5 text-emerald-400 mb-1" />
+                        <span className="text-[10px] font-bold text-slate-600">92% Attnd.</span>
+                    </div>
+                </div>
+
+                <div className="flex gap-2 w-full mt-4">
+                    <button className="flex-1 bg-white border border-slate-200 rounded-xl py-2 px-3 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-100 transition-colors flex items-center justify-center gap-2">
+                        <MessageSquare className="w-3 h-3" /> SMS
+                    </button>
+                    <button className="flex-1 bg-indigo-600 text-white rounded-xl py-2 px-3 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100">
+                        View Detail
+                    </button>
+                </div>
+            </div>
+          )) : (
+            <div className="col-span-full py-40 text-center flex flex-col items-center">
+                <Users className="w-16 h-16 text-slate-100 mb-4" />
+                <p className="text-slate-500 font-bold text-lg mb-1 tracking-tight">No students found matching your criteria.</p>
+                <p className="text-[10px] uppercase font-black tracking-[0.2em] text-slate-400">Total Records: {students.length}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
