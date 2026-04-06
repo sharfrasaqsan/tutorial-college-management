@@ -182,6 +182,24 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
                   />
                   {errors.phone && <p className="text-xs text-red-500 ml-1 mt-1">{errors.phone.message}</p>}
                 </div>
+
+                <div className="space-y-1 col-span-full">
+                  <label className="text-sm font-semibold text-slate-700 ml-1">Gender</label>
+                  <div className="flex gap-4 mt-1">
+                    {["male", "female", "other"].map((g) => (
+                      <label key={g} className="flex items-center gap-2 cursor-pointer group">
+                        <input 
+                          type="radio" 
+                          value={g} 
+                          {...register("gender")}
+                          className="w-4 h-4 text-primary focus:ring-primary-dark border-slate-300 transition-all cursor-pointer"
+                        />
+                        <span className="text-sm font-medium text-slate-600 group-hover:text-primary transition-colors capitalize">{g}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {errors.gender && <p className="text-xs text-red-500 ml-1 mt-1">{errors.gender.message}</p>}
+                </div>
              </div>
           </div>
 

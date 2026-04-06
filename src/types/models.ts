@@ -32,6 +32,7 @@ export interface Teacher {
   employeeId?: string;
   photoURL?: string;
   assignedClasses?: string[];
+  gender: 'male' | 'female' | 'other';
   status: 'active' | 'inactive';
 }
 

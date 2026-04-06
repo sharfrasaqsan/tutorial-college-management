@@ -21,6 +21,7 @@ const teacherSchema = z.object({
   subjects: z.array(z.string()).min(1, "Pick at least one subject"),
   grades: z.array(z.string()).min(1, "Pick at least one grade"),
   address: z.string().min(5, "Address is required"),
+  gender: z.enum(["male", "female", "other"]),
   status: z.enum(["active", "inactive"]),
 }).refine((data) => {
     // If we're not passing an ID (i.e., creating), password is required
@@ -68,6 +69,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
     resolver: zodResolver(teacherSchema),
     defaultValues: {
       status: "active",
+      gender: "male",
       subjects: [],
       grades: [],
     }
@@ -83,6 +85,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
         subjects: initialData.subjects || [],
         grades: initialData.grades || [],
         address: (initialData as any).address || "",
+        gender: initialData.gender || "male",
         status: initialData.status,
         password: "", // Keep empty on edit
       });
@@ -95,6 +98,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
         subjects: [],
         grades: [],
         address: "",
+        gender: "male",
         status: "active",
         password: "",
       });
@@ -163,6 +167,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
           subjects: data.subjects,
           grades: data.grades,
           address: data.address,
+          gender: data.gender,
           status: data.status,
           createdAt: serverTimestamp(),
         });
@@ -209,6 +214,24 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
                   />
                   {errors.nic && <p className="text-xs text-red-500 ml-1 mt-1">{errors.nic.message}</p>}
+                </div>
+
+                <div className="space-y-1 col-span-full">
+                  <label className="text-sm font-semibold text-slate-700 ml-1">Gender</label>
+                  <div className="flex gap-4 mt-1">
+                    {["male", "female", "other"].map((g) => (
+                      <label key={g} className="flex items-center gap-2 cursor-pointer group">
+                        <input 
+                          type="radio" 
+                          value={g} 
+                          {...register("gender")}
+                          className="w-4 h-4 text-primary focus:ring-primary-dark border-slate-300 transition-all cursor-pointer"
+                        />
+                        <span className="text-sm font-medium text-slate-600 group-hover:text-primary transition-colors capitalize">{g}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {errors.gender && <p className="text-xs text-red-500 ml-1 mt-1">{errors.gender.message}</p>}
                 </div>
             </div>
           </div>
