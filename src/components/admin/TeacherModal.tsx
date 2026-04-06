@@ -87,10 +87,10 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
         name: initialData.name,
         email: initialData.email,
         phone: initialData.phone,
-        nic: (initialData as any).nic || "",
+        nic: initialData.nic || "",
         subjects: initialData.subjects || [],
         grades: initialData.grades || [],
-        address: (initialData as any).address || "",
+        address: initialData.address || "",
         gender: initialData.gender || "male",
         status: initialData.status,
         password: "",
@@ -127,7 +127,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
     try {
         await sendPasswordResetEmail(auth, initialData.email);
         toast.success(`Security reset link dispatched to ${initialData.email}`);
-    } catch (err: any) {
+    } catch (err) {
         console.error("Reset error:", err);
         toast.error("Failed to dispatcher security link.");
     }
@@ -142,12 +142,15 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
     setLoading(true);
     try {
       // Uniqueness check for NIC
-      const nicQuery = query(collection(db, "teachers"), where("nic", "==", data.nic));
+      const normalizedNIC = data.nic.trim().toUpperCase();
+      const nicQuery = query(collection(db, "teachers"), where("nic", "==", normalizedNIC));
       const nicSnap = await getDocs(nicQuery);
-      const isDuplicateNIC = nicSnap.docs.some((doc) => initialData ? doc.id !== initialData.id : true);
+      
+      // If NIC exists on a DIFFERENT document
+      const isDuplicateNIC = nicSnap.docs.some((doc) => doc.id !== initialData?.id);
       
       if (isDuplicateNIC) {
-        toast.error(`Faculty member with NIC ${data.nic} is already registered.`);
+        toast.error(`Faculty member with NIC ${normalizedNIC} is already registered.`);
         setLoading(false);
         return;
       }
@@ -208,9 +211,10 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
       reset();
       onSuccess();
       onClose();
-    } catch (err: any) {
-      console.error("Error saving teacher:", err);
-      toast.error(err.message || "Failed to save teacher profile.");
+    } catch (err) {
+      const error = err as Error;
+      console.error("Error saving teacher:", error);
+      toast.error(error.message || "Failed to save teacher profile.");
     } finally {
       setLoading(false);
     }

@@ -35,6 +35,10 @@ export interface Teacher {
   assignedClasses?: string[];
   gender: 'male' | 'female' | 'other';
   status: 'active' | 'inactive';
+  nic: string;
+  address: string;
+  createdAt?: FirestoreTimestamp;
+  updatedAt?: FirestoreTimestamp;
 }
 
 export interface ClassSchedule {

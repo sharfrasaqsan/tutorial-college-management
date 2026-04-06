@@ -39,7 +39,7 @@ export default function MyClassesPage() {
             <p className="text-slate-500 font-medium max-w-lg">Manage your scheduled sessions, track batch progress, and initiate attendance logging for your assigned students.</p>
         </div>
         <div className="flex bg-white p-1 rounded-2xl border border-slate-100 shadow-sm">
-            <div className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-black uppercase tracking-widest">Active ({classes.length})</div>
+            <div className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-black uppercase tracking-widest">Active ({classes.length} Session{classes.length === 1 ? '' : 's'})</div>
             <div className="px-4 py-2 text-slate-400 rounded-xl text-xs font-black uppercase tracking-widest cursor-not-allowed">Archived (0)</div>
         </div>
       </div>
@@ -69,7 +69,7 @@ export default function MyClassesPage() {
                     <div className="flex items-center gap-2 text-xs font-black text-slate-400 uppercase tracking-widest">
                         <span>{item.subject}</span>
                         <span className="w-1.5 h-1.5 bg-slate-200 rounded-full"></span>
-                        <span className="text-indigo-500">{item.grade} Batches</span>
+                        <span className="text-indigo-500">{item.grade} Batch</span>
                     </div>
                 </div>
 
@@ -81,7 +81,9 @@ export default function MyClassesPage() {
                             </div>
                             <div>
                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Students</p>
-                                <p className="text-sm font-bold text-slate-700">{item.studentCount || 0} Registered</p>
+                                <p className="text-sm font-bold text-slate-700">
+                                  {item.studentCount || 0} Student{item.studentCount === 1 ? '' : 's'} registered
+                                </p>
                             </div>
                         </div>
                     </div>

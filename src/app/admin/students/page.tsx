@@ -162,7 +162,7 @@ export default function StudentsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h2 className="text-2xl font-bold text-slate-800">Students Directory</h2>
-          <p className="text-sm text-slate-500">Manage all student enrollments and records.</p>
+          <p className="text-sm text-slate-500">Manage all student enrollment{filteredStudents.length === 1 ? '' : 's'} and records.</p>
         </div>
         <button 
           onClick={handleAdd}
@@ -357,10 +357,10 @@ export default function StudentsPage() {
                       <p className="font-medium text-slate-700">{student.grade || 'N/A'}</p>
                       <div className="flex gap-2 mt-1">
                         <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                          {(student.enrolledClasses?.length || 0)} Classes
+                          {(student.enrolledClasses?.length || 0)} Class{(student.enrolledClasses?.length === 1 ? '' : 'es')}
                         </span>
                         <span className="text-[10px] bg-primary/5 text-primary px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
-                          {(student.enrolledSubjects?.length || 0)} Subjects
+                          {(student.enrolledSubjects?.length || 0)} Subject{(student.enrolledSubjects?.length === 1 ? '' : 's')}
                         </span>
                       </div>
                     </td>
@@ -410,7 +410,7 @@ export default function StudentsPage() {
         </div>
         
         <div className="p-4 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500 bg-slate-50">
-          <p>Showing {filteredStudents.length} entries</p>
+          <p>Showing {filteredStudents.length} entr{filteredStudents.length === 1 ? 'y' : 'ies'}</p>
           <div className="flex gap-1">
             <button className="px-3 py-1 border border-slate-200 rounded hover:bg-slate-100" disabled>Previous</button>
             <button className="px-3 py-1 bg-primary text-white rounded">1</button>

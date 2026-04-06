@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { collection, getDocs, query, orderBy, serverTimestamp, doc, writeBatch, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Loader2, BookOpen, Calendar, Clock, MapPin, Plus, Trash2 } from "lucide-react";
+import { Loader2, BookOpen, Calendar, Clock, Plus, Trash2 } from "lucide-react";
 import { Teacher, Grade, Subject, Class } from "@/types/models";
 import toast from "react-hot-toast";
 import Modal from "@/components/ui/Modal";

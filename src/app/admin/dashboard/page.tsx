@@ -31,7 +31,7 @@ export default function AdminDashboard() {
     { title: "Total Students", value: stats?.totalStudents || 0, icon: Users, color: "text-blue-600", bg: "bg-blue-100" },
     { title: "Total Teachers", value: stats?.totalTeachers || 0, icon: GraduationCap, color: "text-purple-600", bg: "bg-purple-100" },
     { title: "Fees Collected", value: `LKR ${(stats?.feesCollected || 0).toLocaleString()}`, icon: CreditCard, color: "text-success", bg: "bg-green-100" },
-    { title: "Unpaid Fees", value: `${stats?.unpaidFeesCount || 0} Students`, icon: AlertTriangle, color: "text-orange-600", bg: "bg-orange-100" },
+    { title: "Unpaid Fees", value: `${stats?.unpaidFeesCount || 0} Student${stats?.unpaidFeesCount === 1 ? '' : 's'}`, icon: AlertTriangle, color: "text-orange-600", bg: "bg-orange-100" },
   ];
 
   return (

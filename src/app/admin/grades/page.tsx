@@ -215,13 +215,13 @@ export default function GradesPage() {
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-2 text-slate-600 font-medium">
                         <User className="w-3.5 h-3.5 text-slate-300" />
-                        {item.studentCount || 0} enrolled
+                        {item.studentCount || 0} enrolled student{item.studentCount === 1 ? '' : 's'}
                       </div>
                     </td>
                     <td className="px-6 py-5">
                       <div className="flex items-center gap-2 text-slate-600 font-medium">
                         <Calendar className="w-3.5 h-3.5 text-slate-300" />
-                        {item.classCount || 0} active sections
+                        {item.classCount || 0} active section{item.classCount === 1 ? '' : 's'}
                       </div>
                     </td>
                     <td className="px-6 py-5">

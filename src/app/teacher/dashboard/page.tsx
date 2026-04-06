@@ -135,7 +135,7 @@ export default function TeacherDashboard() {
       <div className="relative overflow-hidden bg-indigo-700 h-48 rounded-3xl p-8 flex items-center shadow-xl shadow-indigo-100">
         <div className="relative z-10 space-y-2">
             <h2 className="text-white text-3xl font-black tracking-tight">Bonjour, {teacherData?.name || 'Instructor'}! 👋</h2>
-            <p className="text-indigo-100/80 font-medium max-w-md">Your academic session is live. You have {stats.activeClasses} scheduled classes and {stats.totalStudents} students under your guidance.</p>
+            <p className="text-indigo-100/80 font-medium max-w-md">Your academic session is live. You have {stats.activeClasses} scheduled class{stats.activeClasses === 1 ? '' : 'es'} and {stats.totalStudents} student{stats.totalStudents === 1 ? '' : 's'} under your guidance.</p>
         </div>
         {/* Abstract background elements */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-20 -mt-20 blur-3xl"></div>
@@ -151,7 +151,9 @@ export default function TeacherDashboard() {
           <div>
             <p className="text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Total Impact</p>
             <h4 className="text-2xl font-black text-slate-800">{stats.totalStudents}</h4>
-            <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1"><TrendingUp className="w-3 h-3" /> Students Reached</p>
+            <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+              <TrendingUp className="w-3 h-3" /> Student{stats.totalStudents === 1 ? '' : 's'} Reached
+            </p>
           </div>
         </div>
 
@@ -161,7 +163,7 @@ export default function TeacherDashboard() {
           </div>
           <div>
             <p className="text-xs font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Active Batches</p>
-            <h4 className="text-2xl font-black text-slate-800">{stats.activeClasses} Sessions</h4>
+            <h4 className="text-2xl font-black text-slate-800">{stats.activeClasses} Session{stats.activeClasses === 1 ? '' : 's'}</h4>
             <p className="text-[10px] text-indigo-500 font-bold flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Fully Scheduled</p>
           </div>
         </div>
@@ -219,7 +221,7 @@ export default function TeacherDashboard() {
                 )) : (
                     <div className="bg-white p-12 rounded-3xl border-2 border-dashed border-slate-100 text-center">
                         <Calendar className="w-12 h-12 text-slate-100 mx-auto mb-4" />
-                        <p className="text-slate-500 font-medium tracking-tight">No classes scheduled for today.</p>
+                        <p className="text-slate-500 font-medium tracking-tight">No session scheduled for today.</p>
                     </div>
                 )}
             </div>
