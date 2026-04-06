@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { DollarSign, Search, Filter, Download, CreditCard, User, MoreHorizontal, AlertCircle } from "lucide-react";
+import Skeleton from "@/components/ui/Skeleton";
 import { Salary } from "@/types/models";
 
 export default function SalariesPage() {
@@ -56,7 +57,11 @@ export default function SalariesPage() {
               <span className="text-[10px] font-bold tracking-widest uppercase opacity-70">Payouts</span>
            </div>
            <p className="text-sm font-medium opacity-80 mb-1">Total Payout (This Month)</p>
-           <h3 className="text-3xl font-black">LKR 425,000</h3>
+           {loading ? (
+             <Skeleton variant="text" width="120px" height="32px" className="bg-white/20" />
+           ) : (
+             <h3 className="text-3xl font-black">LKR 425,000</h3>
+           )}
         </div>
         
         <div className="p-6 bg-emerald-600 rounded-3xl text-white shadow-lg shadow-emerald-200">
@@ -67,7 +72,11 @@ export default function SalariesPage() {
               <span className="text-[10px] font-bold tracking-widest uppercase opacity-70">Unpaid</span>
            </div>
            <p className="text-sm font-medium opacity-80 mb-1">Pending Salaries</p>
-           <h3 className="text-3xl font-black">04 Records</h3>
+           {loading ? (
+             <Skeleton variant="text" width="100px" height="32px" className="bg-white/20" />
+           ) : (
+             <h3 className="text-3xl font-black">04 Records</h3>
+           )}
         </div>
 
         <div className="p-6 bg-slate-800 rounded-3xl text-white shadow-lg shadow-slate-200">
@@ -78,7 +87,11 @@ export default function SalariesPage() {
               <span className="text-[10px] font-bold tracking-widest uppercase opacity-70">Staff</span>
            </div>
            <p className="text-sm font-medium opacity-80 mb-1">Active Faculty</p>
-           <h3 className="text-3xl font-black">12 Teachers</h3>
+           {loading ? (
+             <Skeleton variant="text" width="100px" height="32px" className="bg-white/20" />
+           ) : (
+             <h3 className="text-3xl font-black">12 Teachers</h3>
+           )}
         </div>
       </div>
 
@@ -101,9 +114,35 @@ export default function SalariesPage() {
         
         <div className="overflow-x-auto min-h-[400px]">
           {loading ? (
-            <div className="flex justify-center items-center h-64 p-20">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-            </div>
+            <table className="w-full text-sm text-left">
+              <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-widest text-[10px] border-b border-slate-100">
+                <tr>
+                  <th className="px-6 py-5">Faculty Member</th>
+                  <th className="px-6 py-5">Month</th>
+                  <th className="px-6 py-5">Basic Salary</th>
+                  <th className="px-6 py-5">Net Payable</th>
+                  <th className="px-6 py-5">Status</th>
+                  <th className="px-6 py-5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <Skeleton variant="rect" width="32px" height="32px" className="rounded-lg" />
+                        <Skeleton variant="text" width="120px" height="14px" />
+                      </div>
+                    </td>
+                    <td className="px-6 py-4"><Skeleton variant="text" width="60px" height="12px" /></td>
+                    <td className="px-6 py-4"><Skeleton variant="text" width="100px" height="14px" /></td>
+                    <td className="px-6 py-4"><Skeleton variant="text" width="100px" height="16px" /></td>
+                    <td className="px-6 py-4"><Skeleton variant="rect" width="70px" height="24px" className="rounded-md" /></td>
+                    <td className="px-6 py-4 text-right"><Skeleton variant="rect" width="32px" height="32px" className="ml-auto rounded-lg" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           ) : (
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-widest text-[10px] border-b border-slate-100">

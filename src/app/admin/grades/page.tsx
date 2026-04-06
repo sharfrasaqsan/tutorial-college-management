@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy, doc, updateDoc, writeBatch, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Layers, Plus, Search, Filter, Calendar, User, Edit, Trash2, Ban, CheckCircle } from "lucide-react";
+import Skeleton from "@/components/ui/Skeleton";
 import { Grade } from "@/types/models";
 import GradeModal from "@/components/admin/GradeModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
@@ -152,9 +153,43 @@ export default function GradesPage() {
         
         <div className="overflow-x-auto min-h-[400px]">
           {loading ? (
-             <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-             </div>
+            <table className="w-full text-sm text-left">
+              <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-widest text-[10px] border-b border-slate-100">
+                <tr>
+                  <th className="px-6 py-4">Grade Level</th>
+                  <th className="px-6 py-4">Students</th>
+                  <th className="px-6 py-4">Classes</th>
+                  <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-3">
+                        <Skeleton variant="rect" width="32px" height="32px" className="rounded-lg" />
+                        <Skeleton variant="text" width="100px" height="14px" />
+                      </div>
+                    </td>
+                    <td className="px-6 py-5">
+                       <Skeleton variant="text" width="80px" height="14px" />
+                    </td>
+                    <td className="px-6 py-5">
+                       <Skeleton variant="text" width="120px" height="14px" />
+                    </td>
+                    <td className="px-6 py-5">
+                       <Skeleton variant="rect" width="70px" height="24px" className="rounded-md" />
+                    </td>
+                    <td className="px-6 py-5 text-right flex items-center justify-end gap-2">
+                       <Skeleton variant="rect" width="32px" height="32px" className="rounded-lg" />
+                       <Skeleton variant="rect" width="32px" height="32px" className="rounded-lg" />
+                       <Skeleton variant="rect" width="32px" height="32px" className="rounded-lg" />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           ) : (
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-widest text-[10px] border-b border-slate-100">

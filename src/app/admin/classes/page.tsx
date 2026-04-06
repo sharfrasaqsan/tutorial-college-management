@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy, doc, updateDoc, writeBatch, increment, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Plus, BookOpen, Clock, Users, Calendar, Edit, Trash2, Ban, CheckCircle, AlertCircle, Filter, X } from "lucide-react";
+import Skeleton from "@/components/ui/Skeleton";
 import { Class, Teacher, Subject, Grade } from "@/types/models";
 import ClassModal from "@/components/admin/ClassModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
@@ -279,14 +280,23 @@ export default function ClassesPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {loading ? (
-          [1, 2, 3].map(i => (
-            <div key={i} className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4 animate-pulse">
-              <div className="w-12 h-12 bg-slate-100 rounded-xl"></div>
-              <div className="h-6 bg-slate-100 rounded w-2/3"></div>
-              <div className="h-4 bg-slate-100 rounded w-1/2"></div>
-              <div className="pt-4 border-t border-slate-100 flex justify-between">
-                <div className="h-4 bg-slate-100 rounded w-1/4"></div>
-                <div className="h-4 bg-slate-100 rounded w-1/4"></div>
+          [1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4 shadow-sm">
+              <div className="flex justify-between items-start mb-4">
+                <Skeleton variant="rect" width="48px" height="48px" className="rounded-2xl" />
+                <Skeleton variant="rect" width="60px" height="24px" className="rounded-md" />
+              </div>
+              <Skeleton variant="text" width="80%" height="24px" />
+              <Skeleton variant="text" width="60%" height="16px" />
+              <div className="space-y-3 mt-6 pt-4 border-t border-slate-50">
+                <Skeleton variant="text" width="40%" height="14px" />
+                <Skeleton variant="text" width="50%" height="14px" />
+                <Skeleton variant="text" width="45%" height="14px" />
+              </div>
+              <div className="flex gap-2 mt-6">
+                <Skeleton variant="rect" width="100%" height="36px" className="rounded-xl" />
+                <Skeleton variant="rect" width="36px" height="36px" className="rounded-xl" />
+                <Skeleton variant="rect" width="36px" height="36px" className="rounded-xl" />
               </div>
             </div>
           ))

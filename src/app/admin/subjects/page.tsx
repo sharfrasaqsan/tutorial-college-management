@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy, doc, updateDoc, writeBatch, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Plus, BookType, Hash, Search, Filter, BookOpen, Edit, Trash2, Ban, CheckCircle } from "lucide-react";
+import Skeleton from "@/components/ui/Skeleton";
 import { Subject } from "@/types/models";
 import SubjectModal from "@/components/admin/SubjectModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
@@ -152,7 +153,26 @@ export default function SubjectsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {loading ? (
-             [1, 2, 3, 4].map(i => <div key={i} className="h-40 bg-white rounded-2xl animate-pulse"></div>)
+             [1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                <div key={i} className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+                    <div className="flex justify-between items-start">
+                        <Skeleton variant="rect" width="48px" height="48px" className="rounded-xl" />
+                        <div className="flex gap-1">
+                            <Skeleton variant="rect" width="32px" height="32px" className="rounded-lg" />
+                            <Skeleton variant="rect" width="32px" height="32px" className="rounded-lg" />
+                        </div>
+                    </div>
+                    <Skeleton variant="text" width="100%" height="24px" />
+                    <Skeleton variant="text" width="60%" height="14px" />
+                    <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
+                        <Skeleton variant="text" width="40%" height="12px" />
+                        <div className="flex -space-x-2">
+                            <Skeleton variant="circle" width="24px" height="24px" className="border-2 border-white" />
+                            <Skeleton variant="circle" width="24px" height="24px" className="border-2 border-white" />
+                        </div>
+                    </div>
+                </div>
+             ))
           ) : filteredSubjects.length > 0 ? filteredSubjects.map((item) => (
           <div key={item.id} className={`bg-white p-6 rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-all hover:-translate-y-1 ${item.status === 'inactive' ? 'opacity-60 grayscale-[0.5]' : ''}`}>
             <div className="flex justify-between items-start mb-4">

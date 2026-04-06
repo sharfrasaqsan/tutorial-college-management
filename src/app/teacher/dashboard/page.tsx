@@ -12,8 +12,9 @@ import {
   Star,
   CheckCircle2
 } from "lucide-react";
+import Skeleton from "@/components/ui/Skeleton";
 import { useState, useEffect } from "react";
-import { collection, query, where, getDocs, limit, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Class, Teacher } from "@/types/models";
 import Link from "next/link";
@@ -65,9 +66,68 @@ export default function TeacherDashboard() {
     loadDashboardData();
   }, [user]);
 
-  if (loading) return <div className="flex items-center justify-center h-[70vh]">
-    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-  </div>;
+  if (loading) {
+    return (
+      <div className="space-y-8 animate-pulse">
+        {/* Welcome Banner Skeleton */}
+        <div className="bg-slate-100 h-48 rounded-3xl p-8 flex items-center shadow-xl shadow-slate-50 border border-slate-200 overflow-hidden relative">
+          <div className="space-y-4 z-10 w-full max-w-md">
+            <Skeleton variant="text" width="60%" height="32px" className="bg-slate-200" />
+            <Skeleton variant="text" width="90%" height="16px" className="bg-slate-200" />
+            <Skeleton variant="text" width="70%" height="16px" className="bg-slate-200" />
+          </div>
+        </div>
+
+        {/* Stats Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-5">
+              <Skeleton variant="rect" width="56px" height="56px" className="rounded-2xl" />
+              <div className="space-y-2">
+                <Skeleton variant="text" width="60px" height="10px" />
+                <Skeleton variant="text" width="100px" height="24px" />
+                <Skeleton variant="text" width="80px" height="10px" />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-6">
+                <div className="flex items-center justify-between">
+                    <Skeleton variant="text" width="150px" height="24px" />
+                    <Skeleton variant="text" width="80px" height="14px" />
+                </div>
+                <div className="grid grid-cols-1 gap-4">
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                <Skeleton variant="rect" width="48px" height="48px" className="rounded-2xl" />
+                                <div className="space-y-2">
+                                    <Skeleton variant="text" width="150px" height="14px" />
+                                    <Skeleton variant="text" width="100px" height="10px" />
+                                </div>
+                            </div>
+                            <Skeleton variant="rect" width="100px" height="32px" className="rounded-xl" />
+                        </div>
+                    ))}
+                </div>
+            </div>
+            <div className="space-y-8">
+                <Skeleton variant="rect" width="100%" height="180px" className="rounded-3xl" />
+                <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
+                    <Skeleton variant="text" width="120px" height="16px" />
+                    <div className="space-y-2">
+                        <Skeleton variant="rect" width="100%" height="40px" className="rounded-2xl" />
+                        <Skeleton variant="rect" width="100%" height="40px" className="rounded-2xl" />
+                        <Skeleton variant="rect" width="100%" height="40px" className="rounded-2xl" />
+                    </div>
+                </div>
+            </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">

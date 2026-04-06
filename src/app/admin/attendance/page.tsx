@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy, addDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Check, X, Calendar, Users, CheckCircle2 } from "lucide-react";
+import Skeleton from "@/components/ui/Skeleton";
 import { Student, Class } from "@/types/models";
 import toast from "react-hot-toast";
 
@@ -113,8 +114,19 @@ export default function AttendancePage() {
           <p className="text-sm text-slate-500 mt-1 max-w-xs">Please choose a class from the dropdown above to mark attendance for today&apos;s session.</p>
         </div>
       ) : loading ? (
-        <div className="py-32 flex justify-center items-center bg-white rounded-3xl border border-slate-100">
-           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary"></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-6 bg-slate-50/20 rounded-3xl border border-slate-100">
+           {[1, 2, 3, 4, 5, 6].map(i => (
+             <div key={i} className="p-4 rounded-2xl border-2 border-slate-100 bg-white flex items-center justify-between animate-pulse">
+                <div className="flex items-center gap-3">
+                   <Skeleton variant="rect" width="40px" height="40px" className="rounded-xl" />
+                   <div className="space-y-2">
+                      <Skeleton variant="text" width="100px" height="14px" />
+                      <Skeleton variant="text" width="60px" height="10px" />
+                   </div>
+                </div>
+                <Skeleton variant="rect" width="24px" height="24px" className="rounded-lg" />
+             </div>
+           ))}
         </div>
       ) : (
         <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">

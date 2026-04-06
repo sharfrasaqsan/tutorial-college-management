@@ -79,6 +79,7 @@ export interface Salary {
 export interface AttendanceRecord {
   id: string;
   classId: string;
+  className?: string;
   date: string;
   records: Record<string, boolean>;
   createdAt: FirestoreTimestamp;

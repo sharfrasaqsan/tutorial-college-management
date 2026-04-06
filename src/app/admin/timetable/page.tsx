@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy, where } from "firebase/firestore";
+import { collection, query, getDocs, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Calendar, Clock, LayoutGrid, List, MapPin, User, GraduationCap, ArrowRight } from "lucide-react";
+import { Calendar, MapPin, User, ArrowRight } from "lucide-react";
+import Skeleton from "@/components/ui/Skeleton";
 import Link from "next/link";
 
 interface ClassEntry {
@@ -86,13 +87,26 @@ export default function TimetablePage() {
 
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden p-6">
         {loading ? (
-          <div className="flex justify-center items-center h-64">
-             <div className="relative">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <Clock className="w-4 h-4 text-primary" />
-                </div>
-             </div>
+          <div className="space-y-4">
+             {[1, 2, 3].map(i => (
+               <div key={i} className="p-5 rounded-3xl border border-slate-50 bg-slate-50/30 flex flex-col md:flex-row md:items-center justify-between gap-6 animate-pulse">
+                  <div className="flex items-start md:items-center gap-6">
+                     <Skeleton variant="rect" width="100px" height="80px" className="rounded-2xl" />
+                     <div className="space-y-3">
+                        <div className="flex gap-2">
+                           <Skeleton variant="rect" width="60px" height="20px" className="rounded-lg" />
+                           <Skeleton variant="rect" width="80px" height="20px" className="rounded-lg" />
+                        </div>
+                        <Skeleton variant="text" width="200px" height="24px" />
+                        <div className="flex gap-4">
+                           <Skeleton variant="text" width="100px" height="14px" />
+                           <Skeleton variant="text" width="80px" height="14px" />
+                        </div>
+                     </div>
+                  </div>
+                  <Skeleton variant="rect" width="120px" height="40px" className="rounded-xl" />
+               </div>
+             ))}
           </div>
         ) : filteredClasses.length > 0 ? (
           <div className="grid grid-cols-1 gap-4">
@@ -156,7 +170,7 @@ export default function TimetablePage() {
   );
 }
 
-function PlusIcon(props: any) {
+function PlusIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
       {...props}

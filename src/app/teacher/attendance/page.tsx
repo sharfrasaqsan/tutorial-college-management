@@ -3,13 +3,15 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { ClipboardCheck, Calendar, Users, ChevronRight, Activity, Clock, MoreVertical, FileText, Filter, X } from "lucide-react";
+import { ClipboardCheck, Calendar, Clock, FileText, Filter, X } from "lucide-react";
+import Skeleton from "@/components/ui/Skeleton";
 import { useAuth } from "@/context/AuthContext";
+import { AttendanceRecord } from "@/types/models";
 import Link from "next/link";
 
 export default function AttendanceHistoryPage() {
   const { user } = useAuth();
-  const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
+  const [attendanceLogs, setAttendanceLogs] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Filters
@@ -29,12 +31,12 @@ export default function AttendanceHistoryPage() {
           limit(20)
         );
         const snap = await getDocs(q);
-        const logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const logs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as AttendanceRecord));
         setAttendanceLogs(logs);
 
         // Extract unique class names for filters
         const classes = new Set<string>();
-        logs.forEach((l: any) => {
+        logs.forEach((l) => {
             if (l.className) classes.add(l.className);
         });
         setAvailableClasses(Array.from(classes));
@@ -116,8 +118,28 @@ export default function AttendanceHistoryPage() {
 
       <div className="grid grid-cols-1 gap-4">
         {loading ? (
-            [1, 2, 3].map(i => <div key={i} className="h-24 bg-white rounded-3xl animate-pulse"></div>)
-        ) : filteredLogs.length > 0 ? filteredLogs.map((log) => {
+            [1, 2, 3].map(i => (
+              <div key={i} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 animate-pulse">
+                <div className="flex items-center gap-6 flex-1">
+                  <Skeleton variant="rect" width="56px" height="56px" className="rounded-2xl" />
+                  <div className="space-y-3">
+                    <Skeleton variant="text" width="180px" height="24px" />
+                    <Skeleton variant="text" width="120px" height="12px" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-10">
+                  <div className="space-y-2">
+                    <Skeleton variant="text" width="60px" height="10px" className="mx-auto" />
+                    <Skeleton variant="text" width="100px" height="24px" />
+                  </div>
+                  <div className="flex gap-2">
+                    <Skeleton variant="rect" width="40px" height="40px" className="rounded-xl" />
+                    <Skeleton variant="rect" width="120px" height="40px" className="rounded-xl" />
+                  </div>
+                </div>
+              </div>
+            ))
+        ) : filteredLogs.length > 0 ? filteredLogs.map((log: AttendanceRecord) => {
             const records = log.records || {};
             const total = Object.keys(records).length;
             const present = Object.values(records).filter(v => v).length;

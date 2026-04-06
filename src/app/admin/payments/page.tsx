@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { CreditCard, Plus, Search, Filter, Calendar, Download, ArrowUpRight, ArrowDownLeft, X } from "lucide-react";
+import Skeleton from "@/components/ui/Skeleton";
 import { Payment } from "@/types/models";
 import Link from "next/link";
 
@@ -77,7 +78,11 @@ export default function PaymentsPage() {
                     </div>
                 </div>
                 <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">{stat.label}</p>
-                <p className="text-xl font-bold text-slate-800">{stat.value}</p>
+                {loading ? (
+                    <Skeleton variant="text" width="80px" height="24px" className="mt-1" />
+                ) : (
+                    <p className="text-xl font-bold text-slate-800">{stat.value}</p>
+                )}
             </div>
         ))}
       </div>
@@ -161,9 +166,30 @@ export default function PaymentsPage() {
         
         <div className="overflow-x-auto">
           {loading ? (
-             <div className="flex justify-center items-center h-64">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-             </div>
+            <table className="w-full text-sm text-left">
+              <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
+                <tr>
+                  <th className="px-6 py-4">Transaction ID</th>
+                  <th className="px-6 py-4">Student</th>
+                  <th className="px-6 py-4">Date</th>
+                  <th className="px-6 py-4">Amount</th>
+                  <th className="px-6 py-4">Method</th>
+                  <th className="px-6 py-4 text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="px-6 py-4"><Skeleton variant="text" width="60px" height="12px" /></td>
+                    <td className="px-6 py-4"><Skeleton variant="text" width="120px" height="14px" /></td>
+                    <td className="px-6 py-4"><Skeleton variant="text" width="80px" height="12px" /></td>
+                    <td className="px-6 py-4"><Skeleton variant="text" width="100px" height="16px" /></td>
+                    <td className="px-6 py-4"><Skeleton variant="text" width="60px" height="12px" /></td>
+                    <td className="px-6 py-4 text-right"><Skeleton variant="rect" width="60px" height="20px" className="ml-auto rounded" /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           ) : (
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
