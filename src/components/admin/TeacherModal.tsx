@@ -11,11 +11,12 @@ import { Loader2, User, Mail, BookOpen } from "lucide-react";
 import toast from "react-hot-toast";
 import Modal from "@/components/ui/Modal";
 import { Subject, Grade, Teacher } from "@/types/models";
+import { updateTeacherCredentials } from "@/app/actions/teacher-actions";
 
 const teacherSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
   email: z.string().email("Invalid email address"),
-  password: z.string().optional(), // Handled in refinement
+  password: z.string().optional(),
   phone: z.string().min(10, "Phone number must be at least 10 digits"),
   nic: z.string().min(10, "NIC is required"),
   subjects: z.array(z.string()).min(1, "Pick at least one subject"),
@@ -23,10 +24,7 @@ const teacherSchema = z.object({
   address: z.string().min(5, "Address is required"),
   gender: z.enum(["male", "female", "other"]),
   status: z.enum(["active", "inactive"]),
-}).refine((data) => {
-    // If we're not passing an ID (i.e., creating), password is required
-    return true; // We'll handle this in the submit logic or a more complex refinement
-}, { message: "Password is required for new accounts" });
+});
 
 type TeacherForm = z.infer<typeof teacherSchema>;
 
@@ -87,7 +85,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
         address: (initialData as any).address || "",
         gender: initialData.gender || "male",
         status: initialData.status,
-        password: "", // Keep empty on edit
+        password: "",
       });
     } else {
       reset({
@@ -125,9 +123,22 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
     setLoading(true);
     try {
       if (initialData) {
-        // UPDATE Profile
+        if (data.email !== initialData.email || data.password) {
+          const authUpdate = await updateTeacherCredentials(initialData.id, {
+            email: data.email !== initialData.email ? data.email : undefined,
+            password: data.password || undefined
+          });
+          
+          if (!authUpdate.success) {
+            toast.error(`Master Auth Sync Failed: ${authUpdate.error}`);
+          } else {
+            toast.success("Login credentials updated via Master Sync.");
+          }
+        }
+
         await updateDoc(doc(db, "teachers", initialData.id), {
           name: data.name,
+          email: data.email,
           phone: data.phone,
           nic: data.nic,
           subjects: data.subjects,
@@ -137,15 +148,13 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
           updatedAt: serverTimestamp(),
         });
         
-        // Also update shared user record
         await updateDoc(doc(db, "users", initialData.id), {
           name: data.name,
           phone: data.phone,
         });
 
-        toast.success("Faculty profile updated successfully!");
+        toast.success("Faculty profile refreshed.");
       } else {
-        // CREATE
         const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password!);
         const uid = userCredential.user.uid;
 
@@ -172,16 +181,15 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
           createdAt: serverTimestamp(),
         });
 
-        toast.success("Teacher account successfully created!");
+        toast.success("New faculty member registered.");
       }
 
       reset();
       onSuccess();
       onClose();
-    } catch (err: unknown) {
-      const error = err as Error;
-      console.error("Error saving teacher:", error);
-      toast.error(error.message || "Failed to save teacher profile.");
+    } catch (err: any) {
+      console.error("Error saving teacher:", err);
+      toast.error(err.message || "Failed to save teacher profile.");
     } finally {
       setLoading(false);
     }
@@ -231,7 +239,6 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
                       </label>
                     ))}
                   </div>
-                  {errors.gender && <p className="text-xs text-red-500 ml-1 mt-1">{errors.gender.message}</p>}
                 </div>
             </div>
           </div>
@@ -246,24 +253,28 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
                   <input 
                     {...register("email")}
                     type="email"
-                    disabled={!!initialData}
                     placeholder="teacher@tutorial.edu"
-                    className={`w-full px-4 py-2.5 border border-slate-200 rounded-xl outline-none transition-all ${!!initialData ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-50 focus:ring-2 focus:ring-primary/20 focus:border-primary'}`}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
                   />
+                  {initialData && (
+                    <p className="text-[10px] text-amber-600 bg-amber-50 p-2 rounded-lg border border-amber-100 mt-2 font-medium leading-relaxed">
+                        <span className="font-black uppercase">Admin Master Note:</span> Updating this email will update the profile registry and attempt to sync with the login account.
+                    </p>
+                  )}
                   {errors.email && <p className="text-xs text-red-500 ml-1 mt-1">{errors.email.message}</p>}
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-sm font-semibold text-slate-700 ml-1">
-                    {initialData ? 'Password (Read Only)' : 'Initial Password'}
+                    {initialData ? 'Administrative Master Reset' : 'Initial Password'}
                   </label>
                   <input 
                     {...register("password")}
                     type="password"
-                    disabled={!!initialData}
-                    placeholder={initialData ? "••••••••" : "Min 6 characters"}
-                    className={`w-full px-4 py-2.5 border border-slate-200 rounded-xl outline-none transition-all ${!!initialData ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-50 focus:ring-2 focus:ring-primary/20 focus:border-primary'}`}
+                    placeholder={initialData ? "Type new password to force sync..." : "Min 6 characters"}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
                   />
+                  {initialData && <p className="text-[10px] text-slate-400 ml-1">Enter a new password above to force-synchronize with their login account.</p>}
                   {!initialData && errors.password && <p className="text-xs text-red-500 ml-1 mt-1">{errors.password.message}</p>}
                 </div>
             </div>
@@ -286,13 +297,8 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
                     >
                         {s.name}
                     </button>
-                  )) : (
-                    <p className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-100 flex items-center gap-2">
-                       No subjects found. <a href="/admin/subjects" className="underline font-bold">Add One First</a>
-                    </p>
-                  )}
+                  )) : null}
                </div>
-               {errors.subjects && <p className="text-xs text-red-500 ml-1 mt-1">{errors.subjects.message}</p>}
             </div>
 
             <div className="space-y-2">
@@ -307,37 +313,30 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
                     >
                         {g.name}
                     </button>
-                  )) : (
-                    <p className="text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-100 flex items-center gap-2">
-                       No grade levels found. <a href="/admin/grades" className="underline font-bold">Add One First</a>
-                    </p>
-                  )}
+                  )) : null}
                </div>
-               {errors.grades && <p className="text-xs text-red-500 ml-1 mt-1">{errors.grades.message}</p>}
             </div>
             
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 gap-4 pt-2">
                 <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Phone Number</label>
+                  <label className="text-sm font-semibold text-slate-700 ml-1">WhatsApp / Phone Number</label>
                   <input 
                     {...register("phone")}
                     placeholder="e.g. 0712223334"
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
                   />
-                  {errors.phone && <p className="text-xs text-red-500 ml-1 mt-1">{errors.phone.message}</p>}
                 </div>
             </div>
           </div>
 
           <div className="space-y-1 col-span-full pt-4 border-t border-slate-50">
-            <label className="text-sm font-semibold text-slate-700 ml-1">Home Address</label>
+            <label className="text-sm font-semibold text-slate-700 ml-1">Mailing Address</label>
             <textarea 
               {...register("address")}
               rows={2}
-              placeholder="Full mailing address..."
+              placeholder="Full home or mailing address..."
               className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none"
             ></textarea>
-            {errors.address && <p className="text-xs text-red-500 ml-1 mt-1">{errors.address.message}</p>}
           </div>
         </div>
 
@@ -354,7 +353,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
             disabled={loading}
             className="w-full sm:w-auto px-8 py-2.5 bg-primary text-white rounded-xl text-sm font-black hover:bg-primary-dark transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Update Profile" : "Create Profile")}
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Update Profile" : "Register Faculty")}
           </button>
         </div>
       </form>

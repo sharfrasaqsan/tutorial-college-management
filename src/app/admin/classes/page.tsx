@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc, writeBatch, increment } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc, writeBatch, increment, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Plus, BookOpen, Clock, Users, Calendar, Edit, Trash2, Ban, CheckCircle, AlertCircle, Filter, X } from "lucide-react";
 import { Class, Teacher, Subject, Grade } from "@/types/models";
@@ -101,6 +101,18 @@ export default function ClassesPage() {
         if (cls && cls.gradeId) {
           batch.update(doc(db, "grades", cls.gradeId), { classCount: increment(-1) });
         }
+
+        // Auto-Sync: Remove this class from all students' enrollment lists
+        const studentQuery = query(collection(db, "students"), where("enrolledClasses", "array-contains", classToDelete));
+        const studentsInClass = await getDocs(studentQuery);
+        
+        studentsInClass.docs.forEach((stdDoc, index) => {
+          if (index < 490) { // Safety limit for batch operations
+            const stdData = stdDoc.data();
+            const newClasses = (stdData.enrolledClasses || []).filter((id: string) => id !== classToDelete);
+            batch.update(doc(db, "students", stdDoc.id), { enrolledClasses: newClasses });
+          }
+        });
 
         batch.delete(doc(db, "classes", classToDelete));
         await batch.commit();

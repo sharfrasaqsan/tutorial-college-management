@@ -84,10 +84,45 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
       const t = teachers.find(x => x.id === watchedTeacherId);
 
       if (g && s && t) {
-        setValue("name", `${g.name} - ${s.name} - ${t.name}`);
+        setValue("name", `${g.name} • ${s.name} (${t.name})`);
       }
     }
   }, [watchedGradeId, watchedSubjectId, watchedTeacherId, grades, subjects, teachers, setValue]);
+
+  // Filter logic
+  const filteredSubjects = subjects.filter(sub => {
+    if (!watchedGradeId) return true; // Show all if no grade selected yet
+    const selectedGradeName = grades.find(g => g.id === watchedGradeId)?.name;
+    // Show subject if any teacher is assigned to this grade AND teaches this subject
+    return teachers.some(t => 
+      t.grades?.includes(selectedGradeName || "") && 
+      t.subjects?.includes(sub.name)
+    );
+  });
+
+  const filteredTeachers = teachers.filter(t => {
+    const selectedGradeName = grades.find(g => g.id === watchedGradeId)?.name;
+    const selectedSubjectName = subjects.find(s => s.id === watchedSubjectId)?.name;
+
+    const matchesGrade = !watchedGradeId || t.grades?.includes(selectedGradeName || "");
+    const matchesSubject = !watchedSubjectId || t.subjects?.includes(selectedSubjectName || "");
+
+    return matchesGrade && matchesSubject && t.status === 'active';
+  });
+
+  // Effect to clear dependent fields when Parent selection changes
+  useEffect(() => {
+    if (!watchedGradeId) {
+      setValue("subjectId", "");
+      setValue("teacherId", "");
+    }
+  }, [watchedGradeId, setValue]);
+
+  useEffect(() => {
+    if (!watchedSubjectId) {
+      setValue("teacherId", "");
+    }
+  }, [watchedSubjectId, setValue]);
 
   useEffect(() => {
     if (initialData) {
@@ -207,10 +242,11 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
                   <label className="text-sm font-semibold text-slate-700 ml-1">Subject</label>
                   <select 
                     {...register("subjectId")}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    disabled={!watchedGradeId}
+                    className={`w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all ${!watchedGradeId ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-60" : "bg-slate-50 text-slate-700"}`}
                   >
-                    <option value="">Select Subject</option>
-                    {subjects.length > 0 ? subjects.map(s => <option key={s.id} value={s.id}>{s.name} ({s.subjectCode})</option>) : null}
+                    <option value="">{watchedGradeId ? "Select Subject" : "Pick Grade First"}</option>
+                    {filteredSubjects.length > 0 ? filteredSubjects.map(s => <option key={s.id} value={s.id}>{s.name} ({s.subjectCode})</option>) : null}
                   </select>
                   {subjects.length === 0 && <p className="text-[10px] text-amber-600 mt-1 ml-1 flex items-center gap-1">No subjects found. <a href="/admin/subjects" className="underline font-bold">Add One</a></p>}
                   {errors.subjectId && <p className="text-xs text-red-500 ml-1 mt-1">{errors.subjectId.message}</p>}
@@ -235,10 +271,11 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
                   <label className="text-sm font-semibold text-slate-700 ml-1">Assigned Teacher</label>
                   <select 
                     {...register("teacherId")}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    disabled={!watchedSubjectId}
+                    className={`w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all ${!watchedSubjectId ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-60" : "bg-slate-50 text-slate-700"}`}
                   >
-                    <option value="">Select Instructor</option>
-                    {teachers.length > 0 ? teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>) : null}
+                    <option value="">{watchedSubjectId ? "Select Instructor" : "Pick Subject First"}</option>
+                    {filteredTeachers.length > 0 ? filteredTeachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>) : null}
                   </select>
                   {teachers.length === 0 && <p className="text-[10px] text-amber-600 mt-1 ml-1 flex items-center gap-1">No teachers registered. <a href="/admin/teachers" className="underline font-bold">Register Now</a></p>}
                   {errors.teacherId && <p className="text-xs text-red-500 ml-1 mt-1">{errors.teacherId.message}</p>}
