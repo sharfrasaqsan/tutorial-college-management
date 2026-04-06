@@ -11,6 +11,7 @@ import { Loader2, User, Mail, BookOpen } from "lucide-react";
 import toast from "react-hot-toast";
 import Modal from "@/components/ui/Modal";
 import { Subject, Grade, Teacher } from "@/types/models";
+import { generateId } from "@/lib/id-generator";
 
 const teacherSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
@@ -133,6 +134,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
     setLoading(true);
     try {
       if (initialData) {
+        const teacherId = initialData.teacherId || await generateId("teacher");
         await updateDoc(doc(db, "teachers", initialData.id), {
           name: data.name,
           email: data.email,
@@ -142,6 +144,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
           grades: data.grades,
           address: data.address,
           status: data.status,
+          teacherId,
           updatedAt: serverTimestamp(),
         });
         
@@ -152,6 +155,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
 
         toast.success("Faculty profile updated successfully!");
       } else {
+        const teacherId = await generateId("teacher");
         const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password!);
         const uid = userCredential.user.uid;
 
@@ -160,12 +164,14 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
           name: data.name,
           email: data.email,
           role: "teacher",
+          teacherId,
           phone: data.phone,
           createdAt: serverTimestamp(),
         });
 
         await setDoc(doc(db, "teachers", uid), {
           uid,
+          teacherId,
           name: data.name,
           email: data.email,
           phone: data.phone,

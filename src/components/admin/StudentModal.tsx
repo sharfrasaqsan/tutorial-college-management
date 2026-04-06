@@ -11,6 +11,7 @@ import { Grade, Student, Subject, Class } from "@/types/models";
 import toast from "react-hot-toast";
 import Modal from "@/components/ui/Modal";
 import { BookOpen } from "lucide-react";
+import { generateId } from "@/lib/id-generator";
 
 const studentSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
@@ -237,6 +238,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
         // 4. Update Student Document
         batch.update(studentRef, {
           ...data,
+          studentId: initialData.studentId || await generateId("student"),
           updatedAt: serverTimestamp(),
         });
         
@@ -245,6 +247,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
       } else {
         // Create Case
         const studentRef = doc(collection(db, "students"));
+        const studentId = await generateId("student");
         
         // 1. Grade Count
         if (data.gradeId) {

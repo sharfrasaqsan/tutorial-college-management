@@ -102,8 +102,10 @@ export default function TeachersPage() {
   };
 
   const filteredTeachers = teachers.filter(t => {
-    const matchesSearch = t.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          t.subjects?.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesSearch = 
+      t.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (t.teacherId?.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      t.subjects?.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()));
     
     // We check if the filter is empty, or if the teacher has any subject matching the filter (subject name check here, since subjects in teacher model are arrays of names, or arrays of IDs depending on implementation; assuming names for now given original search logic `t.subjects?.some(s => s...toLowerCase())`)
     const matchesSubject = filterSubject === "" || (t.subjects && t.subjects.includes(filterSubject));
@@ -254,7 +256,7 @@ export default function TeachersPage() {
                         </div>
                         <div>
                           <p className={`font-semibold ${teacher.status === 'inactive' ? 'text-slate-500' : 'text-slate-800'}`}>{teacher.name}</p>
-                          <p className="text-xs text-slate-500">Employee ID: {teacher.employeeId || 'N/A'}</p>
+                          <p className="text-xs text-slate-500">Faculty ID: {teacher.teacherId || 'N/A'}</p>
                         </div>
                       </div>
                     </td>

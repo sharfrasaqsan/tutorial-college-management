@@ -127,7 +127,10 @@ export default function StudentsPage() {
   };
 
   const filteredStudents = students.filter(s => {
-    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || (s.phone?.includes(searchTerm));
+    const matchesSearch = 
+      s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      (s.phone?.includes(searchTerm)) ||
+      (s.studentId?.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesGrade = filterGrade === "" || s.grade === filterGrade;
     const matchesStatus = filterStatus === "" || s.status === filterStatus;
     const matchesSubject = filterSubject === "" || (s.enrolledSubjects && s.enrolledSubjects.includes(filterSubject));
@@ -282,7 +285,7 @@ export default function StudentsPage() {
                         </div>
                         <div>
                           <p className={`font-semibold ${student.status === 'inactive' ? 'text-slate-500' : 'text-slate-800'}`}>{student.name}</p>
-                          <p className="text-xs text-slate-500">ID: {student.id.substring(0,6).toUpperCase()}</p>
+                          <p className="text-xs text-slate-500">ID: {student.studentId || student.id.substring(0,6).toUpperCase()}</p>
                         </div>
                       </div>
                     </td>
