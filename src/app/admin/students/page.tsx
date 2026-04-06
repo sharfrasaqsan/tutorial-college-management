@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle } from "lucide-react";
-import { Student } from "@/types/models";
+import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle, X, ChevronDown } from "lucide-react";
+import { Student, Grade, Subject } from "@/types/models";
 import Link from "next/link";
 import StudentModal from "@/components/admin/StudentModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
@@ -16,6 +16,14 @@ export default function StudentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  
+  // Filters State
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterGrade, setFilterGrade] = useState("");
+  const [filterSubject, setFilterSubject] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [grades, setGrades] = useState<Grade[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
   
   // Delete State
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -35,8 +43,22 @@ export default function StudentsPage() {
     }
   };
 
+  const loadInitialData = async () => {
+    try {
+      const [gradeSnap, subjectSnap] = await Promise.all([
+        getDocs(query(collection(db, "grades"), orderBy("name", "asc"))),
+        getDocs(query(collection(db, "subjects"), orderBy("name", "asc")))
+      ]);
+      setGrades(gradeSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Grade)));
+      setSubjects(subjectSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)));
+    } catch (error) {
+      console.error("Error loading filters data", error);
+    }
+  }
+
   useEffect(() => {
     loadStudents();
+    loadInitialData();
   }, []);
 
   const toggleStatus = async (student: Student) => {
@@ -82,10 +104,21 @@ export default function StudentsPage() {
     }
   };
 
-  const filteredStudents = students.filter(s => 
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.phone.includes(searchTerm)
-  );
+  const filteredStudents = students.filter(s => {
+    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.phone.includes(searchTerm);
+    const matchesGrade = filterGrade === "" || s.grade === filterGrade;
+    const matchesStatus = filterStatus === "" || s.status === filterStatus;
+    const matchesSubject = filterSubject === "" || (s.enrolledSubjects && s.enrolledSubjects.includes(filterSubject));
+    
+    return matchesSearch && matchesGrade && matchesStatus && matchesSubject;
+  });
+
+  const clearFilters = () => {
+    setFilterGrade("");
+    setFilterSubject("");
+    setFilterStatus("");
+    setSearchTerm("");
+  };
 
   return (
     <div className="space-y-6">
@@ -136,10 +169,69 @@ export default function StudentsPage() {
               className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             />
           </div>
-          <button className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-2">
+          <button 
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-4 py-2 border rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${showFilters ? 'bg-primary/10 border-primary text-primary' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+          >
             <Filter className="w-4 h-4" /> Filters
+            {(filterGrade || filterSubject || filterStatus) && (
+              <span className="w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+            )}
           </button>
         </div>
+
+        {/* Filter Panel */}
+        {showFilters && (
+          <div className="p-4 border-b border-slate-100 bg-slate-50/30 grid grid-cols-1 sm:grid-cols-3 gap-4 animate-in slide-in-from-top duration-300">
+             <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Grade Level</label>
+                <select 
+                  value={filterGrade}
+                  onChange={(e) => setFilterGrade(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="">All Grades</option>
+                  {grades.map(g => (
+                    <option key={g.id} value={g.name}>{g.name}</option>
+                  ))}
+                </select>
+             </div>
+             <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Subject Enrollment</label>
+                <select 
+                  value={filterSubject}
+                  onChange={(e) => setFilterSubject(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="">All Subjects</option>
+                  {subjects.map(sub => (
+                    <option key={sub.id} value={sub.id}>{sub.name}</option>
+                  ))}
+                </select>
+             </div>
+             <div className="space-y-1 flex flex-col">
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Account Status</label>
+                <div className="flex gap-2">
+                  <select 
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  >
+                    <option value="">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Suspended</option>
+                  </select>
+                  <button 
+                    onClick={clearFilters}
+                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
+                    title="Clear All Filters"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+             </div>
+          </div>
+        )}
         
         <div className="overflow-x-auto min-h-[400px]">
           {loading ? (

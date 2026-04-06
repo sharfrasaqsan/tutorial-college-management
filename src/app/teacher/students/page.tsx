@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Users, Search, Filter, BookOpen, Clock, Activity, MessageSquare, Phone, Edit } from "lucide-react";
-import { Student, Teacher } from "@/types/models";
+import { Users, Search, Filter, BookOpen, Clock, Activity, MessageSquare, Phone, Edit, X } from "lucide-react";
+import { Student, Teacher, Grade, Subject } from "@/types/models";
 import { useAuth } from "@/context/AuthContext";
 import StudentModal from "@/components/admin/StudentModal";
 
@@ -16,6 +16,13 @@ export default function MyStudentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+
+  // Filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterGrade, setFilterGrade] = useState("");
+  const [filterSubject, setFilterSubject] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
 
   const loadData = async () => {
     if (!user?.uid) return;
@@ -31,6 +38,10 @@ export default function MyStudentsPage() {
           const sSnap = await getDocs(query(collection(db, "students"), where("grade", "in", tInfo.grades)));
           setStudents(sSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student)));
         }
+
+        // Load all subjects for filtering
+        const subSnap = await getDocs(query(collection(db, "subjects"), orderBy("name", "asc")));
+        setAllSubjects(subSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)));
       }
     } catch (error) {
       console.error("Error loading student data", error);
@@ -48,10 +59,21 @@ export default function MyStudentsPage() {
     setIsModalOpen(true);
   };
 
-  const filteredStudents = students.filter(s => 
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    s.phone.includes(searchTerm)
-  );
+  const filteredStudents = students.filter(s => {
+    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.phone.includes(searchTerm);
+    const matchesGrade = filterGrade === "" || s.grade === filterGrade;
+    const matchesStatus = filterStatus === "" || s.status === filterStatus;
+    const matchesSubject = filterSubject === "" || (s.enrolledSubjects && s.enrolledSubjects.includes(filterSubject));
+    
+    return matchesSearch && matchesGrade && matchesStatus && matchesSubject;
+  });
+
+  const clearFilters = () => {
+    setFilterGrade("");
+    setFilterSubject("");
+    setFilterStatus("");
+    setSearchTerm("");
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
@@ -63,17 +85,77 @@ export default function MyStudentsPage() {
             <p className="text-slate-500 font-medium max-w-lg">Viewing {students.length} students enrolled in your academic levels. You can monitor their profiles and academic contact details.</p>
         </div>
         
-        <div className="relative w-full md:w-80">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input 
-            type="text" 
-            placeholder="Search by name or contact..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium shadow-sm"
-          />
+        <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          <div className="relative w-full md:w-80">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input 
+              type="text" 
+              placeholder="Search by name or contact..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium shadow-sm"
+            />
+          </div>
+          <button 
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-2 px-5 py-3 rounded-2xl border transition-all font-black text-[10px] uppercase tracking-widest ${showFilters ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+          >
+            <Filter className="w-4 h-4" /> Filters
+            { (filterGrade || filterSubject || filterStatus) && <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse ml-1 opacity-0 group-hover:opacity-100"></span> }
+          </button>
         </div>
       </div>
+
+      {showFilters && (
+        <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm grid grid-cols-1 md:grid-cols-4 gap-4 animate-in slide-in-from-top-4 duration-300">
+           <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Grade Level</label>
+              <select 
+                value={filterGrade}
+                onChange={(e) => setFilterGrade(e.target.value)}
+                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500"
+              >
+                <option value="">All Taught Grades</option>
+                {teacherData?.grades?.map(g => (
+                  <option key={g} value={g}>{g}</option>
+                ))}
+              </select>
+           </div>
+           <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">By Subject</label>
+              <select 
+                value={filterSubject}
+                onChange={(e) => setFilterSubject(e.target.value)}
+                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500"
+              >
+                <option value="">All Subjects</option>
+                {allSubjects.map(sub => (
+                  <option key={sub.id} value={sub.id}>{sub.name}</option>
+                ))}
+              </select>
+           </div>
+           <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Status</label>
+              <select 
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500"
+              >
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Suspended</option>
+              </select>
+           </div>
+           <div className="flex items-end">
+              <button 
+                onClick={clearFilters}
+                className="w-full px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-xl text-xs font-black uppercase tracking-widest transition-all h-[42px] flex items-center justify-center gap-2"
+              >
+                <X className="w-3.5 h-3.5" /> Clear All
+              </button>
+           </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-0 divide-x divide-y divide-slate-50">

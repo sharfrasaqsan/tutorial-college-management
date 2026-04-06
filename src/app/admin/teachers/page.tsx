@@ -3,8 +3,8 @@
 import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle } from "lucide-react";
-import { Teacher } from "@/types/models";
+import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle, X } from "lucide-react";
+import { Teacher, Subject } from "@/types/models";
 import Link from "next/link";
 import TeacherModal from "@/components/admin/TeacherModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
@@ -17,6 +17,12 @@ export default function TeachersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+
+  // Filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterSubject, setFilterSubject] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [subjects, setSubjects] = useState<Subject[]>([]);
 
   // Delete State
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -36,8 +42,18 @@ export default function TeachersPage() {
     }
   };
 
+  const loadInitialData = async () => {
+    try {
+      const subjectSnap = await getDocs(query(collection(db, "subjects"), orderBy("name", "asc")));
+      setSubjects(subjectSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)));
+    } catch (error) {
+      console.error("Error loading subjects data", error);
+    }
+  }
+
   useEffect(() => {
     loadTeachers();
+    loadInitialData();
   }, []);
 
   const handleEdit = (teacher: Teacher) => {
@@ -85,10 +101,22 @@ export default function TeachersPage() {
     }
   };
 
-  const filteredTeachers = teachers.filter(t => 
-    t.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    t.subjects?.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredTeachers = teachers.filter(t => {
+    const matchesSearch = t.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          t.subjects?.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    // We check if the filter is empty, or if the teacher has any subject matching the filter (subject name check here, since subjects in teacher model are arrays of names, or arrays of IDs depending on implementation; assuming names for now given original search logic `t.subjects?.some(s => s...toLowerCase())`)
+    const matchesSubject = filterSubject === "" || (t.subjects && t.subjects.includes(filterSubject));
+    const matchesStatus = filterStatus === "" || t.status === filterStatus;
+    
+    return matchesSearch && matchesSubject && matchesStatus;
+  });
+
+  const clearFilters = () => {
+    setFilterSubject("");
+    setFilterStatus("");
+    setSearchTerm("");
+  };
 
   return (
     <div className="space-y-6">
@@ -139,10 +167,57 @@ export default function TeachersPage() {
               className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             />
           </div>
-          <button className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-2">
+          <button 
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-4 py-2 border rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${showFilters ? 'bg-primary/10 border-primary text-primary' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+          >
             <Filter className="w-4 h-4" /> Filters
+            {(filterSubject || filterStatus) && (
+              <span className="w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+            )}
           </button>
         </div>
+
+        {/* Filter Panel */}
+        {showFilters && (
+          <div className="p-4 border-b border-slate-100 bg-slate-50/30 grid grid-cols-1 sm:grid-cols-3 gap-4 animate-in slide-in-from-top duration-300">
+             <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Subject Expertise</label>
+                <select 
+                  value={filterSubject}
+                  onChange={(e) => setFilterSubject(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="">All Subjects</option>
+                  {subjects.map(sub => (
+                    // We use sub.name as value because the original UI shows teacher.subjects as an array of names or IDs, and we assume names here.
+                    <option key={sub.id} value={sub.name}>{sub.name}</option>
+                  ))}
+                </select>
+             </div>
+             <div className="space-y-1 flex flex-col">
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Account Status</label>
+                <div className="flex gap-2">
+                  <select 
+                    value={filterStatus}
+                    onChange={(e) => setFilterStatus(e.target.value)}
+                    className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  >
+                    <option value="">All Status</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Suspended</option>
+                  </select>
+                  <button 
+                    onClick={clearFilters}
+                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
+                    title="Clear All Filters"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+             </div>
+          </div>
+        )}
         
         <div className="overflow-x-auto min-h-[400px]">
           {loading ? (

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, BookOpen, Clock, Users, Calendar, Edit, Trash2, Ban, CheckCircle, AlertCircle } from "lucide-react";
+import { Plus, BookOpen, Clock, Users, Calendar, Edit, Trash2, Ban, CheckCircle, AlertCircle, Filter, X } from "lucide-react";
 import { Class, Teacher, Subject, Grade } from "@/types/models";
 import ClassModal from "@/components/admin/ClassModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
@@ -15,6 +15,13 @@ export default function ClassesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
+
+  // Filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterGrade, setFilterGrade] = useState("");
+  const [filterSubject, setFilterSubject] = useState("");
+  const [filterDay, setFilterDay] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
 
   // Delete State
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -102,10 +109,23 @@ export default function ClassesPage() {
     }
   };
 
-  const filteredClasses = classes.filter(c => 
-    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    c.subject?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredClasses = classes.filter(c => {
+    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.subject?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesGrade = filterGrade === "" || c.gradeId === filterGrade;
+    const matchesSubject = filterSubject === "" || c.subjectId === filterSubject;
+    const matchesDay = filterDay === "" || c.dayOfWeek === filterDay;
+    const matchesStatus = filterStatus === "" || c.status === filterStatus;
+    
+    return matchesSearch && matchesGrade && matchesSubject && matchesDay && matchesStatus;
+  });
+
+  const clearFilters = () => {
+    setFilterGrade("");
+    setFilterSubject("");
+    setFilterDay("");
+    setFilterStatus("");
+    setSearchTerm("");
+  };
 
   return (
     <div className="space-y-6">
@@ -160,14 +180,82 @@ export default function ClassesPage() {
           />
         </div>
         <div className="flex gap-2">
-           <button className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-2">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg> 
-            Filters
+           <button 
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-4 py-2 border rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${showFilters ? 'bg-primary/10 border-primary text-primary' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+           >
+            <Filter className="w-4 h-4" /> Filters
+            {(filterGrade || filterSubject || filterDay || filterStatus) && (
+              <span className="w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+            )}
            </button>
         </div>
       </div>
+
+      {/* Filter Panel */}
+      {showFilters && (
+        <div className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm grid grid-cols-1 sm:grid-cols-5 gap-4 animate-in slide-in-from-top duration-300">
+           <div className="space-y-1">
+              <label className="text-[10px] font-black   uppercase text-slate-400 ml-1">Grade</label>
+              <select 
+                value={filterGrade}
+                onChange={(e) => setFilterGrade(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="">All Grades</option>
+                {Object.values(grades).map(g => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+           </div>
+           <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Subject</label>
+              <select 
+                value={filterSubject}
+                onChange={(e) => setFilterSubject(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="">All Subjects</option>
+                {Object.values(subjects).map(sub => (
+                  <option key={sub.id} value={sub.id}>{sub.name}</option>
+                ))}
+              </select>
+           </div>
+           <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Day</label>
+              <select 
+                value={filterDay}
+                onChange={(e) => setFilterDay(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="">All Days</option>
+                {["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map(d => (
+                  <option key={d} value={d} className="capitalize">{d}</option>
+                ))}
+              </select>
+           </div>
+           <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Status</label>
+              <select 
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+              >
+                <option value="">All Status</option>
+                <option value="active">Active</option>
+                <option value="inactive">Suspended</option>
+              </select>
+           </div>
+           <div className="flex items-end">
+              <button 
+                onClick={clearFilters}
+                className="w-full h-[38px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2"
+              >
+                <X className="w-4 h-4" /> Clear All
+              </button>
+           </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {loading ? (
@@ -257,8 +345,10 @@ export default function ClassesPage() {
           );
         }) : (
           <div className="col-span-full py-20 text-center bg-white rounded-2xl border border-dashed border-slate-200">
-            <p className="text-slate-500">No classes found matching your criteria.</p>
-            <button className="mt-4 text-sm font-medium text-primary hover:underline">Clear search filters</button>
+            <p className="text-slate-500 font-medium">No classes found matching your criteria.</p>
+            {(searchTerm || filterGrade || filterSubject || filterDay || filterStatus) && (
+              <button onClick={clearFilters} className="mt-4 text-sm font-black uppercase tracking-widest text-primary hover:underline">Clear all filters</button>
+            )}
           </div>
         )}
       </div>

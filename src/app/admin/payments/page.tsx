@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { CreditCard, Plus, Search, Filter, Calendar, Download, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { CreditCard, Plus, Search, Filter, Calendar, Download, ArrowUpRight, ArrowDownLeft, X } from "lucide-react";
 import { Payment } from "@/types/models";
 import Link from "next/link";
 
@@ -11,6 +11,12 @@ export default function PaymentsPage() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterMethod, setFilterMethod] = useState("");
+  const [filterMonth, setFilterMonth] = useState("");
 
   useEffect(() => {
     async function loadPayments() {
@@ -27,9 +33,21 @@ export default function PaymentsPage() {
     loadPayments();
   }, []);
 
-  const filteredPayments = payments.filter(p => 
-    p.studentName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPayments = payments.filter(p => {
+    const matchesSearch = p.studentName?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === "" || p.status === filterStatus;
+    const matchesMethod = filterMethod === "" || p.method === filterMethod;
+    const matchesMonth = filterMonth === "" || p.month === filterMonth;
+    
+    return matchesSearch && matchesStatus && matchesMethod && matchesMonth;
+  });
+
+  const clearFilters = () => {
+    setFilterStatus("");
+    setFilterMethod("");
+    setFilterMonth("");
+    setSearchTerm("");
+  };
 
   return (
     <div className="space-y-6">
@@ -77,14 +95,69 @@ export default function PaymentsPage() {
             />
           </div>
           <div className="flex gap-2">
-            <button className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-2">
+            <button 
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-4 py-2 border rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${showFilters ? 'bg-primary/10 border-primary text-primary' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+            >
                 <Filter className="w-4 h-4" /> Filters
+                {(filterStatus || filterMethod || filterMonth) && (
+                  <span className="w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+                )}
             </button>
             <button className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-50 flex items-center gap-2">
                 <Download className="w-4 h-4" /> Export CSV
             </button>
           </div>
         </div>
+
+        {/* Filter Panel */}
+        {showFilters && (
+          <div className="p-4 border-b border-slate-100 bg-slate-50/30 grid grid-cols-1 sm:grid-cols-4 gap-4 animate-in slide-in-from-top duration-300">
+             <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Status</label>
+                <select 
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="">All Status</option>
+                  <option value="paid">Paid</option>
+                  <option value="pending">Pending</option>
+                  <option value="partial">Partial</option>
+                </select>
+             </div>
+             <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Method</label>
+                <select 
+                  value={filterMethod}
+                  onChange={(e) => setFilterMethod(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                >
+                  <option value="">All Methods</option>
+                  <option value="cash">Cash</option>
+                  <option value="card">Card</option>
+                  <option value="bank_transfer">Bank Transfer</option>
+                </select>
+             </div>
+             <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Month</label>
+                <input 
+                  type="month"
+                  value={filterMonth}
+                  onChange={(e) => setFilterMonth(e.target.value)}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+             </div>
+             <div className="flex items-end">
+                <button 
+                  onClick={clearFilters}
+                  className="w-full h-[38px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2"
+                >
+                  <X className="w-4 h-4" /> Clear All
+                </button>
+             </div>
+          </div>
+        )}
         
         <div className="overflow-x-auto">
           {loading ? (
