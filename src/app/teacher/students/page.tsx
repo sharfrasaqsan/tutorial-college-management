@@ -60,7 +60,7 @@ export default function MyStudentsPage() {
   };
 
   const filteredStudents = students.filter(s => {
-    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.phone.includes(searchTerm);
+    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || (s.phone?.includes(searchTerm));
     const matchesGrade = filterGrade === "" || s.grade === filterGrade;
     const matchesStatus = filterStatus === "" || s.status === filterStatus;
     const matchesSubject = filterSubject === "" || (s.enrolledSubjects && s.enrolledSubjects.includes(filterSubject));
@@ -183,7 +183,7 @@ export default function MyStudentsPage() {
                 <div className="grid grid-cols-2 gap-2 w-full mt-auto">
                     <div className="bg-slate-50 p-3 rounded-2xl flex flex-col items-center">
                         <Phone className="w-3.5 h-3.5 text-slate-400 mb-1" />
-                        <span className="text-[10px] font-bold text-slate-600">{s.phone}</span>
+                        <span className="text-[10px] font-bold text-slate-600">{s.phone || s.parentPhone}</span>
                     </div>
                     <div className="bg-slate-50 p-3 rounded-2xl flex flex-col items-center">
                         <Activity className="w-3.5 h-3.5 text-emerald-400 mb-1" />

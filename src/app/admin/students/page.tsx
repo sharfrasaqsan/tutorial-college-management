@@ -105,7 +105,7 @@ export default function StudentsPage() {
   };
 
   const filteredStudents = students.filter(s => {
-    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.phone.includes(searchTerm);
+    const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) || (s.phone?.includes(searchTerm));
     const matchesGrade = filterGrade === "" || s.grade === filterGrade;
     const matchesStatus = filterStatus === "" || s.status === filterStatus;
     const matchesSubject = filterSubject === "" || (s.enrolledSubjects && s.enrolledSubjects.includes(filterSubject));
@@ -265,7 +265,7 @@ export default function StudentsPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className={`${student.status === 'inactive' ? 'text-slate-400' : 'text-slate-700'}`}>{student.phone}</p>
+                      <p className={`${student.status === 'inactive' ? 'text-slate-400' : 'text-slate-700'} font-medium`}>{student.phone || student.parentPhone}</p>
                       <p className="text-xs text-slate-500">{student.parentName}</p>
                     </td>
                     <td className="px-6 py-4">

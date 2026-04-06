@@ -7,9 +7,9 @@ export type FirestoreTimestamp = {
 export interface Student {
   id: string;
   name: string;
-  phone: string;
+  phone?: string;
   parentName: string;
-  parentPhone?: string;
+  parentPhone: string;
   schoolName: string;
   address: string;
   gender: 'male' | 'female' | 'other';

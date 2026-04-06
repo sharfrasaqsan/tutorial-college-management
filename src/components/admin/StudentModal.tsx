@@ -14,9 +14,9 @@ import { BookOpen } from "lucide-react";
 
 const studentSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
-  phone: z.string().min(10, "Phone number must be at least 10 digits"),
+  phone: z.string().optional(),
   parentName: z.string().min(3, "Parent name is required"),
-  parentPhone: z.string().min(10, "Parent phone is required"),
+  parentPhone: z.string().min(10, "Parent phone number is required"),
   schoolName: z.string().min(3, "School name is required"),
   address: z.string().min(5, "Address is required"),
   grade: z.string().min(1, "Grade is required"),
@@ -91,9 +91,9 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
     if (initialData) {
       reset({
         name: initialData.name,
-        phone: initialData.phone,
+        phone: initialData.phone || "",
         parentName: initialData.parentName,
-        parentPhone: initialData.parentPhone || "",
+        parentPhone: initialData.parentPhone,
         schoolName: initialData.schoolName,
         address: initialData.address,
         grade: initialData.grade || "",
@@ -174,7 +174,9 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
                 </div>
                 
                 <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Phone Number</label>
+                  <label className="text-sm font-semibold text-slate-700 ml-1 flex justify-between items-center">
+                    Student Phone <span className="text-[10px] text-slate-400 font-normal uppercase">(Optional)</span>
+                  </label>
                   <input 
                     {...register("phone")}
                     placeholder="e.g. 0771234567"
