@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc, writeBatch, increment, where } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, doc, updateDoc, writeBatch, increment, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Plus, BookOpen, Clock, Users, Calendar, Edit, Trash2, Ban, CheckCircle, AlertCircle, Filter, X } from "lucide-react";
 import { Class, Teacher, Subject, Grade } from "@/types/models";
@@ -98,7 +98,7 @@ export default function ClassesPage() {
     const batch = writeBatch(db);
     try {
         const cls = classes.find(c => c.id === classToDelete);
-        if (cls && cls.gradeId) {
+        if (cls && cls.gradeId && grades[cls.gradeId]) {
           batch.update(doc(db, "grades", cls.gradeId), { classCount: increment(-1) });
         }
 
@@ -108,9 +108,9 @@ export default function ClassesPage() {
         
         studentsInClass.docs.forEach((stdDoc, index) => {
           if (index < 490) { // Safety limit for batch operations
-            const stdData = stdDoc.data();
-            const newClasses = (stdData.enrolledClasses || []).filter((id: string) => id !== classToDelete);
-            batch.update(doc(db, "students", stdDoc.id), { enrolledClasses: newClasses });
+            batch.update(doc(db, "students", stdDoc.id), { 
+              enrolledClasses: (stdDoc.data().enrolledClasses || []).filter((id: string) => id !== classToDelete) 
+            });
           }
         });
 

@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc, writeBatch, increment } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, doc, updateDoc, writeBatch, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle, X, ChevronDown } from "lucide-react";
+import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle, X } from "lucide-react";
 import { Student, Grade, Subject } from "@/types/models";
 import Link from "next/link";
 import StudentModal from "@/components/admin/StudentModal";
@@ -30,6 +30,8 @@ export default function StudentsPage() {
   const [studentToDelete, setStudentToDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [classesList, setClassesList] = useState<Record<string, boolean>>({});
+  
   const loadStudents = async () => {
     setLoading(true);
     try {
@@ -45,12 +47,17 @@ export default function StudentsPage() {
 
   const loadInitialData = async () => {
     try {
-      const [gradeSnap, subjectSnap] = await Promise.all([
+      const [gradeSnap, subjectSnap, classSnap] = await Promise.all([
         getDocs(query(collection(db, "grades"), orderBy("name", "asc"))),
-        getDocs(query(collection(db, "subjects"), orderBy("name", "asc")))
+        getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
+        getDocs(collection(db, "classes"))
       ]);
       setGrades(gradeSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Grade)));
       setSubjects(subjectSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)));
+      
+      const classMap: Record<string, boolean> = {};
+      classSnap.docs.forEach(d => classMap[d.id] = true);
+      setClassesList(classMap);
     } catch (error) {
       console.error("Error loading filters data", error);
     }
@@ -95,18 +102,22 @@ export default function StudentsPage() {
         const student = students.find(s => s.id === studentToDelete);
         if (student) {
           // 1. Decrement Grade Count
-          if (student.gradeId) {
+          if (student.gradeId && grades.some(g => g.id === student.gradeId)) {
             batch.update(doc(db, "grades", student.gradeId), { studentCount: increment(-1) });
           }
 
           // 2. Decrement Class Counts
           student.enrolledClasses?.forEach(cid => {
-            batch.update(doc(db, "classes", cid), { studentCount: increment(-1) });
+            if (classesList[cid]) {
+              batch.update(doc(db, "classes", cid), { studentCount: increment(-1) });
+            }
           });
 
           // 3. Decrement Subject Counts
           student.enrolledSubjects?.forEach(sid => {
-            batch.update(doc(db, "subjects", sid), { studentCount: increment(-1) });
+            if (subjects.some(s => s.id === sid)) {
+              batch.update(doc(db, "subjects", sid), { studentCount: increment(-1) });
+            }
           });
         }
 
