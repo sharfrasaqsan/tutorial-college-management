@@ -115,12 +115,14 @@ export default function AdminDashboard() {
                         </tr>
                     ))
                 ) : (stats?.recentStudents?.length || 0) > 0 ? stats!.recentStudents.map((student: DashboardStudent) => (
-                  <tr key={student.id} className="hover:bg-slate-50/50 group/row">
-                    <td 
-                        className="px-6 py-4 font-medium text-slate-800 cursor-pointer group-hover/row:text-primary transition-colors"
+                  <tr key={student.id} className="hover:bg-slate-50/50">
+                    <td className="px-6 py-4">
+                      <button 
                         onClick={() => openStudentProfile(student.id)}
-                    >
+                        className="font-medium text-slate-800 hover:text-primary transition-colors text-left"
+                      >
                         {student.name}
+                      </button>
                     </td>
                     <td className="px-6 py-4 text-slate-600">{student.phone}</td>
                     <td className="px-6 py-4 text-slate-600">{student.schoolName}</td>
