@@ -295,10 +295,12 @@ export default function ClassesPage() {
           const subject = subjects[item.subjectId];
           const grade = grades[item.gradeId];
 
-          const isTeacherInactive = teacher?.status === 'inactive';
-          const isSubjectInactive = subject?.status === 'inactive';
-          const isGradeInactive = grade?.status === 'inactive';
+          const isTeacherInactive = !teacher || teacher.status === 'inactive';
+          const isSubjectInactive = !subject || subject.status === 'inactive';
+          const isGradeInactive = !grade || grade.status === 'inactive';
           const isClassInactive = item.status === 'inactive';
+
+          const isDependencyMissing = !teacher || !subject || !grade;
 
           return (
             <div key={item.id} className={`bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all p-6 flex flex-col group ${isClassInactive ? 'opacity-70 grayscale-[0.3]' : ''}`}>
@@ -311,9 +313,9 @@ export default function ClassesPage() {
                       {isClassInactive ? 'Suspended' : 'Active'}
                     </span>
                     {(isTeacherInactive || isSubjectInactive || isGradeInactive) && !isClassInactive && (
-                        <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-50 text-amber-600 rounded-md border border-amber-100 animate-pulse">
+                        <div className={`flex items-center gap-1.5 px-2 py-1 ${isDependencyMissing ? 'bg-red-50 text-red-600 border-red-100' : 'bg-amber-50 text-amber-600 border-amber-100'} rounded-md border animate-pulse`}>
                             <AlertCircle className="w-3 h-3" />
-                            <span className="text-[9px] font-black uppercase">Dependency Offline</span>
+                            <span className="text-[9px] font-black uppercase">{isDependencyMissing ? 'Dependency Missing' : 'Dependency Offline'}</span>
                         </div>
                     )}
                 </div>

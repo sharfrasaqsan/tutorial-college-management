@@ -7,7 +7,8 @@ import * as z from "zod";
 import { serverTimestamp, setDoc, doc, collection, getDocs, orderBy, query, updateDoc } from "firebase/firestore";
 import { createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { db, auth } from "@/lib/firebase";
-import { Loader2, User, Mail, BookOpen } from "lucide-react";
+import { Loader2, User, Mail, BookOpen, AlertCircle } from "lucide-react";
+import Link from "next/link";
 import toast from "react-hot-toast";
 import Modal from "@/components/ui/Modal";
 import { Subject, Grade, Teacher } from "@/types/models";
@@ -41,19 +42,24 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
   const [dbGrades, setDbGrades] = useState<Grade[]>([]);
 
   useEffect(() => {
-    async function loadMetadata() {
-      try {
-        const [subSnap, grSnap] = await Promise.all([
-          getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
-          getDocs(query(collection(db, "grades"), orderBy("name", "asc")))
-        ]);
-        setDbSubjects(subSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)));
-        setDbGrades(grSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Grade)));
-      } catch (error) {
-        console.error("Error loading metadata:", error);
+    const loadMetadata = async () => {
+      if (isOpen) {
+        setLoading(true);
+        try {
+          const [subSnap, grSnap] = await Promise.all([
+            getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
+            getDocs(query(collection(db, "grades"), orderBy("name", "asc")))
+          ]);
+          setDbSubjects(subSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)).filter(s => s.status === 'active'));
+          setDbGrades(grSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Grade)).filter(g => g.status === 'active'));
+        } catch (error) {
+          console.error("Error loading metadata:", error);
+        } finally {
+          setLoading(false);
+        }
       }
-    }
-    if (isOpen) loadMetadata();
+    };
+    loadMetadata();
   }, [isOpen]);
 
   const {
@@ -296,8 +302,11 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
             </h4>
             
             <div className="space-y-2">
-               <label className="text-sm font-semibold text-slate-700 ml-1">Subjects Handled</label>
-               <div className="flex flex-wrap gap-2">
+               <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center justify-between">
+                  Subjects Handled
+                  {dbSubjects.length === 0 && <span className="text-[10px] text-red-500 italic">No subject definitions found</span>}
+               </label>
+               <div className="flex flex-wrap gap-2 p-3 bg-slate-50 border border-dashed border-slate-200 rounded-xl min-h-[50px]">
                   {dbSubjects.length > 0 ? dbSubjects.map(s => (
                     <button 
                         key={s.id}
@@ -307,13 +316,22 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
                     >
                         {s.name}
                     </button>
-                  )) : null}
+                  )) : (
+                    <div className="flex items-center gap-2 text-slate-400">
+                        <AlertCircle className="w-4 h-4" />
+                        <p className="text-xs">No subjects available. <Link href="/admin/subjects" className="text-primary hover:underline font-bold">Set up subjects first.</Link></p>
+                    </div>
+                  )}
                </div>
+               {errors.subjects && <p className="text-xs text-red-500 ml-1 mt-1">{errors.subjects.message}</p>}
             </div>
 
             <div className="space-y-2">
-               <label className="text-sm font-semibold text-slate-700 ml-1">Assigned Grades</label>
-               <div className="flex flex-wrap gap-2">
+               <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center justify-between">
+                  Assigned Grades
+                  {dbGrades.length === 0 && <span className="text-[10px] text-red-500 italic">No grade definitions found</span>}
+               </label>
+               <div className="flex flex-wrap gap-2 p-3 bg-slate-50 border border-dashed border-slate-200 rounded-xl min-h-[50px]">
                   {dbGrades.length > 0 ? dbGrades.map(g => (
                     <button 
                         key={g.id}
@@ -323,8 +341,14 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
                     >
                         {g.name}
                     </button>
-                  )) : null}
+                  )) : (
+                    <div className="flex items-center gap-2 text-slate-400">
+                        <AlertCircle className="w-4 h-4" />
+                        <p className="text-xs">No grades available. <Link href="/admin/grades" className="text-primary hover:underline font-bold">Set up grades first.</Link></p>
+                    </div>
+                  )}
                </div>
+               {errors.grades && <p className="text-xs text-red-500 ml-1 mt-1">{errors.grades.message}</p>}
             </div>
             
             <div className="grid grid-cols-1 gap-4 pt-2">

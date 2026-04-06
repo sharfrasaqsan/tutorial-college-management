@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, doc, updateDoc, writeBatch, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Plus, BookType, Hash, Search, Filter, BookOpen, Edit, Trash2, Ban, CheckCircle } from "lucide-react";
 import { Subject } from "@/types/models";
@@ -68,8 +68,19 @@ export default function SubjectsPage() {
     if (!subjectToDelete) return;
     setDeleting(true);
     try {
-        await deleteDoc(doc(db, "subjects", subjectToDelete));
-        toast.success("Subject definition purged.");
+        const batch = writeBatch(db);
+
+        // Auto-Deactivate associated classes
+        const classQuery = query(collection(db, "classes"), where("subjectId", "==", subjectToDelete));
+        const classSnap = await getDocs(classQuery);
+        classSnap.docs.forEach(cdoc => {
+          batch.update(doc(db, "classes", cdoc.id), { status: 'inactive' });
+        });
+
+        batch.delete(doc(db, "subjects", subjectToDelete));
+        
+        await batch.commit();
+        toast.success("Subject definition purged. Associated classes suspended.");
         setIsDeleteOpen(false);
         setSubjectToDelete(null);
         loadSubjects();

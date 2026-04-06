@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, doc, updateDoc, writeBatch, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle, X } from "lucide-react";
 import { Teacher, Subject } from "@/types/models";
@@ -87,9 +87,20 @@ export default function TeachersPage() {
     if (!teacherToDelete) return;
     setDeleting(true);
     try {
-        await deleteDoc(doc(db, "teachers", teacherToDelete));
-        await deleteDoc(doc(db, "users", teacherToDelete));
-        toast.success("Faculty records purged.");
+        const batch = writeBatch(db);
+        
+        // Auto-Deactivate associated classes
+        const classQuery = query(collection(db, "classes"), where("teacherId", "==", teacherToDelete));
+        const classSnap = await getDocs(classQuery);
+        classSnap.docs.forEach(cdoc => {
+          batch.update(doc(db, "classes", cdoc.id), { status: 'inactive' });
+        });
+
+        batch.delete(doc(db, "teachers", teacherToDelete));
+        batch.delete(doc(db, "users", teacherToDelete));
+        
+        await batch.commit();
+        toast.success("Faculty records purged. Linked classes suspended.");
         setIsDeleteOpen(false);
         setTeacherToDelete(null);
         loadTeachers();

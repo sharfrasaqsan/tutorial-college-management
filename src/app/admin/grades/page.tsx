@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, doc, updateDoc, writeBatch, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Layers, Plus, Search, Filter, Calendar, User, Edit, Trash2, Ban, CheckCircle } from "lucide-react";
 import { Grade } from "@/types/models";
@@ -68,8 +68,19 @@ export default function GradesPage() {
     if (!gradeToDelete) return;
     setDeleting(true);
     try {
-        await deleteDoc(doc(db, "grades", gradeToDelete));
-        toast.success("Grade parameter removed.");
+        const batch = writeBatch(db);
+
+        // Auto-Deactivate associated classes
+        const classQuery = query(collection(db, "classes"), where("gradeId", "==", gradeToDelete));
+        const classSnap = await getDocs(classQuery);
+        classSnap.docs.forEach(cdoc => {
+          batch.update(doc(db, "classes", cdoc.id), { status: 'inactive' });
+        });
+
+        batch.delete(doc(db, "grades", gradeToDelete));
+        
+        await batch.commit();
+        toast.success("Grade parameter removed. Related classes suspended.");
         setIsDeleteOpen(false);
         setGradeToDelete(null);
         loadGrades();
