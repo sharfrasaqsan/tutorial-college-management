@@ -350,24 +350,34 @@ export default function ClassesPage() {
                 
                 <div className="space-y-2 mt-2">
                   <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Weekly Schedule</p>
-                  {item.schedules?.map((schedule, idx) => (
-                    <div key={idx} className="flex flex-col gap-1 p-2 rounded-xl bg-slate-50 border border-slate-100/50">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-[11px] font-bold text-slate-700">
-                          <Calendar className="w-3 h-3 text-primary" />
-                          <span className="capitalize">{schedule.dayOfWeek}</span>
+                  {(item.schedules || [])
+                    .sort((a, b) => {
+                      const dayOrder: Record<string, number> = { 
+                        "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, 
+                        "friday": 4, "saturday": 5, "sunday": 6 
+                      };
+                      const dayCompare = dayOrder[a.dayOfWeek.toLowerCase()] - dayOrder[b.dayOfWeek.toLowerCase()];
+                      if (dayCompare !== 0) return dayCompare;
+                      return a.startTime.localeCompare(b.startTime);
+                    })
+                    .map((schedule, idx) => (
+                      <div key={idx} className="flex flex-col gap-1 p-2 rounded-xl bg-slate-50 border border-slate-100/50">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-[11px] font-bold text-slate-700">
+                            <Calendar className="w-3 h-3 text-primary" />
+                            <span className="capitalize">{schedule.dayOfWeek}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-500 uppercase">
+                            <Clock className="w-3 h-3" />
+                            {schedule.startTime} - {schedule.endTime}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-500 uppercase">
-                          <Clock className="w-3 h-3" />
-                          {schedule.startTime} - {schedule.endTime}
+                        <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-400">
+                          <MapPin className="w-3 h-3 text-amber-500" />
+                          {schedule.room}
                         </div>
                       </div>
-                      <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-400">
-                        <MapPin className="w-3 h-3 text-amber-500" />
-                        {schedule.room}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
                 </div>
               </div>
 
