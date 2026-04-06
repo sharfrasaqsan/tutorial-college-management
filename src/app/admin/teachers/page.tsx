@@ -11,8 +11,10 @@ import TeacherModal from "@/components/admin/TeacherModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import NextImage from "next/image";
 import toast from "react-hot-toast";
+import { useTeacherProfile } from "@/context/TeacherProfileContext";
 
 export default function TeachersPage() {
+  const { openTeacherProfile } = useTeacherProfile();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -309,7 +311,12 @@ export default function TeachersPage() {
                           )}
                         </div>
                         <div>
-                          <p className={`font-semibold ${teacher.status === 'inactive' ? 'text-slate-500' : 'text-slate-800'}`}>{teacher.name}</p>
+                          <button 
+                            onClick={() => openTeacherProfile(teacher.id)}
+                            className={`font-semibold text-left hover:text-primary transition-colors ${teacher.status === 'inactive' ? 'text-slate-500' : 'text-slate-800'}`}
+                          >
+                            {teacher.name}
+                          </button>
                           <p className="text-xs text-slate-500">Faculty ID: {teacher.teacherId || 'N/A'}</p>
                         </div>
                       </div>

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { StudentProfileProvider } from "@/context/StudentProfileContext";
+import { TeacherProfileProvider } from "@/context/TeacherProfileContext";
 import { Toaster } from "react-hot-toast";
 
 const geistSans = Geist({
@@ -33,8 +34,10 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-slate-50 text-slate-900">
         <AuthProvider>
           <StudentProfileProvider>
-            {children}
-            <Toaster position="top-right" />
+            <TeacherProfileProvider>
+              {children}
+              <Toaster position="top-right" />
+            </TeacherProfileProvider>
           </StudentProfileProvider>
         </AuthProvider>
       </body>
