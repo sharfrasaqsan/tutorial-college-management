@@ -242,10 +242,10 @@ export default function StudentsPage() {
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
                 <tr>
-                  <th className="px-6 py-4">Student Name</th>
-                  <th className="px-6 py-4">Contact</th>
-                  <th className="px-6 py-4">Grade & Subjects</th>
-                  <th className="px-6 py-4">School</th>
+                   <th className="px-6 py-4">Student Name</th>
+                   <th className="px-6 py-4">Contact</th>
+                   <th className="px-6 py-4">Enrollments</th>
+                   <th className="px-6 py-4">School</th>
                   <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
@@ -270,9 +270,14 @@ export default function StudentsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <p className="font-medium text-slate-700">{student.grade || 'N/A'}</p>
-                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">
-                        {student.enrolledSubjects?.length || 0} Subjects Enrolled
-                      </p>
+                      <div className="flex gap-2 mt-1">
+                        <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                          {(student.enrolledClasses?.length || 0)} Classes
+                        </span>
+                        <span className="text-[10px] bg-primary/5 text-primary px-1.5 py-0.5 rounded font-bold uppercase tracking-wider">
+                          {(student.enrolledSubjects?.length || 0)} Subjects
+                        </span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-slate-600">{student.schoolName}</td>
                     <td className="px-6 py-4">

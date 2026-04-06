@@ -173,11 +173,14 @@ export default function MyStudentsPage() {
                 <h4 className="text-lg font-black text-slate-800 mb-1 leading-tight">{s.name}</h4>
                 <div className="flex flex-col gap-1 items-center mb-6">
                     <p className="text-[10px] font-black uppercase text-indigo-600 tracking-widest bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">{s.grade}</p>
-                    {s.enrolledSubjects && s.enrolledSubjects.length > 0 && (
-                        <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest leading-none">
-                            {s.enrolledSubjects.length} Subjects Enrolled
-                        </p>
-                    )}
+                    <div className="flex gap-2 items-center mt-1">
+                      <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest leading-none border-r border-slate-100 pr-2">
+                          {s.enrolledClasses?.length || 0} Classes
+                      </p>
+                      <p className="text-[9px] font-black uppercase text-indigo-400 tracking-widest leading-none">
+                          {s.enrolledSubjects?.length || 0} Subjects
+                      </p>
+                    </div>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-2 w-full mt-auto">

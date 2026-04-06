@@ -7,7 +7,7 @@ import * as z from "zod";
 import { collection, addDoc, getDocs, orderBy, serverTimestamp, query, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Loader2, User, Phone, MapPin, GraduationCap } from "lucide-react";
-import { Grade, Student, Subject } from "@/types/models";
+import { Grade, Student, Subject, Class } from "@/types/models";
 import toast from "react-hot-toast";
 import Modal from "@/components/ui/Modal";
 import { BookOpen } from "lucide-react";
@@ -24,6 +24,7 @@ const studentSchema = z.object({
   gender: z.enum(["male", "female", "other"]),
   status: z.enum(["active", "inactive"]),
   enrolledSubjects: z.array(z.string()).optional(),
+  enrolledClasses: z.array(z.string()).optional(),
 });
 
 type StudentForm = z.infer<typeof studentSchema>;
@@ -39,6 +40,8 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
   const [loading, setLoading] = useState(false);
   const [grades, setGrades] = useState<Grade[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [availableClasses, setAvailableClasses] = useState<Class[]>([]);
+  const [fetchingClasses, setFetchingClasses] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -73,18 +76,38 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
       status: "active",
       gender: "male",
       enrolledSubjects: [],
+      enrolledClasses: [],
     }
   });
 
   const selectedGrade = watch("grade");
-  const selectedSubjects = watch("enrolledSubjects") || [];
+  const selectedClassIds = watch("enrolledClasses") || [];
 
   useEffect(() => {
     const gradeObj = grades.find(g => g.name === selectedGrade);
     if (gradeObj) {
       setValue("gradeId", gradeObj.id);
+      loadClasses(gradeObj.id);
+    } else {
+      setAvailableClasses([]);
     }
   }, [selectedGrade, grades, setValue]);
+
+  const loadClasses = async (gradeId: string) => {
+    setFetchingClasses(true);
+    try {
+      const q = query(collection(db, "classes"), orderBy("name", "asc"));
+      // We filter manually to avoid complex index requirements for simple queries if possible, 
+      // but usually where("gradeId", "==", gradeId) is better.
+      const snap = await getDocs(q);
+      const all = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Class));
+      setAvailableClasses(all.filter(c => c.gradeId === gradeId));
+    } catch (error) {
+      console.error("Error loading classes:", error);
+    } finally {
+      setFetchingClasses(false);
+    }
+  };
 
   // Re-sync form when initialData changes or modal opens
   useEffect(() => {
@@ -101,6 +124,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
         gender: initialData.gender || "male",
         status: initialData.status,
         enrolledSubjects: initialData.enrolledSubjects || [],
+        enrolledClasses: initialData.enrolledClasses || [],
       });
     } else {
       reset({
@@ -115,6 +139,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
         gender: "male",
         status: "active",
         enrolledSubjects: [],
+        enrolledClasses: [],
       });
     }
   }, [initialData, reset, isOpen]);
@@ -122,6 +147,15 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
   const onSubmit = async (data: StudentForm) => {
     setLoading(true);
     try {
+      // Derive subjects from selected classes
+      const subjectsSet = new Set<string>();
+      availableClasses.forEach(c => {
+        if (data.enrolledClasses?.includes(c.id)) {
+          subjectsSet.add(c.subjectId);
+        }
+      });
+      data.enrolledSubjects = Array.from(subjectsSet);
+
       if (initialData) {
         // Update
         const studentRef = doc(db, "students", initialData.id);
@@ -241,42 +275,61 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
                 </div>
              </div>
 
-             {/* Subject Selection */}
-             <div className="space-y-2 mt-4">
-                <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2">
-                   <BookOpen className="w-3.5 h-3.5 text-primary/60" /> Enrolled Subjects
+             {/* Class Selection */}
+             <div className="space-y-3 mt-4">
+                <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center justify-between">
+                   <div className="flex items-center gap-2">
+                    <BookOpen className="w-3.5 h-3.5 text-primary/60" /> Class Enrollment
+                   </div>
+                   {fetchingClasses && <Loader2 className="w-3 h-3 animate-spin text-primary" />}
                 </label>
-                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
-                   {subjects.map(subject => (
-                     <label 
-                       key={subject.id} 
-                       className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${
-                         selectedSubjects.includes(subject.id) 
-                         ? 'bg-primary/10 border-primary/30 text-primary font-bold' 
-                         : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
-                       }`}
-                     >
-                       <input 
-                         type="checkbox"
-                         value={subject.id}
-                         className="hidden"
-                         checked={selectedSubjects.includes(subject.id)}
-                         onChange={(e) => {
-                           const val = e.target.value;
-                           const updated = e.target.checked 
-                             ? [...selectedSubjects, val]
-                             : selectedSubjects.filter(i => i !== val);
-                           setValue("enrolledSubjects", updated);
-                         }}
-                       />
-                       <span className="text-xs uppercase tracking-tight">{subject.name}</span>
-                     </label>
-                   ))}
-                   {subjects.length === 0 && (
-                     <p className="text-[10px] text-slate-400 italic">No subjects available.</p>
-                   )}
-                </div>
-                {errors.enrolledSubjects && <p className="text-xs text-red-500 ml-1 mt-1">{errors.enrolledSubjects.message}</p>}
+                
+                {!selectedGrade ? (
+                  <div className="p-8 border-2 border-dashed border-slate-100 rounded-2xl text-center">
+                    <p className="text-xs text-slate-400">Please select a grade above to view available classes.</p>
+                  </div>
+                ) : availableClasses.length === 0 ? (
+                  <div className="p-8 border-2 border-dashed border-slate-100 rounded-2xl text-center">
+                    <p className="text-xs text-slate-400">{fetchingClasses ? 'Loading sessions...' : 'No classes scheduled for this grade yet.'}</p>
+                    <a href="/admin/classes" className="text-[10px] text-primary font-bold uppercase hover:underline mt-2 block">Schedule a Class</a>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2">
+                    {availableClasses.map(cls => (
+                      <label 
+                        key={cls.id} 
+                        className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer group ${
+                          selectedClassIds.includes(cls.id) 
+                          ? 'bg-primary/5 border-primary shadow-sm' 
+                          : 'bg-white border-slate-100 hover:border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${selectedClassIds.includes(cls.id) ? 'bg-primary text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'}`}>
+                            <BookOpen className="w-5 h-5" />
+                          </div>
+                          <div>
+                            <p className={`font-bold text-sm ${selectedClassIds.includes(cls.id) ? 'text-primary' : 'text-slate-700'}`}>{cls.name}</p>
+                            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">{cls.subject} • {cls.dayOfWeek}s</p>
+                          </div>
+                        </div>
+                        <input 
+                          type="checkbox"
+                          className="w-5 h-5 rounded-lg border-slate-200 text-primary focus:ring-primary/20 transition-all cursor-pointer"
+                          checked={selectedClassIds.includes(cls.id)}
+                          onChange={(e) => {
+                            const val = cls.id;
+                            const updated = e.target.checked 
+                              ? [...selectedClassIds, val]
+                              : selectedClassIds.filter(i => i !== val);
+                            setValue("enrolledClasses", updated, { shouldValidate: true });
+                          }}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                )}
+                {errors.enrolledClasses && <p className="text-xs text-red-500 ml-1 mt-1">{errors.enrolledClasses.message}</p>}
              </div>
           </div>
 
