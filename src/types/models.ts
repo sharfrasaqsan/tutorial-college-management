@@ -37,6 +37,13 @@ export interface Teacher {
   status: 'active' | 'inactive';
 }
 
+export interface ClassSchedule {
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  room: string;
+}
+
 export interface Class {
   id: string;
   name: string;
@@ -45,10 +52,8 @@ export interface Class {
   grade: string;
   gradeId: string;
   teacherId: string;
-  dayOfWeek: string;
-  startTime: string;
-  endTime: string;
-  room: string;
+  teacherName: string;
+  schedules: ClassSchedule[];
   monthlyFee: number;
   studentCount?: number;
   status: 'active' | 'inactive';

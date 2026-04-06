@@ -195,7 +195,7 @@ export default function TeacherDashboard() {
                     <div key={item.id} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between group hover:border-indigo-200 transition-colors">
                         <div className="flex items-center gap-4">
                             <div className="w-12 h-12 bg-slate-50 rounded-2xl flex flex-col items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-colors">
-                                <span className="text-[10px] font-black uppercase tracking-tighter">{item.dayOfWeek?.substring(0,3)}</span>
+                                <span className="text-[10px] font-black uppercase tracking-tighter">{item.schedules?.[0]?.dayOfWeek?.substring(0,3) || '---'}</span>
                                 <Clock className="w-4 h-4" />
                             </div>
                             <div>
@@ -203,7 +203,9 @@ export default function TeacherDashboard() {
                                 <div className="flex items-center gap-2 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                                     <span>{item.subject}</span>
                                     <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                                    <span className="text-indigo-600 font-black">{item.startTime} - {item.endTime}</span>
+                                    <span className="text-indigo-600 font-black">
+                                        {item.schedules?.[0] ? `${item.schedules[0].startTime} - ${item.schedules[0].endTime}` : 'Time TBD'}
+                                    </span>
                                 </div>
                             </div>
                         </div>

@@ -1,26 +1,30 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { collection, getDocs, query, orderBy, serverTimestamp, doc, writeBatch, increment, where } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, serverTimestamp, doc, writeBatch, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Loader2, BookOpen, Calendar, Clock, MapPin } from "lucide-react";
+import { Loader2, BookOpen, Calendar, Clock, MapPin, Plus, Trash2 } from "lucide-react";
 import { Teacher, Grade, Subject, Class } from "@/types/models";
 import toast from "react-hot-toast";
 import Modal from "@/components/ui/Modal";
 import Skeleton from "@/components/ui/Skeleton";
+
+const scheduleSchema = z.object({
+  dayOfWeek: z.string().min(1, "Day is required"),
+  startTime: z.string().min(1, "Start time is required"),
+  endTime: z.string().min(1, "End time is required"),
+  room: z.string().min(1, "Room is required"),
+});
 
 const classSchema = z.object({
   name: z.string().min(3, "Class name must be at least 3 characters"),
   subjectId: z.string().min(1, "Subject is required"),
   gradeId: z.string().min(1, "Grade is required"),
   teacherId: z.string().min(1, "Teacher is required"),
-  dayOfWeek: z.string().min(1, "Day of week is required"),
-  startTime: z.string().min(1, "Start time is required"),
-  endTime: z.string().min(1, "End time is required"),
-  room: z.string().min(1, "Room/Hall is required"),
+  schedules: z.array(scheduleSchema).min(1, "At least one schedule is required"),
   monthlyFee: z.coerce.number().min(0, "Fee must be a positive number"),
   status: z.enum(["active", "inactive"]),
 });
@@ -40,6 +44,29 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
   const [grades, setGrades] = useState<Grade[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [metaLoading, setMetaLoading] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    control,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(classSchema),
+    defaultValues: {
+      status: "active",
+      name: "",
+      monthlyFee: 0,
+      schedules: [{ dayOfWeek: "monday", startTime: "", endTime: "", room: "" }],
+    }
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "schedules",
+  });
 
   useEffect(() => {
     async function loadData() {
@@ -63,23 +90,6 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
     if (isOpen) loadData();
   }, [isOpen]);
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    watch,
-    setValue,
-    formState: { errors },
-  } = useForm<ClassForm>({
-    resolver: zodResolver(classSchema),
-    defaultValues: {
-      status: "active",
-      dayOfWeek: "monday",
-      name: "",
-      monthlyFee: 0,
-    }
-  });
-
   const watchedGradeId = watch("gradeId");
   const watchedSubjectId = watch("subjectId");
   const watchedTeacherId = watch("teacherId");
@@ -98,9 +108,8 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
 
   // Filter logic
   const filteredSubjects = subjects.filter(sub => {
-    if (!watchedGradeId) return true; // Show all if no grade selected yet
+    if (!watchedGradeId) return true;
     const selectedGradeName = grades.find(g => g.id === watchedGradeId)?.name;
-    // Show subject if any teacher is assigned to this grade AND teaches this subject
     return teachers.some(t => 
       t.grades?.includes(selectedGradeName || "") && 
       t.subjects?.includes(sub.name)
@@ -117,7 +126,6 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
     return matchesGrade && matchesSubject && t.status === 'active';
   });
 
-  // Effect to clear dependent fields when Parent selection changes
   useEffect(() => {
     if (!watchedGradeId) {
       setValue("subjectId", "");
@@ -138,10 +146,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
         subjectId: initialData.subjectId || "",
         gradeId: initialData.gradeId || "",
         teacherId: initialData.teacherId,
-        dayOfWeek: initialData.dayOfWeek,
-        startTime: initialData.startTime,
-        endTime: initialData.endTime,
-        room: initialData.room,
+        schedules: initialData.schedules || [{ dayOfWeek: "monday", startTime: "", endTime: "", room: "" }],
         status: initialData.status || "active",
         monthlyFee: initialData.monthlyFee || 0,
       });
@@ -151,12 +156,9 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
         subjectId: "",
         gradeId: "",
         teacherId: "",
-        dayOfWeek: "monday",
-        startTime: "",
-        endTime: "",
-        room: "",
+        schedules: [{ dayOfWeek: "monday", startTime: "", endTime: "", room: "" }],
         status: "active",
-        monthlyFee: 0 as number,
+        monthlyFee: 0,
       });
     }
   }, [initialData, reset, isOpen]);
@@ -165,24 +167,6 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
     setLoading(true);
     const batch = writeBatch(db);
     try {
-      // Schedule collision/uniqueness check
-      const dupQuery = query(
-        collection(db, "classes"),
-        where("gradeId", "==", data.gradeId),
-        where("subjectId", "==", data.subjectId),
-        where("teacherId", "==", data.teacherId),
-        where("dayOfWeek", "==", data.dayOfWeek),
-        where("startTime", "==", data.startTime)
-      );
-      const dupSnap = await getDocs(dupQuery);
-      const isDuplicate = dupSnap.docs.some(doc => initialData ? doc.id !== initialData.id : true);
-      
-      if (isDuplicate) {
-        toast.error("A class with this identical schedule already exists.");
-        setLoading(false);
-        return;
-      }
-
       const selectedTeacher = teachers.find(t => t.id === data.teacherId);
       const selectedSubject = subjects.find(s => s.id === data.subjectId);
       const selectedGrade = grades.find(g => g.id === data.gradeId);
@@ -196,7 +180,6 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
       };
 
       if (initialData) {
-        // Handle Grade Migration for Class Count
         if (initialData.gradeId !== data.gradeId) {
           if (initialData.gradeId) {
             batch.update(doc(db, "grades", initialData.gradeId), { classCount: increment(-1) });
@@ -211,8 +194,6 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
         toast.success("Class schedule updated!");
       } else {
         const classRef = doc(collection(db, "classes"));
-        
-        // Increment Grade Class Count
         if (data.gradeId) {
           batch.update(doc(db, "grades", data.gradeId), { classCount: increment(1) });
         }
@@ -246,7 +227,6 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Module Selection */}
           <div className="space-y-4 col-span-full">
             <h4 className="text-xs font-black uppercase tracking-widest text-primary/60 flex items-center gap-2">
                 <BookOpen className="w-3 h-3" /> Curriculum Setup
@@ -266,6 +246,24 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
                 </div>
 
                 <div className="space-y-1">
+                  <label className="text-sm font-semibold text-slate-700 ml-1">Grade Level *</label>
+                  {metaLoading ? (
+                    <Skeleton className="w-full h-[45px] rounded-xl" />
+                  ) : (
+                    <select 
+                      {...register("gradeId")}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    >
+                      <option value="">Select Grade</option>
+                      {grades.length > 0 ? grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>) : null}
+                    </select>
+                  )}
+                  {errors.gradeId && <p className="text-xs text-red-500 ml-1 mt-1">{errors.gradeId.message}</p>}
+                </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
                   <label className="text-sm font-semibold text-slate-700 ml-1">Subject *</label>
                   {metaLoading ? (
                     <Skeleton className="w-full h-[45px] rounded-xl" />
@@ -279,27 +277,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
                       {filteredSubjects.length > 0 ? filteredSubjects.map(s => <option key={s.id} value={s.id}>{s.name} ({s.subjectCode})</option>) : null}
                     </select>
                   )}
-                  {!metaLoading && subjects.length === 0 && <p className="text-[10px] text-amber-600 mt-1 ml-1 flex items-center gap-1">No subjects found. <a href="/admin/subjects" className="underline font-bold">Add One</a></p>}
                   {errors.subjectId && <p className="text-xs text-red-500 ml-1 mt-1">{errors.subjectId.message}</p>}
-                </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Grade Level *</label>
-                  {metaLoading ? (
-                    <Skeleton className="w-full h-[45px] rounded-xl" />
-                  ) : (
-                    <select 
-                      {...register("gradeId")}
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                    >
-                      <option value="">Select Grade</option>
-                      {grades.length > 0 ? grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>) : null}
-                    </select>
-                  )}
-                  {!metaLoading && grades.length === 0 && <p className="text-[10px] text-amber-600 mt-1 ml-1 flex items-center gap-1">No grades found. <a href="/admin/grades" className="underline font-bold">Add One</a></p>}
-                  {errors.gradeId && <p className="text-xs text-red-500 ml-1 mt-1">{errors.gradeId.message}</p>}
                 </div>
 
                 <div className="space-y-1">
@@ -316,76 +294,92 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
                       {filteredTeachers.length > 0 ? filteredTeachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>) : null}
                     </select>
                   )}
-                  {!metaLoading && teachers.length === 0 && <p className="text-[10px] text-amber-600 mt-1 ml-1 flex items-center gap-1">No teachers registered. <a href="/admin/teachers" className="underline font-bold">Register Now</a></p>}
                   {errors.teacherId && <p className="text-xs text-red-500 ml-1 mt-1">{errors.teacherId.message}</p>}
                 </div>
             </div>
+            
+            <div className="space-y-1">
+              <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2">Monthly Fee (LKR) *</label>
+              <input 
+                {...register("monthlyFee")}
+                type="number"
+                placeholder="e.g. 2500"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-bold"
+              />
+              {errors.monthlyFee && <p className="text-xs text-red-500 ml-1 mt-1">{errors.monthlyFee.message}</p>}
+            </div>
           </div>
 
-          {/* Schedule */}
           <div className="space-y-4 col-span-full pt-4 border-t border-slate-50">
-             <h4 className="text-xs font-black uppercase tracking-widest text-primary/60 flex items-center gap-2">
-                <Calendar className="w-3 h-3" /> Timing & Location
-             </h4>
-             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Day *</label>
-                  <select 
-                    {...register("dayOfWeek")}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                  >
-                    <option value="monday">Monday</option>
-                    <option value="tuesday">Tuesday</option>
-                    <option value="wednesday">Wednesday</option>
-                    <option value="thursday">Thursday</option>
-                    <option value="friday">Friday</option>
-                    <option value="saturday">Saturday</option>
-                    <option value="sunday">Sunday</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2"><Clock className="w-3 h-3 text-slate-400" /> Start *</label>
-                  <input 
-                    {...register("startTime")}
-                    type="time"
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                  />
-                  {errors.startTime && <p className="text-xs text-red-500 ml-1 mt-1">{errors.startTime.message}</p>}
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2"><Clock className="w-3 h-3 text-slate-400" /> End *</label>
-                  <input 
-                    {...register("endTime")}
-                    type="time"
-                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                  />
-                  {errors.endTime && <p className="text-xs text-red-500 ml-1 mt-1">{errors.endTime.message}</p>}
-                </div>
+             <div className="flex items-center justify-between">
+                <h4 className="text-xs font-black uppercase tracking-widest text-primary/60 flex items-center gap-2">
+                    <Calendar className="w-3 h-3" /> Timing & Location
+                </h4>
+                <button 
+                  type="button"
+                  onClick={() => append({ dayOfWeek: "monday", startTime: "", endTime: "", room: "" })}
+                  className="px-3 py-1 bg-primary/10 text-primary rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-primary/20 transition-all flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Add Slot
+                </button>
              </div>
-             
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-slate-400" /> Hall / Room Number *</label>
-                  <input 
-                    {...register("room")}
-                    placeholder="e.g. Main Hall 01 / Room 204"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                  />
-                  {errors.room && <p className="text-xs text-red-500 ml-1 mt-1">{errors.room.message}</p>}
-               </div>
 
-               <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2">Monthly Fee (LKR) *</label>
-                  <input 
-                    {...register("monthlyFee")}
-                    type="number"
-                    placeholder="e.g. 2500"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-bold"
-                  />
-                  {errors.monthlyFee && <p className="text-xs text-red-500 ml-1 mt-1">{errors.monthlyFee.message}</p>}
-               </div>
+             <div className="space-y-4">
+               {fields.map((field, index) => (
+                 <div key={field.id} className="p-4 rounded-2xl bg-slate-50 border border-slate-100 space-y-4 relative group">
+                    {fields.length > 1 && (
+                      <button 
+                        type="button"
+                        onClick={() => remove(index)}
+                        className="absolute -top-2 -right-2 w-7 h-7 bg-white border border-slate-200 text-red-500 rounded-full flex items-center justify-center hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100 shadow-sm"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-500 ml-1">Day *</label>
+                        <select 
+                          {...register(`schedules.${index}.dayOfWeek`)}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                        >
+                          {["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map(d => (
+                            <option key={d} value={d} className="capitalize">{d}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-500 ml-1">Hall / Room *</label>
+                        <input 
+                          {...register(`schedules.${index}.room`)}
+                          placeholder="e.g. Room 101"
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-500 ml-1 flex items-center gap-1.5"><Clock className="w-3 h-3" /> Start *</label>
+                        <input 
+                          {...register(`schedules.${index}.startTime`)}
+                          type="time"
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs font-bold text-slate-500 ml-1 flex items-center gap-1.5"><Clock className="w-3 h-3" /> End *</label>
+                        <input 
+                          {...register(`schedules.${index}.endTime`)}
+                          type="time"
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
+                        />
+                      </div>
+                    </div>
+                 </div>
+               ))}
+               {errors.schedules && <p className="text-xs text-red-500 ml-1">{errors.schedules.message}</p>}
              </div>
           </div>
         </div>

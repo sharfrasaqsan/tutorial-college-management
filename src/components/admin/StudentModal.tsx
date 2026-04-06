@@ -428,7 +428,9 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
                           </div>
                           <div>
                             <p className={`font-bold text-sm ${selectedClassIds.includes(cls.id) ? 'text-primary' : 'text-slate-700'}`}>{cls.name}</p>
-                            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">{cls.subject} • {cls.dayOfWeek}s</p>
+                            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">
+                              {cls.subject} • {cls.schedules?.map(s => s.dayOfWeek.substring(0,3)).join(', ')}
+                            </p>
                           </div>
                         </div>
                         <input 

@@ -73,45 +73,37 @@ export default function MyClassesPage() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-y-4 gap-x-8 mb-8 pt-6 border-t border-slate-50">
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400">
-                            <Users className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Students</p>
-                            <p className="text-sm font-bold text-slate-700">{item.studentCount || 0} Registered</p>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400">
-                            <Calendar className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Schedule</p>
-                            <p className="text-sm font-bold text-slate-700 capitalize">{item.dayOfWeek}</p>
+                <div className="space-y-3 mb-8 pt-6 border-t border-slate-50">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400">
+                                <Users className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Students</p>
+                                <p className="text-sm font-bold text-slate-700">{item.studentCount || 0} Registered</p>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400">
-                            <Clock className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Time Slot</p>
-                            <p className="text-sm font-bold text-slate-700">{item.startTime} - {item.endTime}</p>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400">
-                            <MapPin className="w-5 h-5" />
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Location</p>
-                            <p className="text-sm font-bold text-slate-700">{item.room || 'Main Hall'}</p>
-                        </div>
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Weekly Schedule</p>
+                        {item.schedules?.map((schedule, idx) => (
+                            <div key={idx} className="grid grid-cols-2 gap-4 p-3 rounded-2xl bg-slate-50/50 border border-slate-100">
+                                <div className="flex items-center gap-2.5">
+                                    <Calendar className="w-4 h-4 text-indigo-500" />
+                                    <span className="text-xs font-bold text-slate-700 capitalize">{schedule.dayOfWeek}</span>
+                                </div>
+                                <div className="flex items-center gap-2.5">
+                                    <Clock className="w-4 h-4 text-indigo-400" />
+                                    <span className="text-xs font-bold text-slate-700">{schedule.startTime} - {schedule.endTime}</span>
+                                </div>
+                                <div className="col-span-2 flex items-center gap-2.5 pt-1 border-t border-slate-100/50">
+                                    <MapPin className="w-4 h-4 text-amber-500" />
+                                    <span className="text-[11px] font-medium text-slate-500">{schedule.room || 'Main Hall'}</span>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
 

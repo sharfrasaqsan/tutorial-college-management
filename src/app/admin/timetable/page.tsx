@@ -6,22 +6,10 @@ import { db } from "@/lib/firebase";
 import { Calendar, MapPin, User, ArrowRight } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
 import Link from "next/link";
-
-interface ClassEntry {
-  id: string;
-  name: string;
-  grade: string;
-  subject: string;
-  teacherName: string;
-  dayOfWeek: string;
-  startTime: string;
-  endTime: string;
-  room: string;
-  status: string;
-}
+import { Class } from "@/types/models";
 
 export default function TimetablePage() {
-  const [classes, setClasses] = useState<ClassEntry[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState("monday");
 
@@ -32,15 +20,14 @@ export default function TimetablePage() {
       try {
         setLoading(true);
         const q = query(
-          collection(db, "classes"), 
-          orderBy("startTime", "asc")
+          collection(db, "classes")
         );
         const snap = await getDocs(q);
         const fetchedClasses = snap.docs
           .map(doc => ({ 
             id: doc.id, 
             ...doc.data() 
-          } as ClassEntry))
+          } as Class))
           .filter(c => c.status === "active");
         
         setClasses(fetchedClasses);
@@ -53,7 +40,18 @@ export default function TimetablePage() {
     loadClasses();
   }, []);
 
-  const filteredClasses = classes.filter(c => c.dayOfWeek.toLowerCase() === selectedDay.toLowerCase());
+  const allSlots = classes.flatMap(cls => 
+    (cls.schedules || []).map(schedule => ({
+      ...cls,
+      ...schedule,
+      classId: cls.id,
+      uniqueSlotId: `${cls.id}-${schedule.dayOfWeek}-${schedule.startTime}`
+    }))
+  );
+
+  const filteredSlots = allSlots
+    .filter(slot => slot.dayOfWeek.toLowerCase() === selectedDay.toLowerCase())
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
   return (
     <div className="space-y-6">
@@ -108,35 +106,35 @@ export default function TimetablePage() {
                </div>
              ))}
           </div>
-        ) : filteredClasses.length > 0 ? (
+        ) : filteredSlots.length > 0 ? (
           <div className="grid grid-cols-1 gap-4">
-            {filteredClasses.map((cls) => (
-              <div key={cls.id} className="p-5 rounded-3xl border border-slate-50 bg-slate-50/30 hover:border-primary/20 hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 group flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
+            {filteredSlots.map((slot) => (
+              <div key={slot.uniqueSlotId} className="p-5 rounded-3xl border border-slate-50 bg-slate-50/30 hover:border-primary/20 hover:bg-white hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 group flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
                 <div className="absolute top-0 left-0 w-2 h-full bg-primary transform -translate-x-full group-hover:translate-x-0 transition-transform duration-300"></div>
                 
                 <div className="flex items-start md:items-center gap-6 z-10">
                   <div className="min-w-[100px] flex flex-col items-center justify-center p-4 rounded-2xl bg-white shadow-sm border border-slate-100 group-hover:border-primary/10 transition-colors">
-                    <span className="text-sm font-black text-slate-800 tracking-tight">{cls.startTime}</span>
+                    <span className="text-sm font-black text-slate-800 tracking-tight">{slot.startTime}</span>
                     <div className="w-10 h-[1px] bg-slate-200 my-1"></div>
-                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{cls.endTime}</span>
+                    <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{slot.endTime}</span>
                   </div>
 
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
-                        <span className="px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-[10px] font-black uppercase tracking-wider">{cls.grade}</span>
-                        <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-wider">{cls.subject}</span>
+                        <span className="px-2.5 py-1 rounded-lg bg-primary/10 text-primary text-[10px] font-black uppercase tracking-wider">{slot.grade}</span>
+                        <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-wider">{slot.subject}</span>
                     </div>
                     <h3 className="text-xl font-black text-slate-800 group-hover:text-primary transition-colors leading-tight">
-                        {cls.name}
+                        {slot.name}
                     </h3>
                     <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-slate-500">
                       <div className="flex items-center gap-1.5 hover:text-primary transition-colors">
                         <User className="w-4 h-4" />
-                        <span>{cls.teacherName}</span>
+                        <span>{slot.teacherName}</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <MapPin className="w-4 h-4 text-amber-500" />
-                        <span>{cls.room || "Main Hall"}</span>
+                        <span>{slot.room || "Main Hall"}</span>
                       </div>
                     </div>
                   </div>

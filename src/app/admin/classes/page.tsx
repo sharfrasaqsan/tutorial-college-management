@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy, doc, updateDoc, writeBatch, increment, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, BookOpen, Clock, Users, Calendar, Edit, Trash2, Ban, CheckCircle, AlertCircle, Filter, X } from "lucide-react";
+import { Plus, BookOpen, Clock, Users, Calendar, Edit, Trash2, Ban, CheckCircle, AlertCircle, Filter, X, MapPin } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
 import { Class, Teacher, Subject, Grade } from "@/types/models";
 import ClassModal from "@/components/admin/ClassModal";
@@ -131,10 +131,16 @@ export default function ClassesPage() {
   };
 
   const filteredClasses = classes.filter(c => {
-    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || c.subject?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         c.subject?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         c.teacherName?.toLowerCase().includes(searchTerm.toLowerCase());
+    
     const matchesGrade = filterGrade === "" || c.gradeId === filterGrade;
     const matchesSubject = filterSubject === "" || c.subjectId === filterSubject;
-    const matchesDay = filterDay === "" || c.dayOfWeek === filterDay;
+    
+    // Check if any schedule matches the selected day
+    const matchesDay = filterDay === "" || c.schedules?.some(s => s.dayOfWeek.toLowerCase() === filterDay.toLowerCase());
+    
     const matchesStatus = filterStatus === "" || c.status === filterStatus;
     
     return matchesSearch && matchesGrade && matchesSubject && matchesDay && matchesStatus;
@@ -337,15 +343,29 @@ export default function ClassesPage() {
               <div className="space-y-3 mt-auto">
                 <div className="flex items-center gap-2 text-sm">
                   <Users className={`w-4 h-4 ${isClassInactive ? 'text-slate-300' : 'text-slate-400'}`} />
-                  <span className={isClassInactive ? 'text-slate-400' : 'text-slate-600'}>{item.studentCount || 0} Students</span>
+                  <span className={isClassInactive ? 'text-slate-400' : 'text-slate-600'}>{item.studentCount || 0} Students enrolled</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Calendar className={`w-4 h-4 ${isClassInactive ? 'text-slate-300' : 'text-slate-400'}`} />
-                  <span className={`${isClassInactive ? 'text-slate-400' : 'text-slate-600'} capitalize`}>{item.dayOfWeek}</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <Clock className={`w-4 h-4 ${isClassInactive ? 'text-slate-300' : 'text-slate-400'}`} />
-                  <span className={isClassInactive ? 'text-slate-400' : 'text-slate-600'}>{item.startTime} - {item.endTime}</span>
+                
+                <div className="space-y-2 mt-2">
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Weekly Schedule</p>
+                  {item.schedules?.map((schedule, idx) => (
+                    <div key={idx} className="flex flex-col gap-1 p-2 rounded-xl bg-slate-50 border border-slate-100/50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-[11px] font-bold text-slate-700">
+                          <Calendar className="w-3 h-3 text-primary" />
+                          <span className="capitalize">{schedule.dayOfWeek}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-500 uppercase">
+                          <Clock className="w-3 h-3" />
+                          {schedule.startTime} - {schedule.endTime}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-400">
+                        <MapPin className="w-3 h-3 text-amber-500" />
+                        {schedule.room}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
