@@ -10,8 +10,10 @@ import Link from "next/link";
 import StudentModal from "@/components/admin/StudentModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import toast from "react-hot-toast";
+import { useStudentProfile } from "@/context/StudentProfileContext";
 
 export default function StudentsPage() {
+  const { openStudentProfile } = useStudentProfile();
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -343,8 +345,8 @@ export default function StudentsPage() {
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${student.status === 'inactive' ? 'bg-slate-200 text-slate-500' : 'bg-primary/10 text-primary'}`}>
                           {student.name.charAt(0)}
                         </div>
-                        <div>
-                          <p className={`font-semibold ${student.status === 'inactive' ? 'text-slate-500' : 'text-slate-800'}`}>{student.name}</p>
+                        <div className="cursor-pointer group/name" onClick={() => openStudentProfile(student.id)}>
+                          <p className={`font-semibold transition-colors group-hover/name:text-primary ${student.status === 'inactive' ? 'text-slate-500' : 'text-slate-800'}`}>{student.name}</p>
                           <p className="text-xs text-slate-500">ID: {student.studentId || student.id.substring(0,6).toUpperCase()}</p>
                         </div>
                       </div>
@@ -379,9 +381,12 @@ export default function StudentsPage() {
                         >
                           {student.status === 'active' ? <Ban className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                         </button>
-                        <Link href={`/admin/students/${student.id}`} className="p-2 text-slate-400 hover:text-primary transition-colors hover:bg-slate-100 rounded-lg">
+                        <button 
+                          onClick={() => openStudentProfile(student.id)}
+                          className="p-2 text-slate-400 hover:text-primary transition-colors hover:bg-slate-100 rounded-lg"
+                        >
                           <Eye className="w-4 h-4" />
-                        </Link>
+                        </button>
                         <button 
                           onClick={() => handleEdit(student)}
                           className="p-2 text-slate-400 hover:text-blue-600 transition-colors hover:bg-blue-50 rounded-lg"

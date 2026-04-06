@@ -14,8 +14,10 @@ import {
 import { DashboardStudent, DashboardTimetableSlot } from "@/types/dashboard";
 import Skeleton from "@/components/ui/Skeleton";
 import Link from "next/link";
+import { useStudentProfile } from "@/context/StudentProfileContext";
 
 export default function AdminDashboard() {
+  const { openStudentProfile } = useStudentProfile();
   const { stats, isLoading, isError } = useDashboard();
 
   if (isError) {
@@ -113,8 +115,13 @@ export default function AdminDashboard() {
                         </tr>
                     ))
                 ) : (stats?.recentStudents?.length || 0) > 0 ? stats!.recentStudents.map((student: DashboardStudent) => (
-                  <tr key={student.id} className="hover:bg-slate-50/50">
-                    <td className="px-6 py-4 font-medium text-slate-800">{student.name}</td>
+                  <tr key={student.id} className="hover:bg-slate-50/50 group/row">
+                    <td 
+                        className="px-6 py-4 font-medium text-slate-800 cursor-pointer group-hover/row:text-primary transition-colors"
+                        onClick={() => openStudentProfile(student.id)}
+                    >
+                        {student.name}
+                    </td>
                     <td className="px-6 py-4 text-slate-600">{student.phone}</td>
                     <td className="px-6 py-4 text-slate-600">{student.schoolName}</td>
                     <td className="px-6 py-4 text-right">
