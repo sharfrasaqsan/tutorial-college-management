@@ -107,7 +107,7 @@ export default function SubjectModal({ isOpen, onClose, onSuccess, initialData }
         <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Subject Name</label>
+                  <label className="text-sm font-semibold text-slate-700 ml-1">Subject Name *</label>
                   <input 
                     {...register("name")}
                     placeholder="e.g. Pure Mathematics"
@@ -117,7 +117,7 @@ export default function SubjectModal({ isOpen, onClose, onSuccess, initialData }
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Subject Code</label>
+                  <label className="text-sm font-semibold text-slate-700 ml-1">Subject Code *</label>
                   <input 
                     {...register("subjectCode")}
                     placeholder="e.g. MAT202"
@@ -128,7 +128,7 @@ export default function SubjectModal({ isOpen, onClose, onSuccess, initialData }
             </div>
 
             <div className="space-y-3">
-              <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2"><Palette className="w-3 h-3" /> Visual Style Identity</label>
+              <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2"><Palette className="w-3 h-3" /> Visual Style Identity *</label>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                  {colors.map((c) => (
                     <label key={c.value} className="relative cursor-pointer group">

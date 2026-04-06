@@ -10,6 +10,7 @@ import { Loader2, BookOpen, Calendar, Clock, MapPin } from "lucide-react";
 import { Teacher, Grade, Subject, Class } from "@/types/models";
 import toast from "react-hot-toast";
 import Modal from "@/components/ui/Modal";
+import Skeleton from "@/components/ui/Skeleton";
 
 const classSchema = z.object({
   name: z.string().min(3, "Class name must be at least 3 characters"),
@@ -20,6 +21,7 @@ const classSchema = z.object({
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
   room: z.string().min(1, "Room/Hall is required"),
+  monthlyFee: z.coerce.number().min(0, "Fee must be a positive number"),
   status: z.enum(["active", "inactive"]),
 });
 
@@ -37,9 +39,11 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [metaLoading, setMetaLoading] = useState(false);
 
   useEffect(() => {
     async function loadData() {
+      setMetaLoading(true);
       try {
         const [teachersSnap, gradesSnap, subjectsSnap] = await Promise.all([
           getDocs(query(collection(db, "teachers"), orderBy("name", "asc"))),
@@ -52,6 +56,8 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
         setSubjects(subjectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)));
       } catch (error) {
         console.error("Error loading dropdown data:", error);
+      } finally {
+        setMetaLoading(false);
       }
     }
     if (isOpen) loadData();
@@ -70,6 +76,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
       status: "active",
       dayOfWeek: "monday",
       name: "",
+      monthlyFee: 0,
     }
   });
 
@@ -128,14 +135,15 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
     if (initialData) {
       reset({
         name: initialData.name,
-        subjectId: (initialData as any).subjectId || "",
-        gradeId: (initialData as any).gradeId || "",
+        subjectId: initialData.subjectId || "",
+        gradeId: initialData.gradeId || "",
         teacherId: initialData.teacherId,
         dayOfWeek: initialData.dayOfWeek,
         startTime: initialData.startTime,
         endTime: initialData.endTime,
         room: initialData.room,
         status: initialData.status || "active",
+        monthlyFee: initialData.monthlyFee || 0,
       });
     } else {
       reset({
@@ -147,6 +155,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
         startTime: "",
         endTime: "",
         room: "",
+        monthlyFee: 0,
         status: "active",
       });
     }
@@ -170,9 +179,9 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
 
       if (initialData) {
         // Handle Grade Migration for Class Count
-        if ((initialData as any).gradeId !== data.gradeId) {
-          if ((initialData as any).gradeId) {
-            batch.update(doc(db, "grades", (initialData as any).gradeId), { classCount: increment(-1) });
+        if (initialData.gradeId !== data.gradeId) {
+          if (initialData.gradeId) {
+            batch.update(doc(db, "grades", initialData.gradeId), { classCount: increment(-1) });
           }
           if (data.gradeId) {
             batch.update(doc(db, "grades", data.gradeId), { classCount: increment(1) });
@@ -227,7 +236,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-sm font-semibold text-slate-700 ml-1 flex justify-between items-center">
-                    Class Display Name <span className="text-[10px] text-primary/60 font-black uppercase tracking-widest">(Auto-Generated)</span>
+                    Class Display Name <span className="text-[10px] text-primary/60 font-black uppercase tracking-widest">(Auto-Generated) *</span>
                   </label>
                   <input 
                     {...register("name")}
@@ -239,45 +248,57 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Subject</label>
-                  <select 
-                    {...register("subjectId")}
-                    disabled={!watchedGradeId}
-                    className={`w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all ${!watchedGradeId ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-60" : "bg-slate-50 text-slate-700"}`}
-                  >
-                    <option value="">{watchedGradeId ? "Select Subject" : "Pick Grade First"}</option>
-                    {filteredSubjects.length > 0 ? filteredSubjects.map(s => <option key={s.id} value={s.id}>{s.name} ({s.subjectCode})</option>) : null}
-                  </select>
-                  {subjects.length === 0 && <p className="text-[10px] text-amber-600 mt-1 ml-1 flex items-center gap-1">No subjects found. <a href="/admin/subjects" className="underline font-bold">Add One</a></p>}
+                  <label className="text-sm font-semibold text-slate-700 ml-1">Subject *</label>
+                  {metaLoading ? (
+                    <Skeleton className="w-full h-[45px] rounded-xl" />
+                  ) : (
+                    <select 
+                      {...register("subjectId")}
+                      disabled={!watchedGradeId}
+                      className={`w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all ${!watchedGradeId ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-60" : "bg-slate-50 text-slate-700"}`}
+                    >
+                      <option value="">{watchedGradeId ? "Select Subject" : "Pick Grade First"}</option>
+                      {filteredSubjects.length > 0 ? filteredSubjects.map(s => <option key={s.id} value={s.id}>{s.name} ({s.subjectCode})</option>) : null}
+                    </select>
+                  )}
+                  {!metaLoading && subjects.length === 0 && <p className="text-[10px] text-amber-600 mt-1 ml-1 flex items-center gap-1">No subjects found. <a href="/admin/subjects" className="underline font-bold">Add One</a></p>}
                   {errors.subjectId && <p className="text-xs text-red-500 ml-1 mt-1">{errors.subjectId.message}</p>}
                 </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Grade Level</label>
-                  <select 
-                    {...register("gradeId")}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                  >
-                    <option value="">Select Grade</option>
-                    {grades.length > 0 ? grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>) : null}
-                  </select>
-                  {grades.length === 0 && <p className="text-[10px] text-amber-600 mt-1 ml-1 flex items-center gap-1">No grades found. <a href="/admin/grades" className="underline font-bold">Add One</a></p>}
+                  <label className="text-sm font-semibold text-slate-700 ml-1">Grade Level *</label>
+                  {metaLoading ? (
+                    <Skeleton className="w-full h-[45px] rounded-xl" />
+                  ) : (
+                    <select 
+                      {...register("gradeId")}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    >
+                      <option value="">Select Grade</option>
+                      {grades.length > 0 ? grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>) : null}
+                    </select>
+                  )}
+                  {!metaLoading && grades.length === 0 && <p className="text-[10px] text-amber-600 mt-1 ml-1 flex items-center gap-1">No grades found. <a href="/admin/grades" className="underline font-bold">Add One</a></p>}
                   {errors.gradeId && <p className="text-xs text-red-500 ml-1 mt-1">{errors.gradeId.message}</p>}
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Assigned Teacher</label>
-                  <select 
-                    {...register("teacherId")}
-                    disabled={!watchedSubjectId}
-                    className={`w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all ${!watchedSubjectId ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-60" : "bg-slate-50 text-slate-700"}`}
-                  >
-                    <option value="">{watchedSubjectId ? "Select Instructor" : "Pick Subject First"}</option>
-                    {filteredTeachers.length > 0 ? filteredTeachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>) : null}
-                  </select>
-                  {teachers.length === 0 && <p className="text-[10px] text-amber-600 mt-1 ml-1 flex items-center gap-1">No teachers registered. <a href="/admin/teachers" className="underline font-bold">Register Now</a></p>}
+                  <label className="text-sm font-semibold text-slate-700 ml-1">Assigned Teacher *</label>
+                  {metaLoading ? (
+                    <Skeleton className="w-full h-[45px] rounded-xl" />
+                  ) : (
+                    <select 
+                      {...register("teacherId")}
+                      disabled={!watchedSubjectId}
+                      className={`w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all ${!watchedSubjectId ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-60" : "bg-slate-50 text-slate-700"}`}
+                    >
+                      <option value="">{watchedSubjectId ? "Select Instructor" : "Pick Subject First"}</option>
+                      {filteredTeachers.length > 0 ? filteredTeachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>) : null}
+                    </select>
+                  )}
+                  {!metaLoading && teachers.length === 0 && <p className="text-[10px] text-amber-600 mt-1 ml-1 flex items-center gap-1">No teachers registered. <a href="/admin/teachers" className="underline font-bold">Register Now</a></p>}
                   {errors.teacherId && <p className="text-xs text-red-500 ml-1 mt-1">{errors.teacherId.message}</p>}
                 </div>
             </div>
@@ -290,7 +311,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
              </h4>
              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Day</label>
+                  <label className="text-sm font-semibold text-slate-700 ml-1">Day *</label>
                   <select 
                     {...register("dayOfWeek")}
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
@@ -306,7 +327,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2"><Clock className="w-3 h-3 text-slate-400" /> Start</label>
+                  <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2"><Clock className="w-3 h-3 text-slate-400" /> Start *</label>
                   <input 
                     {...register("startTime")}
                     type="time"
@@ -316,7 +337,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2"><Clock className="w-3 h-3 text-slate-400" /> End</label>
+                  <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2"><Clock className="w-3 h-3 text-slate-400" /> End *</label>
                   <input 
                     {...register("endTime")}
                     type="time"
@@ -326,14 +347,27 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
                 </div>
              </div>
              
-             <div className="space-y-1">
-                <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-slate-400" /> Hall / Room Number</label>
-                <input 
-                  {...register("room")}
-                  placeholder="e.g. Main Hall 01 / Room 204"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                />
-                {errors.room && <p className="text-xs text-red-500 ml-1 mt-1">{errors.room.message}</p>}
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <div className="space-y-1">
+                  <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-slate-400" /> Hall / Room Number *</label>
+                  <input 
+                    {...register("room")}
+                    placeholder="e.g. Main Hall 01 / Room 204"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                  />
+                  {errors.room && <p className="text-xs text-red-500 ml-1 mt-1">{errors.room.message}</p>}
+               </div>
+
+               <div className="space-y-1">
+                  <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2">Monthly Fee (LKR) *</label>
+                  <input 
+                    {...register("monthlyFee")}
+                    type="number"
+                    placeholder="e.g. 2500"
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-bold"
+                  />
+                  {errors.monthlyFee && <p className="text-xs text-red-500 ml-1 mt-1">{errors.monthlyFee.message}</p>}
+               </div>
              </div>
           </div>
         </div>

@@ -4,14 +4,15 @@ import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { collection, addDoc, getDocs, orderBy, serverTimestamp, query, doc, updateDoc, increment, writeBatch } from "firebase/firestore";
+import { collection, getDocs, orderBy, serverTimestamp, query, doc, increment, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Loader2, User, Phone, MapPin, GraduationCap } from "lucide-react";
-import { Grade, Student, Subject, Class } from "@/types/models";
-import toast from "react-hot-toast";
+import { Grade, Student, Class } from "@/types/models";
 import Modal from "@/components/ui/Modal";
 import { BookOpen } from "lucide-react";
+import toast from "react-hot-toast";
 import { generateId } from "@/lib/id-generator";
+import Skeleton from "@/components/ui/Skeleton";
 
 const studentSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
@@ -40,26 +41,22 @@ interface StudentModalProps {
 export default function StudentModal({ isOpen, onClose, onSuccess, initialData }: StudentModalProps) {
   const [loading, setLoading] = useState(false);
   const [grades, setGrades] = useState<Grade[]>([]);
-  const [subjects, setSubjects] = useState<Subject[]>([]);
   const [availableClasses, setAvailableClasses] = useState<Class[]>([]);
+  const [metaLoading, setMetaLoading] = useState(false);
   const [fetchingClasses, setFetchingClasses] = useState(false);
   const isInitializing = useRef(false);
 
   useEffect(() => {
     async function loadData() {
+      setMetaLoading(true);
       try {
         const gradeQuery = query(collection(db, "grades"), orderBy("name", "asc"));
-        const subjectQuery = query(collection(db, "subjects"), orderBy("name", "asc"));
-        
-        const [gradeSnap, subjectSnap] = await Promise.all([
-          getDocs(gradeQuery),
-          getDocs(subjectQuery)
-        ]);
-
+        const gradeSnap = await getDocs(gradeQuery);
         setGrades(gradeSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Grade)));
-        setSubjects(subjectSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)));
       } catch (error) {
         console.error("Error loading form data:", error);
+      } finally {
+        setMetaLoading(false);
       }
     }
     if (isOpen) loadData();
@@ -247,7 +244,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
       } else {
         // Create Case
         const studentRef = doc(collection(db, "students"));
-        const studentId = await generateId("student");
+        await generateId("student"); // Generate for side effects if any, but we use it in the data below
         
         // 1. Grade Count
         if (data.gradeId) {
@@ -267,6 +264,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
         // 4. Create Student
         batch.set(studentRef, {
           ...data,
+          studentId: await generateId("student"),
           createdAt: serverTimestamp(),
         });
 
@@ -290,13 +288,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
         onClose={onClose} 
         title={initialData ? "Modify Student Profile" : "Register New Student"}
     >
-      {grades.length === 0 ? (
-        <div className="py-20 flex flex-col items-center justify-center text-slate-400 space-y-4">
-           <Loader2 className="w-8 h-8 animate-spin text-primary" />
-           <p className="text-sm font-medium uppercase tracking-widest text-[10px] font-black">Syncing Academic Registry...</p>
-        </div>
-      ) : (
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Basic Info */}
           <div className="space-y-4 col-span-full">
@@ -305,7 +297,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
              </h4>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Full Name</label>
+                  <label className="text-sm font-semibold text-slate-700 ml-1">Full Name *</label>
                   <input 
                     {...register("name")}
                     placeholder="e.g. Ruwan Kumara"
@@ -327,7 +319,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
                 </div>
 
                 <div className="space-y-1 col-span-full">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Gender</label>
+                  <label className="text-sm font-semibold text-slate-700 ml-1">Gender *</label>
                   <div className="flex gap-4 mt-1">
                     {["male", "female", "other"].map((g) => (
                       <label key={g} className="flex items-center gap-2 cursor-pointer group">
@@ -353,26 +345,30 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
              </h4>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                   <label className="text-sm font-semibold text-slate-700 ml-1">Grade / Level</label>
-                   <select 
-                     {...register("grade")}
-                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                   >
-                     <option value="">Select Grade</option>
-                     {grades.length > 0 ? grades.map(g => (
-                       <option key={g.id} value={g.name}>{g.name}</option>
-                     )) : null}
-                   </select>
-                   {grades.length === 0 && (
-                     <p className="text-[10px] text-amber-600 mt-1 ml-1 flex items-center gap-1">
-                       No grades found. <a href="/admin/grades" className="underline font-bold">Add One</a>
-                     </p>
-                   )}
-                   {errors.grade && <p className="text-xs text-red-500 ml-1 mt-1">{errors.grade.message}</p>}
+                    <label className="text-sm font-semibold text-slate-700 ml-1">Grade / Level *</label>
+                    {metaLoading ? (
+                      <Skeleton className="w-full h-[45px] rounded-xl" />
+                    ) : (
+                      <select 
+                        {...register("grade")}
+                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                      >
+                        <option value="">Select Grade</option>
+                        {grades.map(g => (
+                          <option key={g.id} value={g.name}>{g.name}</option>
+                        ))}
+                      </select>
+                    )}
+                    {!metaLoading && grades.length === 0 && (
+                      <p className="text-[10px] text-amber-600 mt-1 ml-1 flex items-center gap-1">
+                        No grades found. <a href="/admin/grades" className="underline font-bold">Add One</a>
+                      </p>
+                    )}
+                    {errors.grade && <p className="text-xs text-red-500 ml-1 mt-1">{errors.grade.message}</p>}
                 </div>
 
                 <div className="space-y-1">
-                   <label className="text-sm font-semibold text-slate-700 ml-1">School Name</label>
+                   <label className="text-sm font-semibold text-slate-700 ml-1">School Name *</label>
                    <input 
                      {...register("schoolName")}
                      placeholder="e.g. Royal College"
@@ -386,7 +382,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
              <div className="space-y-3 mt-4">
                 <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center justify-between">
                    <div className="flex items-center gap-2">
-                    <BookOpen className="w-3.5 h-3.5 text-primary/60" /> Class Enrollment
+                    <BookOpen className="w-3.5 h-3.5 text-primary/60" /> Class Enrollment *
                    </div>
                    {fetchingClasses && <Loader2 className="w-3 h-3 animate-spin text-primary" />}
                 </label>
@@ -395,9 +391,13 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
                   <div className="p-8 border-2 border-dashed border-slate-100 rounded-2xl text-center">
                     <p className="text-xs text-slate-400">Please select a grade above to view available classes.</p>
                   </div>
+                ) : fetchingClasses ? (
+                  <div className="space-y-2">
+                     {[1,2].map(i => <Skeleton key={i} className="w-full h-20 rounded-2xl" />)}
+                  </div>
                 ) : availableClasses.length === 0 ? (
                   <div className="p-8 border-2 border-dashed border-slate-100 rounded-2xl text-center">
-                    <p className="text-xs text-slate-400">{fetchingClasses ? 'Loading sessions...' : 'No classes scheduled for this grade yet.'}</p>
+                    <p className="text-xs text-slate-400">No classes scheduled for this grade yet.</p>
                     <a href="/admin/classes" className="text-[10px] text-primary font-bold uppercase hover:underline mt-2 block">Schedule a Class</a>
                   </div>
                 ) : (
@@ -447,7 +447,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
              </h4>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Parent/Guardian Name</label>
+                  <label className="text-sm font-semibold text-slate-700 ml-1">Parent/Guardian Name *</label>
                   <input 
                     {...register("parentName")}
                     placeholder="e.g. Mr. S. Kumara"
@@ -457,7 +457,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Guardian Phone</label>
+                  <label className="text-sm font-semibold text-slate-700 ml-1">Guardian Phone *</label>
                   <input 
                     {...register("parentPhone")}
                     placeholder="e.g. 0712345678"
@@ -472,7 +472,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
           <div className="space-y-4 col-span-full pt-4 border-t border-slate-50">
              <div className="space-y-1">
                <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2">
-                  <MapPin className="w-3.5 h-3.5 text-slate-400" /> Current Address
+                  <MapPin className="w-3.5 h-3.5 text-slate-400" /> Current Address *
                </label>
                <textarea 
                   {...register("address")}
@@ -502,7 +502,6 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
           </button>
         </div>
       </form>
-      )}
     </Modal>
   );
 }

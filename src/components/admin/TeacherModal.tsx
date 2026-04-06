@@ -13,6 +13,7 @@ import toast from "react-hot-toast";
 import Modal from "@/components/ui/Modal";
 import { Subject, Grade, Teacher } from "@/types/models";
 import { generateId } from "@/lib/id-generator";
+import Skeleton from "@/components/ui/Skeleton";
 
 const teacherSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
@@ -38,13 +39,14 @@ interface TeacherModalProps {
 
 export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }: TeacherModalProps) {
   const [loading, setLoading] = useState(false);
+  const [metaLoading, setMetaLoading] = useState(false);
   const [dbSubjects, setDbSubjects] = useState<Subject[]>([]);
   const [dbGrades, setDbGrades] = useState<Grade[]>([]);
 
   useEffect(() => {
     const loadMetadata = async () => {
       if (isOpen) {
-        setLoading(true);
+        setMetaLoading(true);
         try {
           const [subSnap, grSnap] = await Promise.all([
             getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
@@ -55,7 +57,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
         } catch (error) {
           console.error("Error loading metadata:", error);
         } finally {
-          setLoading(false);
+          setMetaLoading(false);
         }
       }
     };
@@ -214,7 +216,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Full Name</label>
+                  <label className="text-sm font-semibold text-slate-700 ml-1">Full Name *</label>
                   <input 
                     {...register("name")}
                     placeholder="e.g. Mr. Sunil Perera"
@@ -224,7 +226,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">NIC Number</label>
+                  <label className="text-sm font-semibold text-slate-700 ml-1">NIC Number *</label>
                   <input 
                     {...register("nic")}
                     placeholder="e.g. 199012345678"
@@ -234,7 +236,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
                 </div>
 
                 <div className="space-y-1 col-span-full">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Gender</label>
+                  <label className="text-sm font-semibold text-slate-700 ml-1">Gender *</label>
                   <div className="flex gap-4 mt-1">
                     {["male", "female", "other"].map((g) => (
                       <label key={g} className="flex items-center gap-2 cursor-pointer group">
@@ -258,7 +260,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Official Email</label>
+                  <label className="text-sm font-semibold text-slate-700 ml-1">Official Email *</label>
                   <input 
                     {...register("email")}
                     type="email"
@@ -272,7 +274,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
 
                 <div className="space-y-1">
                   <label className="text-sm font-semibold text-slate-700 ml-1">
-                    {initialData ? 'Security Management' : 'Initial Password'}
+                    {initialData ? 'Security Management' : 'Initial Password *'}
                   </label>
                   {initialData ? (
                     <button 
@@ -303,11 +305,15 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
             
             <div className="space-y-2">
                <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center justify-between">
-                  Subjects Handled
-                  {dbSubjects.length === 0 && <span className="text-[10px] text-red-500 italic">No subject definitions found</span>}
+                  Subjects Handled *
+                  {dbSubjects.length === 0 && !metaLoading && <span className="text-[10px] text-red-500 italic">No subject definitions found</span>}
                </label>
                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 border border-dashed border-slate-200 rounded-xl min-h-[50px]">
-                  {dbSubjects.length > 0 ? dbSubjects.map(s => (
+                  {metaLoading ? (
+                    <div className="flex flex-wrap gap-2 w-full">
+                       {[1,2,3,4].map(i => <Skeleton key={i} width="80px" height="32px" className="rounded-lg" />)}
+                    </div>
+                  ) : dbSubjects.length > 0 ? dbSubjects.map(s => (
                     <button 
                         key={s.id}
                         type="button"
@@ -328,11 +334,15 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
 
             <div className="space-y-2">
                <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center justify-between">
-                  Assigned Grades
-                  {dbGrades.length === 0 && <span className="text-[10px] text-red-500 italic">No grade definitions found</span>}
+                  Assigned Grades *
+                  {dbGrades.length === 0 && !metaLoading && <span className="text-[10px] text-red-500 italic">No grade definitions found</span>}
                </label>
                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 border border-dashed border-slate-200 rounded-xl min-h-[50px]">
-                  {dbGrades.length > 0 ? dbGrades.map(g => (
+                  {metaLoading ? (
+                    <div className="flex flex-wrap gap-2 w-full">
+                       {[1,2,3].map(i => <Skeleton key={i} width="100px" height="32px" className="rounded-lg" />)}
+                    </div>
+                  ) : dbGrades.length > 0 ? dbGrades.map(g => (
                     <button 
                         key={g.id}
                         type="button"
@@ -353,7 +363,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
             
             <div className="grid grid-cols-1 gap-4 pt-2">
                 <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">WhatsApp / Phone Number</label>
+                  <label className="text-sm font-semibold text-slate-700 ml-1">WhatsApp / Phone Number *</label>
                   <input 
                     {...register("phone")}
                     placeholder="e.g. 0712223334"
@@ -364,7 +374,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
           </div>
 
           <div className="space-y-1 col-span-full pt-4 border-t border-slate-50">
-            <label className="text-sm font-semibold text-slate-700 ml-1">Mailing Address</label>
+            <label className="text-sm font-semibold text-slate-700 ml-1">Mailing Address *</label>
             <textarea 
               {...register("address")}
               rows={2}

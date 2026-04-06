@@ -49,6 +49,7 @@ export interface Class {
   startTime: string;
   endTime: string;
   room: string;
+  monthlyFee: number;
   studentCount?: number;
   status: 'active' | 'inactive';
 }

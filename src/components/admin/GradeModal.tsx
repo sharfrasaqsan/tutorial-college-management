@@ -95,7 +95,7 @@ export default function GradeModal({ isOpen, onClose, onSuccess, initialData }: 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="space-y-4">
             <div className="space-y-1">
-              <label className="text-sm font-semibold text-slate-700 ml-1">Grade / Level Name</label>
+              <label className="text-sm font-semibold text-slate-700 ml-1">Grade / Level Name *</label>
               <input 
                 {...register("name")}
                 placeholder="e.g. Grade 11 (O/L)"
@@ -105,7 +105,7 @@ export default function GradeModal({ isOpen, onClose, onSuccess, initialData }: 
             </div>
 
             <div className="space-y-1">
-              <label className="text-sm font-semibold text-slate-700 ml-1">Academic Category</label>
+              <label className="text-sm font-semibold text-slate-700 ml-1">Academic Category *</label>
               <select 
                 {...register("level")}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
