@@ -7,9 +7,10 @@ import * as z from "zod";
 import { collection, addDoc, getDocs, orderBy, serverTimestamp, query, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Loader2, User, Phone, MapPin, GraduationCap } from "lucide-react";
-import { Grade, Student } from "@/types/models";
+import { Grade, Student, Subject } from "@/types/models";
 import toast from "react-hot-toast";
 import Modal from "@/components/ui/Modal";
+import { BookOpen } from "lucide-react";
 
 const studentSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
@@ -19,8 +20,10 @@ const studentSchema = z.object({
   schoolName: z.string().min(3, "School name is required"),
   address: z.string().min(5, "Address is required"),
   grade: z.string().min(1, "Grade is required"),
+  gradeId: z.string().optional(),
   gender: z.enum(["male", "female", "other"]),
   status: z.enum(["active", "inactive"]),
+  enrolledSubjects: z.array(z.string()).optional(),
 });
 
 type StudentForm = z.infer<typeof studentSchema>;
@@ -35,32 +38,53 @@ interface StudentModalProps {
 export default function StudentModal({ isOpen, onClose, onSuccess, initialData }: StudentModalProps) {
   const [loading, setLoading] = useState(false);
   const [grades, setGrades] = useState<Grade[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
 
   useEffect(() => {
-    async function loadGrades() {
+    async function loadData() {
       try {
-        const q = query(collection(db, "grades"), orderBy("name", "asc"));
-        const snap = await getDocs(q);
-        setGrades(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Grade)));
+        const gradeQuery = query(collection(db, "grades"), orderBy("name", "asc"));
+        const subjectQuery = query(collection(db, "subjects"), orderBy("name", "asc"));
+        
+        const [gradeSnap, subjectSnap] = await Promise.all([
+          getDocs(gradeQuery),
+          getDocs(subjectQuery)
+        ]);
+
+        setGrades(gradeSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Grade)));
+        setSubjects(subjectSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)));
       } catch (error) {
-        console.error("Error loading grades:", error);
+        console.error("Error loading form data:", error);
       }
     }
-    if (isOpen) loadGrades();
+    if (isOpen) loadData();
   }, [isOpen]);
 
   const {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm<StudentForm>({
     resolver: zodResolver(studentSchema),
     defaultValues: {
       status: "active",
       gender: "male",
+      enrolledSubjects: [],
     }
   });
+
+  const selectedGrade = watch("grade");
+  const selectedSubjects = watch("enrolledSubjects") || [];
+
+  useEffect(() => {
+    const gradeObj = grades.find(g => g.name === selectedGrade);
+    if (gradeObj) {
+      setValue("gradeId", gradeObj.id);
+    }
+  }, [selectedGrade, grades, setValue]);
 
   // Re-sync form when initialData changes or modal opens
   useEffect(() => {
@@ -73,8 +97,10 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
         schoolName: initialData.schoolName,
         address: initialData.address,
         grade: initialData.grade || "",
-        gender: (initialData as any).gender || "male",
+        gradeId: initialData.gradeId || "",
+        gender: initialData.gender || "male",
         status: initialData.status,
+        enrolledSubjects: initialData.enrolledSubjects || [],
       });
     } else {
       reset({
@@ -85,8 +111,10 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
         schoolName: "",
         address: "",
         grade: "",
+        gradeId: "",
         gender: "male",
         status: "active",
+        enrolledSubjects: [],
       });
     }
   }, [initialData, reset, isOpen]);
@@ -164,33 +192,71 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
              </h4>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Grade / Level</label>
-                  <select 
-                    {...register("grade")}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                  >
-                    <option value="">Select Grade</option>
-                    {grades.length > 0 ? grades.map(g => (
-                      <option key={g.id} value={g.name}>{g.name}</option>
-                    )) : null}
-                  </select>
-                  {grades.length === 0 && (
-                    <p className="text-[10px] text-amber-600 mt-1 ml-1 flex items-center gap-1">
-                      No grades found. <a href="/admin/grades" className="underline font-bold">Add One</a>
-                    </p>
-                  )}
-                  {errors.grade && <p className="text-xs text-red-500 ml-1 mt-1">{errors.grade.message}</p>}
+                   <label className="text-sm font-semibold text-slate-700 ml-1">Grade / Level</label>
+                   <select 
+                     {...register("grade")}
+                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                   >
+                     <option value="">Select Grade</option>
+                     {grades.length > 0 ? grades.map(g => (
+                       <option key={g.id} value={g.name}>{g.name}</option>
+                     )) : null}
+                   </select>
+                   {grades.length === 0 && (
+                     <p className="text-[10px] text-amber-600 mt-1 ml-1 flex items-center gap-1">
+                       No grades found. <a href="/admin/grades" className="underline font-bold">Add One</a>
+                     </p>
+                   )}
+                   {errors.grade && <p className="text-xs text-red-500 ml-1 mt-1">{errors.grade.message}</p>}
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">School Name</label>
-                  <input 
-                    {...register("schoolName")}
-                    placeholder="e.g. Royal College"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                  />
-                  {errors.schoolName && <p className="text-xs text-red-500 ml-1 mt-1">{errors.schoolName.message}</p>}
+                   <label className="text-sm font-semibold text-slate-700 ml-1">School Name</label>
+                   <input 
+                     {...register("schoolName")}
+                     placeholder="e.g. Royal College"
+                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                   />
+                   {errors.schoolName && <p className="text-xs text-red-500 ml-1 mt-1">{errors.schoolName.message}</p>}
                 </div>
+             </div>
+
+             {/* Subject Selection */}
+             <div className="space-y-2 mt-4">
+                <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2">
+                   <BookOpen className="w-3.5 h-3.5 text-primary/60" /> Enrolled Subjects
+                </label>
+                <div className="flex flex-wrap gap-2 p-3 bg-slate-50 rounded-xl border border-slate-100">
+                   {subjects.map(subject => (
+                     <label 
+                       key={subject.id} 
+                       className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${
+                         selectedSubjects.includes(subject.id) 
+                         ? 'bg-primary/10 border-primary/30 text-primary font-bold' 
+                         : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                       }`}
+                     >
+                       <input 
+                         type="checkbox"
+                         value={subject.id}
+                         className="hidden"
+                         checked={selectedSubjects.includes(subject.id)}
+                         onChange={(e) => {
+                           const val = e.target.value;
+                           const updated = e.target.checked 
+                             ? [...selectedSubjects, val]
+                             : selectedSubjects.filter(i => i !== val);
+                           setValue("enrolledSubjects", updated);
+                         }}
+                       />
+                       <span className="text-xs uppercase tracking-tight">{subject.name}</span>
+                     </label>
+                   ))}
+                   {subjects.length === 0 && (
+                     <p className="text-[10px] text-slate-400 italic">No subjects available.</p>
+                   )}
+                </div>
+                {errors.enrolledSubjects && <p className="text-xs text-red-500 ml-1 mt-1">{errors.enrolledSubjects.message}</p>}
              </div>
           </div>
 

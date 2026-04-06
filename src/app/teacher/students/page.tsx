@@ -3,9 +3,10 @@
 import { useState, useEffect } from "react";
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Users, Search, Filter, BookOpen, Clock, Activity, MessageSquare, Phone } from "lucide-react";
+import { Users, Search, Filter, BookOpen, Clock, Activity, MessageSquare, Phone, Edit } from "lucide-react";
 import { Student, Teacher } from "@/types/models";
 import { useAuth } from "@/context/AuthContext";
+import StudentModal from "@/components/admin/StudentModal";
 
 export default function MyStudentsPage() {
   const { user } = useAuth();
@@ -13,30 +14,39 @@ export default function MyStudentsPage() {
   const [teacherData, setTeacherData] = useState<Teacher | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+
+  const loadData = async () => {
+    if (!user?.uid) return;
+    setLoading(true);
+    try {
+      const tSnap = await getDocs(query(collection(db, "teachers"), where("id", "==", user.uid)));
+      if (!tSnap.empty) {
+        const tInfo = { id: tSnap.docs[0].id, ...tSnap.docs[0].data() } as Teacher;
+        setTeacherData(tInfo);
+
+        // Fetch students in the grades the teacher handles
+        if (tInfo.grades && tInfo.grades.length > 0) {
+          const sSnap = await getDocs(query(collection(db, "students"), where("grade", "in", tInfo.grades)));
+          setStudents(sSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student)));
+        }
+      }
+    } catch (error) {
+      console.error("Error loading student data", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function loadData() {
-      if (!user?.uid) return;
-      try {
-        const tSnap = await getDocs(query(collection(db, "teachers"), where("id", "==", user.uid)));
-        if (!tSnap.empty) {
-          const tInfo = { id: tSnap.docs[0].id, ...tSnap.docs[0].data() } as Teacher;
-          setTeacherData(tInfo);
-
-          // Fetch students in the grades the teacher handles
-          if (tInfo.grades && tInfo.grades.length > 0) {
-            const sSnap = await getDocs(query(collection(db, "students"), where("grade", "in", tInfo.grades)));
-            setStudents(sSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student)));
-          }
-        }
-      } catch (error) {
-        console.error("Error loading student data", error);
-      } finally {
-        setLoading(false);
-      }
-    }
     loadData();
   }, [user]);
+
+  const handleEdit = (student: Student) => {
+    setSelectedStudent(student);
+    setIsModalOpen(true);
+  };
 
   const filteredStudents = students.filter(s => 
     s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -79,7 +89,14 @@ export default function MyStudentsPage() {
                 </div>
                 
                 <h4 className="text-lg font-black text-slate-800 mb-1 leading-tight">{s.name}</h4>
-                <p className="text-[10px] font-black uppercase text-indigo-600 tracking-widest bg-indigo-50 px-3 py-1 rounded-full mb-6 border border-indigo-100">{s.grade}</p>
+                <div className="flex flex-col gap-1 items-center mb-6">
+                    <p className="text-[10px] font-black uppercase text-indigo-600 tracking-widest bg-indigo-50 px-3 py-1 rounded-full border border-indigo-100">{s.grade}</p>
+                    {s.enrolledSubjects && s.enrolledSubjects.length > 0 && (
+                        <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest leading-none">
+                            {s.enrolledSubjects.length} Subjects Enrolled
+                        </p>
+                    )}
+                </div>
                 
                 <div className="grid grid-cols-2 gap-2 w-full mt-auto">
                     <div className="bg-slate-50 p-3 rounded-2xl flex flex-col items-center">
@@ -93,11 +110,14 @@ export default function MyStudentsPage() {
                 </div>
 
                 <div className="flex gap-2 w-full mt-4">
-                    <button className="flex-1 bg-white border border-slate-200 rounded-xl py-2 px-3 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-100 transition-colors flex items-center justify-center gap-2">
-                        <MessageSquare className="w-3 h-3" /> SMS
+                    <button 
+                        onClick={() => handleEdit(s)}
+                        className="flex-1 bg-white border border-slate-200 rounded-xl py-2 px-3 text-[10px] font-black uppercase tracking-widest text-slate-600 hover:bg-slate-100 transition-colors flex items-center justify-center gap-2"
+                    >
+                        <Edit className="w-3 h-3" /> Enroll
                     </button>
                     <button className="flex-1 bg-indigo-600 text-white rounded-xl py-2 px-3 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-100">
-                        View Detail
+                        View Profile
                     </button>
                 </div>
             </div>
@@ -110,6 +130,16 @@ export default function MyStudentsPage() {
           )}
         </div>
       </div>
+
+      <StudentModal 
+        isOpen={isModalOpen} 
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedStudent(null);
+        }} 
+        onSuccess={loadData}
+        initialData={selectedStudent}
+      />
     </div>
   );
 }

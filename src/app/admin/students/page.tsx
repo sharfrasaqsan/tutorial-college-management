@@ -152,6 +152,7 @@ export default function StudentsPage() {
                 <tr>
                   <th className="px-6 py-4">Student Name</th>
                   <th className="px-6 py-4">Contact</th>
+                  <th className="px-6 py-4">Grade & Subjects</th>
                   <th className="px-6 py-4">School</th>
                   <th className="px-6 py-4">Status</th>
                   <th className="px-6 py-4 text-right">Actions</th>
@@ -174,6 +175,12 @@ export default function StudentsPage() {
                     <td className="px-6 py-4">
                       <p className={`${student.status === 'inactive' ? 'text-slate-400' : 'text-slate-700'}`}>{student.phone}</p>
                       <p className="text-xs text-slate-500">{student.parentName}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="font-medium text-slate-700">{student.grade || 'N/A'}</p>
+                      <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tighter">
+                        {student.enrolledSubjects?.length || 0} Subjects Enrolled
+                      </p>
                     </td>
                     <td className="px-6 py-4 text-slate-600">{student.schoolName}</td>
                     <td className="px-6 py-4">
@@ -210,7 +217,7 @@ export default function StudentsPage() {
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-slate-500">
+                    <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
                       No students found matching your criteria.
                     </td>
                   </tr>

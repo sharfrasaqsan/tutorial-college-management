@@ -15,7 +15,11 @@ export interface Student {
   gender: 'male' | 'female' | 'other';
   status: 'active' | 'inactive';
   grade?: string;
+  gradeId?: string;
+  enrolledSubjects?: string[]; // IDs of subjects
+  enrolledClasses?: string[];  // IDs of classes
   createdAt?: FirestoreTimestamp;
+  updatedAt?: FirestoreTimestamp;
 }
 
 export interface Teacher {
