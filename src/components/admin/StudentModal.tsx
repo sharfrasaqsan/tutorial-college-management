@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -42,6 +42,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [availableClasses, setAvailableClasses] = useState<Class[]>([]);
   const [fetchingClasses, setFetchingClasses] = useState(false);
+  const isInitializing = useRef(false);
 
   useEffect(() => {
     async function loadData() {
@@ -85,6 +86,12 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
 
   useEffect(() => {
     const gradeObj = grades.find(g => g.name === selectedGrade);
+    
+    // Clear classes if the grade changes, BUT NOT during initial modal population
+    if (!isInitializing.current && selectedGrade) {
+      setValue("enrolledClasses", []);
+    }
+
     if (gradeObj) {
       setValue("gradeId", gradeObj.id);
       loadClasses(gradeObj.id);
@@ -109,53 +116,81 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
     }
   };
 
-  // Re-sync form when initialData changes or modal opens
+  // Coordinate data loading and form initialization
   useEffect(() => {
-    if (initialData) {
-      reset({
-        name: initialData.name,
-        phone: initialData.phone || "",
-        parentName: initialData.parentName,
-        parentPhone: initialData.parentPhone,
-        schoolName: initialData.schoolName,
-        address: initialData.address,
-        grade: initialData.grade || "",
-        gradeId: initialData.gradeId || "",
-        gender: initialData.gender || "male",
-        status: initialData.status,
-        enrolledSubjects: initialData.enrolledSubjects || [],
-        enrolledClasses: initialData.enrolledClasses || [],
-      });
-    } else {
-      reset({
-        name: "",
-        phone: "",
-        parentName: "",
-        parentPhone: "",
-        schoolName: "",
-        address: "",
-        grade: "",
-        gradeId: "",
-        gender: "male",
-        status: "active",
-        enrolledSubjects: [],
-        enrolledClasses: [],
-      });
+    if (!isOpen) {
+      setAvailableClasses([]);
+      return;
     }
-  }, [initialData, reset, isOpen]);
+
+    // Only populate form once we have the grades to avoid dropdown reset issues
+    if (grades.length > 0) {
+      isInitializing.current = true; // Mark that we are populating
+      if (initialData) {
+        // Handle legacy data where grade name might be missing but ID exists
+        let resolvedGrade = initialData.grade || "";
+        if (!resolvedGrade && initialData.gradeId) {
+          resolvedGrade = grades.find(g => g.id === initialData.gradeId)?.name || "";
+        }
+
+        reset({
+          name: initialData.name || "",
+          phone: initialData.phone || "",
+          parentName: initialData.parentName || "",
+          parentPhone: initialData.parentPhone || "",
+          schoolName: initialData.schoolName || "",
+          address: initialData.address || "",
+          grade: resolvedGrade,
+          gradeId: initialData.gradeId || "",
+          gender: initialData.gender || "male",
+          status: initialData.status || "active",
+          enrolledSubjects: initialData.enrolledSubjects || [],
+          enrolledClasses: initialData.enrolledClasses || [],
+        });
+      } else {
+        reset({
+          name: "",
+          phone: "",
+          parentName: "",
+          parentPhone: "",
+          schoolName: "",
+          address: "",
+          grade: "",
+          gradeId: "",
+          gender: "male",
+          status: "active",
+          enrolledSubjects: [],
+          enrolledClasses: [],
+        });
+      }
+      
+      // Allow the next effect cycle to handle clearing classes on user changes
+      setTimeout(() => {
+        isInitializing.current = false;
+      }, 100);
+    }
+  }, [initialData, reset, isOpen, grades]);
 
   const onSubmit = async (data: StudentForm) => {
     setLoading(true);
     const batch = writeBatch(db);
     try {
       // Derive subjects from selected classes
-      const subjectsSet = new Set<string>();
-      availableClasses.forEach(c => {
-        if (data.enrolledClasses?.includes(c.id)) {
-          subjectsSet.add(c.subjectId);
-        }
-      });
-      data.enrolledSubjects = Array.from(subjectsSet);
+      // If availableClasses is empty but we have enrolledClasses (still loading), 
+      // we must preserve existing subjects to prevent wiping data.
+      let finalEnrolledSubjects = data.enrolledSubjects || [];
+      
+      if (availableClasses.length > 0) {
+        const subjectsSet = new Set<string>();
+        availableClasses.forEach(c => {
+          if (data.enrolledClasses?.includes(c.id)) {
+            subjectsSet.add(c.subjectId);
+          }
+        });
+        finalEnrolledSubjects = Array.from(subjectsSet);
+      }
+      
+      data.enrolledSubjects = finalEnrolledSubjects;
 
       if (initialData) {
         // Update Case
@@ -252,7 +287,13 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
         onClose={onClose} 
         title={initialData ? "Modify Student Profile" : "Register New Student"}
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      {grades.length === 0 ? (
+        <div className="py-20 flex flex-col items-center justify-center text-slate-400 space-y-4">
+           <Loader2 className="w-8 h-8 animate-spin text-primary" />
+           <p className="text-sm font-medium uppercase tracking-widest text-[10px] font-black">Syncing Academic Registry...</p>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Basic Info */}
           <div className="space-y-4 col-span-full">
@@ -458,6 +499,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
           </button>
         </div>
       </form>
+      )}
     </Modal>
   );
 }
