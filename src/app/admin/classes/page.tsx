@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc, writeBatch, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Plus, BookOpen, Clock, Users, Calendar, Edit, Trash2, Ban, CheckCircle, AlertCircle, Filter, X } from "lucide-react";
 import { Class, Teacher, Subject, Grade } from "@/types/models";
@@ -95,8 +95,16 @@ export default function ClassesPage() {
   const handleDelete = async () => {
     if (!classToDelete) return;
     setDeleting(true);
+    const batch = writeBatch(db);
     try {
-        await deleteDoc(doc(db, "classes", classToDelete));
+        const cls = classes.find(c => c.id === classToDelete);
+        if (cls && cls.gradeId) {
+          batch.update(doc(db, "grades", cls.gradeId), { classCount: increment(-1) });
+        }
+
+        batch.delete(doc(db, "classes", classToDelete));
+        await batch.commit();
+
         toast.success("Class schedule dissolved.");
         setIsDeleteOpen(false);
         setClassToDelete(null);
@@ -300,7 +308,7 @@ export default function ClassesPage() {
               </div>
               
               <h3 className={`font-bold text-lg mb-1 transition-colors ${isClassInactive ? 'text-slate-400' : 'text-slate-800'}`}>{item.name}</h3>
-              <p className="text-xs text-slate-500 mb-4">{item.subject} • {item.grade}</p>
+              <p className="text-xs text-slate-500 mb-4">{item.subject || subject?.name || '---'} • {item.grade || grade?.name || '---'}</p>
               
               <div className="space-y-3 mt-auto">
                 <div className="flex items-center gap-2 text-sm">

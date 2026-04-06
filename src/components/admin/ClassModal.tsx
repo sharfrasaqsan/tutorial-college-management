@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, doc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, doc, updateDoc, writeBatch, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Loader2, BookOpen, Calendar, Clock, MapPin } from "lucide-react";
 import { Teacher, Grade, Subject, Class } from "@/types/models";
@@ -61,14 +61,33 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
     register,
     handleSubmit,
     reset,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<ClassForm>({
     resolver: zodResolver(classSchema),
     defaultValues: {
       status: "active",
       dayOfWeek: "monday",
+      name: "",
     }
   });
+
+  const watchedGradeId = watch("gradeId");
+  const watchedSubjectId = watch("subjectId");
+  const watchedTeacherId = watch("teacherId");
+
+  useEffect(() => {
+    if (watchedGradeId && watchedSubjectId && watchedTeacherId) {
+      const g = grades.find(x => x.id === watchedGradeId);
+      const s = subjects.find(x => x.id === watchedSubjectId);
+      const t = teachers.find(x => x.id === watchedTeacherId);
+
+      if (g && s && t) {
+        setValue("name", `${g.name} - ${s.name} - ${t.name}`);
+      }
+    }
+  }, [watchedGradeId, watchedSubjectId, watchedTeacherId, grades, subjects, teachers, setValue]);
 
   useEffect(() => {
     if (initialData) {
@@ -100,6 +119,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
 
   const onSubmit = async (data: ClassForm) => {
     setLoading(true);
+    const batch = writeBatch(db);
     try {
       const selectedTeacher = teachers.find(t => t.id === data.teacherId);
       const selectedSubject = subjects.find(s => s.id === data.subjectId);
@@ -108,20 +128,40 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
       const classData = {
         ...data,
         teacherName: selectedTeacher?.name || "",
-        subjectName: selectedSubject?.name || "",
-        gradeName: selectedGrade?.name || "",
+        subject: selectedSubject?.name || "",
+        grade: selectedGrade?.name || "",
         updatedAt: serverTimestamp(),
       };
 
       if (initialData) {
-        await updateDoc(doc(db, "classes", initialData.id), classData);
+        // Handle Grade Migration for Class Count
+        if ((initialData as any).gradeId !== data.gradeId) {
+          if ((initialData as any).gradeId) {
+            batch.update(doc(db, "grades", (initialData as any).gradeId), { classCount: increment(-1) });
+          }
+          if (data.gradeId) {
+            batch.update(doc(db, "grades", data.gradeId), { classCount: increment(1) });
+          }
+        }
+        
+        batch.update(doc(db, "classes", initialData.id), classData);
+        await batch.commit();
         toast.success("Class schedule updated!");
       } else {
-        await addDoc(collection(db, "classes"), {
+        const classRef = doc(collection(db, "classes"));
+        
+        // Increment Grade Class Count
+        if (data.gradeId) {
+          batch.update(doc(db, "grades", data.gradeId), { classCount: increment(1) });
+        }
+
+        batch.set(classRef, {
           ...classData,
           studentCount: 0,
           createdAt: serverTimestamp(),
         });
+        
+        await batch.commit();
         toast.success("New class successfully scheduled!");
       }
 
@@ -150,12 +190,15 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
                 <BookOpen className="w-3 h-3" /> Curriculum Setup
             </h4>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-               <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Class Display Name</label>
+                <div className="space-y-1">
+                  <label className="text-sm font-semibold text-slate-700 ml-1 flex justify-between items-center">
+                    Class Display Name <span className="text-[10px] text-primary/60 font-black uppercase tracking-widest">(Auto-Generated)</span>
+                  </label>
                   <input 
                     {...register("name")}
-                    placeholder="e.g. Physics 2026 Batch - A"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    readOnly
+                    placeholder="Select Grade, Subject & Teacher..."
+                    className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-slate-500 cursor-not-allowed outline-none transition-all font-bold"
                   />
                   {errors.name && <p className="text-xs text-red-500 ml-1 mt-1">{errors.name.message}</p>}
                 </div>

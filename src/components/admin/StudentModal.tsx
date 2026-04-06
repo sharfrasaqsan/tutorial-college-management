@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { collection, addDoc, getDocs, orderBy, serverTimestamp, query, doc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, getDocs, orderBy, serverTimestamp, query, doc, updateDoc, increment, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Loader2, User, Phone, MapPin, GraduationCap } from "lucide-react";
 import { Grade, Student, Subject, Class } from "@/types/models";
@@ -146,6 +146,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
 
   const onSubmit = async (data: StudentForm) => {
     setLoading(true);
+    const batch = writeBatch(db);
     try {
       // Derive subjects from selected classes
       const subjectsSet = new Set<string>();
@@ -157,19 +158,81 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
       data.enrolledSubjects = Array.from(subjectsSet);
 
       if (initialData) {
-        // Update
+        // Update Case
         const studentRef = doc(db, "students", initialData.id);
-        await updateDoc(studentRef, {
+        
+        // 1. Handle Grade Change
+        if (initialData.gradeId !== data.gradeId) {
+          if (initialData.gradeId) {
+            batch.update(doc(db, "grades", initialData.gradeId), { studentCount: increment(-1) });
+          }
+          if (data.gradeId) {
+            batch.update(doc(db, "grades", data.gradeId), { studentCount: increment(1) });
+          }
+        }
+
+        // 2. Handle Class Enrollment Changes
+        const oldClasses = initialData.enrolledClasses || [];
+        const newClasses = data.enrolledClasses || [];
+        
+        const classesLeft = oldClasses.filter(x => !newClasses.includes(x));
+        const classesJoined = newClasses.filter(x => !oldClasses.includes(x));
+
+        classesLeft.forEach(cid => {
+          batch.update(doc(db, "classes", cid), { studentCount: increment(-1) });
+        });
+        classesJoined.forEach(cid => {
+          batch.update(doc(db, "classes", cid), { studentCount: increment(1) });
+        });
+
+        // 3. Handle Subject Enrollment Changes (Unique Subject Count)
+        const oldSubjects = initialData.enrolledSubjects || [];
+        const newSubjects = data.enrolledSubjects || [];
+        
+        const subjectsLeft = oldSubjects.filter(x => !newSubjects.includes(x));
+        const subjectsJoined = newSubjects.filter(x => !oldSubjects.includes(x));
+
+        subjectsLeft.forEach(sid => {
+          batch.update(doc(db, "subjects", sid), { studentCount: increment(-1) });
+        });
+        subjectsJoined.forEach(sid => {
+          batch.update(doc(db, "subjects", sid), { studentCount: increment(1) });
+        });
+
+        // 4. Update Student Document
+        batch.update(studentRef, {
           ...data,
           updatedAt: serverTimestamp(),
         });
+        
+        await batch.commit();
         toast.success("Student profile updated!");
       } else {
-        // Create
-        await addDoc(collection(db, "students"), {
+        // Create Case
+        const studentRef = doc(collection(db, "students"));
+        
+        // 1. Grade Count
+        if (data.gradeId) {
+          batch.update(doc(db, "grades", data.gradeId), { studentCount: increment(1) });
+        }
+
+        // 2. Class Counts
+        data.enrolledClasses?.forEach(cid => {
+          batch.update(doc(db, "classes", cid), { studentCount: increment(1) });
+        });
+
+        // 3. Subject Counts
+        data.enrolledSubjects?.forEach(sid => {
+          batch.update(doc(db, "subjects", sid), { studentCount: increment(1) });
+        });
+
+        // 4. Create Student
+        batch.set(studentRef, {
           ...data,
           createdAt: serverTimestamp(),
         });
+
+        await batch.commit();
         toast.success("Student successfully registered!");
       }
       reset();
@@ -177,7 +240,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
       onClose();
     } catch (error) {
       console.error("Error saving student:", error);
-      toast.error(`Error: ${initialData ? 'Update' : 'Creation'} failed.`);
+      toast.error(`Error: Enrollment processing failed.`);
     } finally {
       setLoading(false);
     }

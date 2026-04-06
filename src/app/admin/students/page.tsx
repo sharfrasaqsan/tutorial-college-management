@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, doc, deleteDoc, updateDoc, writeBatch, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle, X, ChevronDown } from "lucide-react";
 import { Student, Grade, Subject } from "@/types/models";
@@ -90,9 +90,31 @@ export default function StudentsPage() {
   const handleDelete = async () => {
     if (!studentToDelete) return;
     setDeleting(true);
+    const batch = writeBatch(db);
     try {
-        await deleteDoc(doc(db, "students", studentToDelete));
-        toast.success("Student record purged.");
+        const student = students.find(s => s.id === studentToDelete);
+        if (student) {
+          // 1. Decrement Grade Count
+          if (student.gradeId) {
+            batch.update(doc(db, "grades", student.gradeId), { studentCount: increment(-1) });
+          }
+
+          // 2. Decrement Class Counts
+          student.enrolledClasses?.forEach(cid => {
+            batch.update(doc(db, "classes", cid), { studentCount: increment(-1) });
+          });
+
+          // 3. Decrement Subject Counts
+          student.enrolledSubjects?.forEach(sid => {
+            batch.update(doc(db, "subjects", sid), { studentCount: increment(-1) });
+          });
+        }
+
+        // 4. Delete Student
+        batch.delete(doc(db, "students", studentToDelete));
+        
+        await batch.commit();
+        toast.success("Student record purged and enrollment counts updated.");
         setIsDeleteOpen(false);
         setStudentToDelete(null);
         loadStudents();
