@@ -5,13 +5,12 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { serverTimestamp, setDoc, doc, collection, getDocs, orderBy, query, updateDoc } from "firebase/firestore";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { db, auth } from "@/lib/firebase";
 import { Loader2, User, Mail, BookOpen } from "lucide-react";
 import toast from "react-hot-toast";
 import Modal from "@/components/ui/Modal";
 import { Subject, Grade, Teacher } from "@/types/models";
-import { updateTeacherCredentials } from "@/app/actions/teacher-actions";
 
 const teacherSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
@@ -114,6 +113,17 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
     setValue(field, updated, { shouldValidate: true });
   };
 
+  const handlePasswordReset = async () => {
+    if (!initialData?.email) return;
+    try {
+        await sendPasswordResetEmail(auth, initialData.email);
+        toast.success(`Security reset link dispatched to ${initialData.email}`);
+    } catch (err: any) {
+        console.error("Reset error:", err);
+        toast.error("Failed to dispatcher security link.");
+    }
+  };
+
   const onSubmit = async (data: TeacherForm) => {
     if (!initialData && (!data.password || data.password.length < 6)) {
         toast.error("Password is required and must be 6+ chars for new accounts");
@@ -123,19 +133,6 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
     setLoading(true);
     try {
       if (initialData) {
-        if (data.email !== initialData.email || data.password) {
-          const authUpdate = await updateTeacherCredentials(initialData.id, {
-            email: data.email !== initialData.email ? data.email : undefined,
-            password: data.password || undefined
-          });
-          
-          if (!authUpdate.success) {
-            toast.error(`Master Auth Sync Failed: ${authUpdate.error}`);
-          } else {
-            toast.success("Login credentials updated via Master Sync.");
-          }
-        }
-
         await updateDoc(doc(db, "teachers", initialData.id), {
           name: data.name,
           email: data.email,
@@ -153,7 +150,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
           phone: data.phone,
         });
 
-        toast.success("Faculty profile refreshed.");
+        toast.success("Faculty profile updated successfully!");
       } else {
         const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password!);
         const uid = userCredential.user.uid;
@@ -181,7 +178,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
           createdAt: serverTimestamp(),
         });
 
-        toast.success("New faculty member registered.");
+        toast.success("Teacher account successfully created!");
       }
 
       reset();
@@ -253,29 +250,36 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
                   <input 
                     {...register("email")}
                     type="email"
+                    disabled={!!initialData}
                     placeholder="teacher@tutorial.edu"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    className={`w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all ${initialData ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50'}`}
                   />
-                  {initialData && (
-                    <p className="text-[10px] text-amber-600 bg-amber-50 p-2 rounded-lg border border-amber-100 mt-2 font-medium leading-relaxed">
-                        <span className="font-black uppercase">Admin Master Note:</span> Updating this email will update the profile registry and attempt to sync with the login account.
-                    </p>
-                  )}
+                  {initialData && <p className="text-[10px] text-slate-400 ml-1 mt-2">Login email is locked for security. To change, please contact +94751230001 or sharfrasaqsan@gmail.com.</p>}
                   {errors.email && <p className="text-xs text-red-500 ml-1 mt-1">{errors.email.message}</p>}
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-sm font-semibold text-slate-700 ml-1">
-                    {initialData ? 'Administrative Master Reset' : 'Initial Password'}
+                    {initialData ? 'Security Management' : 'Initial Password'}
                   </label>
-                  <input 
-                    {...register("password")}
-                    type="password"
-                    placeholder={initialData ? "Type new password to force sync..." : "Min 6 characters"}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-                  />
-                  {initialData && <p className="text-[10px] text-slate-400 ml-1">Enter a new password above to force-synchronize with their login account.</p>}
-                  {!initialData && errors.password && <p className="text-xs text-red-500 ml-1 mt-1">{errors.password.message}</p>}
+                  {initialData ? (
+                    <button 
+                        type="button" 
+                        onClick={handlePasswordReset}
+                        className="w-full px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 border border-slate-200"
+                    >
+                        Send Password Recovery Email
+                    </button>
+                  ) : (
+                    <input 
+                      {...register("password")}
+                      type="password"
+                      placeholder="Min 6 characters"
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    />
+                  )}
+                  {errors.password && !initialData && <p className="text-xs text-red-500 ml-1 mt-1">{errors.password.message}</p>}
+                  {initialData && <p className="text-[10px] text-slate-400 ml-1">Credentials are managed via secure authentication links.</p>}
                 </div>
             </div>
           </div>
