@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy, addDoc, serverTimestamp } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, addDoc, serverTimestamp, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Check, X, Calendar, Users, CheckCircle2 } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
@@ -65,6 +65,19 @@ export default function AttendancePage() {
     
     setSubmitting(true);
     try {
+      const today = new Date().toISOString().split('T')[0];
+      const dupQuery = query(
+        collection(db, "attendance"),
+        where("classId", "==", selectedClass),
+        where("date", "==", today)
+      );
+      const dupSnap = await getDocs(dupQuery);
+      if (!dupSnap.empty) {
+        toast.error("Attendance for this class has already been marked for today.");
+        setSubmitting(false);
+        return;
+      }
+
       await addDoc(collection(db, "attendance"), {
         classId: selectedClass,
         date: new Date().toISOString().split('T')[0],

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Loader2, BookType, Palette } from "lucide-react";
 import toast from "react-hot-toast";
@@ -72,6 +72,31 @@ export default function SubjectModal({ isOpen, onClose, onSuccess, initialData }
   const onSubmit = async (data: SubjectForm) => {
     setLoading(true);
     try {
+      // Uniqueness check for Name or Code
+      const dupQuery = query(
+        collection(db, "subjects"), 
+        where("name", "==", data.name)
+      );
+      const dupSnap = await getDocs(dupQuery);
+      const nameTaken = dupSnap.docs.some(doc => initialData ? doc.id !== initialData.id : true);
+      if (nameTaken) {
+        toast.error(`Subject "${data.name}" already exists.`);
+        setLoading(false);
+        return;
+      }
+
+      const codeQuery = query(
+          collection(db, "subjects"), 
+          where("subjectCode", "==", data.subjectCode)
+      );
+      const codeSnap = await getDocs(codeQuery);
+      const codeTaken = codeSnap.docs.some(doc => initialData ? doc.id !== initialData.id : true);
+      if (codeTaken) {
+        toast.error(`Subject code "${data.subjectCode}" is already in use.`);
+        setLoading(false);
+        return;
+      }
+
       if (initialData) {
         await updateDoc(doc(db, "subjects", initialData.id), {
           ...data,

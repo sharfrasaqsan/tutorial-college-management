@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { serverTimestamp, setDoc, doc, collection, getDocs, orderBy, query, updateDoc } from "firebase/firestore";
+import { serverTimestamp, setDoc, doc, collection, getDocs, orderBy, query, updateDoc, where } from "firebase/firestore";
 import { createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { db, auth } from "@/lib/firebase";
 import { Loader2, User, Mail, BookOpen, AlertCircle } from "lucide-react";
@@ -141,6 +141,16 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
 
     setLoading(true);
     try {
+      // Uniqueness check for NIC
+      const nicQuery = query(collection(db, "teachers"), where("nic", "==", data.nic));
+      const nicSnap = await getDocs(nicQuery);
+      const isDuplicateNIC = nicSnap.docs.some((doc) => initialData ? doc.id !== initialData.id : true);
+      
+      if (isDuplicateNIC) {
+        toast.error(`Faculty member with NIC ${data.nic} is already registered.`);
+        setLoading(false);
+        return;
+      }
       if (initialData) {
         const teacherId = initialData.teacherId || await generateId("teacher");
         await updateDoc(doc(db, "teachers", initialData.id), {

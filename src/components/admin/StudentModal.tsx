@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { collection, getDocs, orderBy, serverTimestamp, query, doc, increment, writeBatch } from "firebase/firestore";
+import { collection, getDocs, orderBy, serverTimestamp, query, doc, increment, writeBatch, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Loader2, User, Phone, MapPin, GraduationCap } from "lucide-react";
 import { Grade, Student, Class } from "@/types/models";
@@ -173,11 +173,23 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
     setLoading(true);
     const batch = writeBatch(db);
     try {
-      // Derive subjects from selected classes
-      // If availableClasses is empty but we have enrolledClasses (still loading), 
-      // we must preserve existing subjects to prevent wiping data.
-      let finalEnrolledSubjects = data.enrolledSubjects || [];
+      // Uniqueness check for Name + Parent Phone
+      const dupQuery = query(
+        collection(db, "students"), 
+        where("name", "==", data.name),
+        where("parentPhone", "==", data.parentPhone)
+      );
+      const dupSnap = await getDocs(dupQuery);
+      const isDuplicate = dupSnap.docs.some(doc => initialData ? doc.id !== initialData.id : true);
       
+      if (isDuplicate) {
+        toast.error("A student with this name and parent phone is already registered.");
+        setLoading(false);
+        return;
+      }
+
+      // Derive subjects from selected classes
+      let finalEnrolledSubjects = data.enrolledSubjects || [];
       if (availableClasses.length > 0) {
         const subjectsSet = new Set<string>();
         availableClasses.forEach(c => {
@@ -187,7 +199,6 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
         });
         finalEnrolledSubjects = Array.from(subjectsSet);
       }
-      
       data.enrolledSubjects = finalEnrolledSubjects;
 
       if (initialData) {

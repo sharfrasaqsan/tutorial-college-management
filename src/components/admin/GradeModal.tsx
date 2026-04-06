@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { collection, addDoc, serverTimestamp, doc, updateDoc } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp, doc, updateDoc, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Loader2, Info } from "lucide-react";
 import toast from "react-hot-toast";
@@ -60,6 +60,17 @@ export default function GradeModal({ isOpen, onClose, onSuccess, initialData }: 
   const onSubmit = async (data: GradeForm) => {
     setLoading(true);
     try {
+      // Name check
+      const dupQuery = query(collection(db, "grades"), where("name", "==", data.name));
+      const dupSnap = await getDocs(dupQuery);
+      const isDuplicate = dupSnap.docs.some(doc => initialData ? doc.id !== initialData.id : true);
+      
+      if (isDuplicate) {
+        toast.error(`The academic level "${data.name}" is already defined.`);
+        setLoading(false);
+        return;
+      }
+
       if (initialData) {
         await updateDoc(doc(db, "grades", initialData.id), {
           ...data,

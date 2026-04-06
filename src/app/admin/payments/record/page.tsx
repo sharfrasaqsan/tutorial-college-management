@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, addDoc, serverTimestamp, orderBy } from "firebase/firestore";
+import { collection, query, getDocs, addDoc, serverTimestamp, orderBy, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { CreditCard, Search, ChevronRight, Calendar, Receipt } from "lucide-react";
 import { Student } from "@/types/models";
@@ -37,7 +37,7 @@ export default function RecordPaymentPage() {
 
   const filteredStudents = students.filter(s => 
     s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.phone.includes(searchTerm)
+    (s.phone || "").includes(searchTerm)
   );
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -47,6 +47,18 @@ export default function RecordPaymentPage() {
 
     setSubmitting(true);
     try {
+      const dupQuery = query(
+        collection(db, "payments"),
+        where("studentId", "==", selectedStudent.id),
+        where("month", "==", paymentData.month)
+      );
+      const dupSnap = await getDocs(dupQuery);
+      if (!dupSnap.empty) {
+        toast.error(`A payment for ${selectedStudent.name} for the month of ${paymentData.month} already exists.`);
+        setSubmitting(false);
+        return;
+      }
+
       await addDoc(collection(db, "payments"), {
         studentId: selectedStudent.id,
         studentName: selectedStudent.name,

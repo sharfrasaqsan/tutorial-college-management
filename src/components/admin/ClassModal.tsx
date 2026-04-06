@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { collection, addDoc, getDocs, query, orderBy, serverTimestamp, doc, updateDoc, writeBatch, increment } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, serverTimestamp, doc, writeBatch, increment, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Loader2, BookOpen, Calendar, Clock, MapPin } from "lucide-react";
 import { Teacher, Grade, Subject, Class } from "@/types/models";
@@ -155,8 +155,8 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
         startTime: "",
         endTime: "",
         room: "",
-        monthlyFee: 0,
         status: "active",
+        monthlyFee: 0 as number,
       });
     }
   }, [initialData, reset, isOpen]);
@@ -165,6 +165,24 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
     setLoading(true);
     const batch = writeBatch(db);
     try {
+      // Schedule collision/uniqueness check
+      const dupQuery = query(
+        collection(db, "classes"),
+        where("gradeId", "==", data.gradeId),
+        where("subjectId", "==", data.subjectId),
+        where("teacherId", "==", data.teacherId),
+        where("dayOfWeek", "==", data.dayOfWeek),
+        where("startTime", "==", data.startTime)
+      );
+      const dupSnap = await getDocs(dupQuery);
+      const isDuplicate = dupSnap.docs.some(doc => initialData ? doc.id !== initialData.id : true);
+      
+      if (isDuplicate) {
+        toast.error("A class with this identical schedule already exists.");
+        setLoading(false);
+        return;
+      }
+
       const selectedTeacher = teachers.find(t => t.id === data.teacherId);
       const selectedSubject = subjects.find(s => s.id === data.subjectId);
       const selectedGrade = grades.find(g => g.id === data.gradeId);
