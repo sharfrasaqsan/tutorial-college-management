@@ -36,9 +36,10 @@ interface ClassModalProps {
   onClose: () => void;
   onSuccess: () => void;
   initialData?: Class | null;
+  fixedTeacherId?: string;
 }
 
-export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: ClassModalProps) {
+export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fixedTeacherId }: ClassModalProps) {
   const [loading, setLoading] = useState(false);
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
@@ -58,6 +59,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
     defaultValues: {
       status: "active",
       name: "",
+      teacherId: fixedTeacherId || "",
       monthlyFee: 0,
       schedules: [{ dayOfWeek: "monday", startTime: "", endTime: "", room: "" }],
     }
@@ -95,6 +97,12 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
   const watchedTeacherId = watch("teacherId");
 
   useEffect(() => {
+    if (fixedTeacherId) {
+        setValue("teacherId", fixedTeacherId);
+    }
+  }, [fixedTeacherId, setValue, isOpen]);
+
+  useEffect(() => {
     if (watchedGradeId && watchedSubjectId && watchedTeacherId) {
       const g = grades.find(x => x.id === watchedGradeId);
       const s = subjects.find(x => x.id === watchedSubjectId);
@@ -107,7 +115,18 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
   }, [watchedGradeId, watchedSubjectId, watchedTeacherId, grades, subjects, teachers, setValue]);
 
   // Filter logic
+  const fixedTeacher = teachers.find(t => t.id === fixedTeacherId);
+
+  const filteredGrades = grades.filter(g => {
+    if (!fixedTeacherId) return true;
+    return fixedTeacher?.grades?.includes(g.name);
+  });
+
   const filteredSubjects = subjects.filter(sub => {
+    if (fixedTeacherId) {
+      const selectedGradeName = grades.find(g => g.id === watchedGradeId)?.name;
+      return fixedTeacher?.subjects?.includes(sub.name) && (!watchedGradeId || fixedTeacher?.grades?.includes(selectedGradeName || ""));
+    }
     if (!watchedGradeId) return true;
     const selectedGradeName = grades.find(g => g.id === watchedGradeId)?.name;
     return teachers.some(t => 
@@ -117,6 +136,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
   });
 
   const filteredTeachers = teachers.filter(t => {
+    if (fixedTeacherId) return t.id === fixedTeacherId;
     const selectedGradeName = grades.find(g => g.id === watchedGradeId)?.name;
     const selectedSubjectName = subjects.find(s => s.id === watchedSubjectId)?.name;
 
@@ -255,7 +275,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
                       className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
                     >
                       <option value="">Select Grade</option>
-                      {grades.length > 0 ? grades.map(g => <option key={g.id} value={g.id}>{g.name}</option>) : null}
+                      {filteredGrades.length > 0 ? filteredGrades.map(g => <option key={g.id} value={g.id}>{g.name}</option>) : null}
                     </select>
                   )}
                   {errors.gradeId && <p className="text-xs text-red-500 ml-1 mt-1">{errors.gradeId.message}</p>}
@@ -280,19 +300,26 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData }: 
                   {errors.subjectId && <p className="text-xs text-red-500 ml-1 mt-1">{errors.subjectId.message}</p>}
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Assigned Teacher *</label>
-                  {metaLoading ? (
-                    <Skeleton className="w-full h-[45px] rounded-xl" />
-                  ) : (
-                    <select 
-                      {...register("teacherId")}
-                      disabled={!watchedSubjectId}
-                      className={`w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all ${!watchedSubjectId ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-60" : "bg-slate-50 text-slate-700"}`}
-                    >
-                      <option value="">{watchedSubjectId ? "Select Instructor" : "Pick Subject First"}</option>
-                      {filteredTeachers.length > 0 ? filteredTeachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>) : null}
-                    </select>
+                 <div className="space-y-1">
+                  {!fixedTeacherId && (
+                    <>
+                      <label className="text-sm font-semibold text-slate-700 ml-1">Assigned Teacher *</label>
+                      {metaLoading ? (
+                        <Skeleton className="w-full h-[45px] rounded-xl" />
+                      ) : (
+                        <select 
+                          {...register("teacherId")}
+                          disabled={!watchedSubjectId}
+                          className={`w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all ${!watchedSubjectId ? "bg-slate-100 text-slate-400 cursor-not-allowed opacity-60" : "bg-slate-50 text-slate-700"}`}
+                        >
+                          <option value="">{watchedSubjectId ? "Select Instructor" : "Pick Subject First"}</option>
+                          {filteredTeachers.length > 0 ? filteredTeachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>) : null}
+                        </select>
+                      )}
+                    </>
+                  )}
+                  {fixedTeacherId && (
+                    <input type="hidden" {...register("teacherId")} />
                   )}
                   {errors.teacherId && <p className="text-xs text-red-500 ml-1 mt-1">{errors.teacherId.message}</p>}
                 </div>
