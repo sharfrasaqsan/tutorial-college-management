@@ -1,11 +1,12 @@
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
-import { Bell, Search, User as UserIcon, BookOpen, Clock } from "lucide-react";
+import { Bell, Search, User as UserIcon, Clock } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import Link from "next/link";
 
 export default function TeacherTopbar() {
   const { user } = useAuth();
@@ -55,15 +56,15 @@ export default function TeacherTopbar() {
         
         <div className="h-8 w-px bg-slate-200 mx-1"></div>
         
-        <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 p-1.5 px-3 rounded-full hover:bg-slate-100 transition-colors cursor-pointer group">
+        <Link href="/teacher/profile" className="flex items-center gap-3 bg-slate-50 border border-slate-200 p-1.5 px-3 rounded-full hover:bg-slate-100 transition-all cursor-pointer group">
           <div className="text-right hidden sm:block">
             <p className="text-xs font-black text-slate-800 group-hover:text-indigo-600 transition-colors leading-tight">{teacherName}</p>
-            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-tight">Instructor</p>
+            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-tight">Instructor Badge</p>
           </div>
-          <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white border border-indigo-700 shadow-sm shadow-indigo-100">
+          <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white border border-indigo-700 shadow-sm shadow-indigo-100 group-hover:scale-105 transition-transform">
             <UserIcon className="w-4 h-4" />
           </div>
-        </div>
+        </Link>
       </div>
     </header>
   );

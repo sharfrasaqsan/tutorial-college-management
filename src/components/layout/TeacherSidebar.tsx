@@ -28,6 +28,9 @@ const navItems = [
   { label: "Earnings", items: [
     { name: "Salary History", href: "/teacher/salary", icon: Banknote },
   ]},
+  { label: "Account", items: [
+    { name: "My Profile", href: "/teacher/profile", icon: Settings },
+  ]},
 ];
 
 export default function TeacherSidebar() {
