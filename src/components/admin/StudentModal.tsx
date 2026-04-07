@@ -6,10 +6,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { collection, getDocs, orderBy, serverTimestamp, query, doc, increment, writeBatch, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Loader2, User, Phone, MapPin, GraduationCap } from "lucide-react";
+import { Loader2, User, Phone, MapPin, GraduationCap, BookOpen } from "lucide-react";
 import { Grade, Student, Class } from "@/types/models";
 import Modal from "@/components/ui/Modal";
-import { BookOpen } from "lucide-react";
 import toast from "react-hot-toast";
 import { generateId } from "@/lib/id-generator";
 import Skeleton from "@/components/ui/Skeleton";
@@ -36,9 +35,11 @@ interface StudentModalProps {
   onClose: () => void;
   onSuccess: () => void;
   initialData?: Student | null;
+  isReadOnly?: boolean;
+  teacherId?: string;
 }
 
-export default function StudentModal({ isOpen, onClose, onSuccess, initialData }: StudentModalProps) {
+export default function StudentModal({ isOpen, onClose, onSuccess, initialData, isReadOnly, teacherId }: StudentModalProps) {
   const [loading, setLoading] = useState(false);
   const [grades, setGrades] = useState<Grade[]>([]);
   const [availableClasses, setAvailableClasses] = useState<Class[]>([]);
@@ -102,11 +103,18 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
     setFetchingClasses(true);
     try {
       const q = query(collection(db, "classes"), orderBy("name", "asc"));
-      // We filter manually to avoid complex index requirements for simple queries if possible, 
-      // but usually where("gradeId", "==", gradeId) is better.
       const snap = await getDocs(q);
-      const all = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Class));
-      setAvailableClasses(all.filter(c => c.gradeId === gradeId));
+      let all = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Class));
+      
+      // Filter by Grade
+      all = all.filter(c => c.gradeId === gradeId);
+
+      // If teacherId is present, filter classes to only those handled by this teacher
+      // for the EDIT side (so they can't toggle others' classes),
+      // but for VIEW side we might want to show them? 
+      // User said: "teacher can be edi the student details and the own subjects only"
+      // and "teacher cant edit the students other classes or other subjects that not theirs"
+      setAvailableClasses(all);
     } catch (error) {
       console.error("Error loading classes:", error);
     } finally {
@@ -121,11 +129,9 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
       return;
     }
 
-    // Only populate form once we have the grades to avoid dropdown reset issues
     if (grades.length > 0) {
-      isInitializing.current = true; // Mark that we are populating
+      isInitializing.current = true;
       if (initialData) {
-        // Handle legacy data where grade name might be missing but ID exists
         let resolvedGrade = initialData.grade || "";
         if (!resolvedGrade && initialData.gradeId) {
           resolvedGrade = grades.find(g => g.id === initialData.gradeId)?.name || "";
@@ -133,6 +139,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
 
         reset({
           name: initialData.name || "",
+          studentId: initialData.studentId || "",
           phone: initialData.phone || "",
           parentName: initialData.parentName || "",
           parentPhone: initialData.parentPhone || "",
@@ -148,6 +155,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
       } else {
         reset({
           name: "",
+          studentId: "AUTO-GENERATED",
           phone: "",
           parentName: "",
           parentPhone: "",
@@ -162,7 +170,6 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
         });
       }
       
-      // Allow the next effect cycle to handle clearing classes on user changes
       setTimeout(() => {
         isInitializing.current = false;
       }, 100);
@@ -170,10 +177,11 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
   }, [initialData, reset, isOpen, grades]);
 
   const onSubmit = async (data: StudentForm) => {
+    if (isReadOnly) return;
     setLoading(true);
     const batch = writeBatch(db);
     try {
-      // Uniqueness check for Name + Parent Phone
+      // Uniqueness check
       const dupQuery = query(
         collection(db, "students"), 
         where("name", "==", data.name),
@@ -183,14 +191,28 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
       const isDuplicate = dupSnap.docs.some(doc => initialData ? doc.id !== initialData.id : true);
       
       if (isDuplicate) {
-        toast.error("A student with this name and parent phone is already registered.");
+        toast.error("Student profile already exists with these details.");
         setLoading(false);
         return;
       }
 
-      // Derive subjects from selected classes
+      // Handle Teacher Permission Logic
+      let finalEnrolledClasses = data.enrolledClasses || [];
       let finalEnrolledSubjects = data.enrolledSubjects || [];
-      if (availableClasses.length > 0) {
+
+      if (teacherId && initialData) {
+        const currentTeachersClasses = availableClasses.filter(c => c.teacherId === teacherId).map(c => c.id);
+        const othersClasses = (initialData.enrolledClasses || []).filter(cid => !currentTeachersClasses.includes(cid));
+        const teachersSelectedClasses = (data.enrolledClasses || []).filter(cid => currentTeachersClasses.includes(cid));
+        finalEnrolledClasses = Array.from(new Set([...teachersSelectedClasses, ...othersClasses]));
+        
+        const teachersSubjectsInGrade = new Set(availableClasses.filter(c => c.teacherId === teacherId).map(c => c.subjectId));
+        const othersSubjectsFromBefore = (initialData.enrolledSubjects || []).filter(sid => !teachersSubjectsInGrade.has(sid));
+        const newSubjectsFromTeacher = new Set<string>();
+        availableClasses.filter(c => c.teacherId === teacherId && teachersSelectedClasses.includes(c.id)).forEach(c => newSubjectsFromTeacher.add(c.subjectId));
+        
+        finalEnrolledSubjects = Array.from(new Set([...Array.from(newSubjectsFromTeacher), ...othersSubjectsFromBefore]));
+      } else if (!teacherId) {
         const subjectsSet = new Set<string>();
         availableClasses.forEach(c => {
           if (data.enrolledClasses?.includes(c.id)) {
@@ -198,52 +220,32 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
           }
         });
         finalEnrolledSubjects = Array.from(subjectsSet);
+        finalEnrolledClasses = data.enrolledClasses || [];
       }
+      
+      data.enrolledClasses = finalEnrolledClasses;
       data.enrolledSubjects = finalEnrolledSubjects;
 
       if (initialData) {
-        // Update Case
         const studentRef = doc(db, "students", initialData.id);
-        
-        // 1. Handle Grade Change
         if (initialData.gradeId !== data.gradeId) {
-          if (initialData.gradeId) {
-            batch.update(doc(db, "grades", initialData.gradeId), { studentCount: increment(-1) });
-          }
-          if (data.gradeId) {
-            batch.update(doc(db, "grades", data.gradeId), { studentCount: increment(1) });
-          }
+          if (initialData.gradeId) batch.update(doc(db, "grades", initialData.gradeId), { studentCount: increment(-1) });
+          if (data.gradeId) batch.update(doc(db, "grades", data.gradeId), { studentCount: increment(1) });
         }
 
-        // 2. Handle Class Enrollment Changes
-        const oldClasses = initialData.enrolledClasses || [];
-        const newClasses = data.enrolledClasses || [];
-        
-        const classesLeft = oldClasses.filter(x => !newClasses.includes(x));
-        const classesJoined = newClasses.filter(x => !oldClasses.includes(x));
-
-        classesLeft.forEach(cid => {
-          batch.update(doc(db, "classes", cid), { studentCount: increment(-1) });
-        });
-        classesJoined.forEach(cid => {
-          batch.update(doc(db, "classes", cid), { studentCount: increment(1) });
+        const diff = (old: string[], newArr: string[]) => ({
+            left: old.filter(x => !newArr.includes(x)),
+            joined: newArr.filter(x => !old.includes(x))
         });
 
-        // 3. Handle Subject Enrollment Changes (Unique Subject Count)
-        const oldSubjects = initialData.enrolledSubjects || [];
-        const newSubjects = data.enrolledSubjects || [];
-        
-        const subjectsLeft = oldSubjects.filter(x => !newSubjects.includes(x));
-        const subjectsJoined = newSubjects.filter(x => !oldSubjects.includes(x));
+        const classDiff = diff(initialData.enrolledClasses || [], data.enrolledClasses || []);
+        classDiff.left.forEach(cid => batch.update(doc(db, "classes", cid), { studentCount: increment(-1) }));
+        classDiff.joined.forEach(cid => batch.update(doc(db, "classes", cid), { studentCount: increment(1) }));
 
-        subjectsLeft.forEach(sid => {
-          batch.update(doc(db, "subjects", sid), { studentCount: increment(-1) });
-        });
-        subjectsJoined.forEach(sid => {
-          batch.update(doc(db, "subjects", sid), { studentCount: increment(1) });
-        });
+        const subDiff = diff(initialData.enrolledSubjects || [], data.enrolledSubjects || []);
+        subDiff.left.forEach(sid => batch.update(doc(db, "subjects", sid), { studentCount: increment(-1) }));
+        subDiff.joined.forEach(sid => batch.update(doc(db, "subjects", sid), { studentCount: increment(1) }));
 
-        // 4. Update Student Document
         batch.update(studentRef, {
           ...data,
           studentId: initialData.studentId || await generateId("student"),
@@ -251,43 +253,28 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
         });
         
         await batch.commit();
-        toast.success("Student profile updated!");
+        toast.success("Profile updated successfully.");
       } else {
-        // Create Case
         const studentRef = doc(collection(db, "students"));
-        await generateId("student"); // Generate for side effects if any, but we use it in the data below
-        
-        // 1. Grade Count
-        if (data.gradeId) {
-          batch.update(doc(db, "grades", data.gradeId), { studentCount: increment(1) });
-        }
+        const studentId = await generateId("student");
+        if (data.gradeId) batch.update(doc(db, "grades", data.gradeId), { studentCount: increment(1) });
+        data.enrolledClasses?.forEach(cid => batch.update(doc(db, "classes", cid), { studentCount: increment(1) }));
+        data.enrolledSubjects?.forEach(sid => batch.update(doc(db, "subjects", sid), { studentCount: increment(1) }));
 
-        // 2. Class Counts
-        data.enrolledClasses?.forEach(cid => {
-          batch.update(doc(db, "classes", cid), { studentCount: increment(1) });
-        });
-
-        // 3. Subject Counts
-        data.enrolledSubjects?.forEach(sid => {
-          batch.update(doc(db, "subjects", sid), { studentCount: increment(1) });
-        });
-
-        // 4. Create Student
         batch.set(studentRef, {
           ...data,
-          studentId: await generateId("student"),
+          studentId,
           createdAt: serverTimestamp(),
         });
 
         await batch.commit();
-        toast.success("Student successfully registered!");
+        toast.success("Student registered.");
       }
-      reset();
       onSuccess();
       onClose();
     } catch (error) {
       console.error("Error saving student:", error);
-      toast.error(`Error: Enrollment processing failed.`);
+      toast.error(`System error during data persistence.`);
     } finally {
       setLoading(false);
     }
@@ -297,222 +284,236 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData }
     <Modal 
         isOpen={isOpen} 
         onClose={onClose} 
-        title={initialData ? "Modify Student Profile" : "Register New Student"}
+        title={isReadOnly ? "View Admissions Record" : (initialData ? "Update Institutional Record" : "Register Student")}
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Basic Info */}
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Identity */}
           <div className="space-y-4 col-span-full">
-             <h4 className="text-xs font-black uppercase tracking-widest text-primary/60 flex items-center gap-2">
-                <User className="w-3 h-3" /> Basic Information
-             </h4>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Full Name *</label>
+             <div className="flex items-center justify-between mb-2">
+                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/40 flex items-center gap-2">
+                    <User className="w-3.5 h-3.5" /> Core Identity
+                </h4>
+                {initialData && (
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black uppercase text-slate-400">ID:</span>
+                        <span className="text-[10px] font-black text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded italic">{initialData.studentId}</span>
+                    </div>
+                )}
+             </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black text-slate-500 ml-1 uppercase tracking-wider">Full Name</label>
                   <input 
                     {...register("name")}
+                    disabled={isReadOnly}
                     placeholder="e.g. Ruwan Kumara"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    className="w-full px-4 py-3 bg-slate-50/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all disabled:bg-slate-100/50 disabled:cursor-not-allowed font-bold text-slate-800"
                   />
-                  {errors.name && <p className="text-xs text-red-500 ml-1 mt-1">{errors.name.message}</p>}
+                  {errors.name && <p className="text-[10px] text-red-500 ml-1 mt-1 font-bold">{errors.name.message}</p>}
                 </div>
                 
-                <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1 flex justify-between items-center">
-                    Student Phone <span className="text-[10px] text-slate-400 font-normal uppercase">(Optional)</span>
-                  </label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black text-slate-500 ml-1 uppercase tracking-wider">Direct Phone</label>
                   <input 
                     {...register("phone")}
+                    disabled={isReadOnly}
                     placeholder="e.g. 0771234567"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    className="w-full px-4 py-3 bg-slate-50/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all disabled:bg-slate-100/50 disabled:cursor-not-allowed font-bold text-slate-800"
                   />
-                  {errors.phone && <p className="text-xs text-red-500 ml-1 mt-1">{errors.phone.message}</p>}
                 </div>
 
-                <div className="space-y-1 col-span-full">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Gender *</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black text-slate-500 ml-1 uppercase tracking-wider">Gender</label>
                   <div className="flex gap-4 mt-1">
                     {["male", "female", "other"].map((g) => (
-                      <label key={g} className="flex items-center gap-2 cursor-pointer group">
+                      <label key={g} className={`flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all border ${watch("gender") === g ? 'bg-indigo-50 border-indigo-200' : 'bg-transparent border-transparent opacity-60'} ${isReadOnly ? 'cursor-default' : 'cursor-pointer'}`}>
                         <input 
                           type="radio" 
+                          disabled={isReadOnly}
                           value={g} 
                           {...register("gender")}
-                          className="w-4 h-4 text-primary focus:ring-primary-dark border-slate-300 transition-all cursor-pointer"
+                          className="w-3.5 h-3.5 text-primary focus:ring-primary-dark border-slate-300 transition-all disabled:cursor-not-allowed"
                         />
-                        <span className="text-sm font-medium text-slate-600 group-hover:text-primary transition-colors capitalize">{g}</span>
+                        <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest capitalize">{g}</span>
                       </label>
                     ))}
                   </div>
-                  {errors.gender && <p className="text-xs text-red-500 ml-1 mt-1">{errors.gender.message}</p>}
+                </div>
+
+                <div className="space-y-1.5">
+                    <label className="text-xs font-black text-slate-500 ml-1 uppercase tracking-wider">Admission Status</label>
+                    <div className="flex gap-4 mt-1">
+                        {["active", "inactive"].map((s) => (
+                            <label key={s} className={`flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all border ${watch("status") === s ? (s === 'active' ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200') : 'bg-transparent border-transparent opacity-60'} ${isReadOnly ? 'cursor-default' : 'cursor-pointer'}`}>
+                                <input 
+                                    type="radio" 
+                                    disabled={isReadOnly}
+                                    value={s} 
+                                    {...register("status")}
+                                    className="w-3.5 h-3.5 text-primary focus:ring-primary-dark border-slate-300 transition-all disabled:cursor-not-allowed"
+                                />
+                                <span className={`text-[10px] font-black uppercase tracking-widest ${watch("status") === s ? (s === 'active' ? 'text-emerald-700' : 'text-rose-700') : 'text-slate-700'}`}>{s}</span>
+                            </label>
+                        ))}
+                    </div>
                 </div>
              </div>
           </div>
 
-          {/* Academic Info */}
-          <div className="space-y-4 col-span-full pt-4 border-t border-slate-50">
-             <h4 className="text-xs font-black uppercase tracking-widest text-primary/60 flex items-center gap-2">
-                <GraduationCap className="w-3 h-3" /> Academic & Region
+          {/* Academic Profile */}
+          <div className="space-y-4 col-span-full pt-6 border-t border-slate-100/50">
+             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/40 flex items-center gap-2 mb-2">
+                <GraduationCap className="w-3.5 h-3.5" /> Academic Profile
              </h4>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                    <label className="text-sm font-semibold text-slate-700 ml-1">Grade / Level *</label>
-                    {metaLoading ? (
-                      <Skeleton className="w-full h-[45px] rounded-xl" />
-                    ) : (
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                    <label className="text-xs font-black text-slate-500 ml-1 uppercase tracking-wider">Classification</label>
+                    {metaLoading ? <Skeleton className="w-full h-[52px] rounded-2xl" /> : (
                       <select 
                         {...register("grade")}
-                        className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                        disabled={isReadOnly || (!!teacherId && !!initialData)}
+                        className="w-full px-4 py-3 bg-slate-50/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all disabled:bg-slate-100/50 disabled:cursor-not-allowed font-bold text-slate-800 appearance-none"
                       >
-                        <option value="">Select Grade</option>
-                        {grades.map(g => (
-                          <option key={g.id} value={g.name}>{g.name}</option>
-                        ))}
+                        <option value="">Select Level</option>
+                        {grades.map(g => <option key={g.id} value={g.name}>{g.name}</option>)}
                       </select>
                     )}
-                    {!metaLoading && grades.length === 0 && (
-                      <p className="text-[10px] text-amber-600 mt-1 ml-1 flex items-center gap-1">
-                        No grades found. <a href="/admin/grades" className="underline font-bold">Add One</a>
-                      </p>
+                    {!!teacherId && !!initialData && (
+                      <p className="text-[10px] text-slate-400 mt-1 ml-1">Grade level is managed by administration.</p>
                     )}
-                    {errors.grade && <p className="text-xs text-red-500 ml-1 mt-1">{errors.grade.message}</p>}
                 </div>
 
-                <div className="space-y-1">
-                   <label className="text-sm font-semibold text-slate-700 ml-1">School Name *</label>
+                <div className="space-y-1.5">
+                   <label className="text-xs font-black text-slate-500 ml-1 uppercase tracking-wider">Current Schooling</label>
                    <input 
                      {...register("schoolName")}
-                     placeholder="e.g. Royal College"
-                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                     disabled={isReadOnly}
+                     placeholder="Official school name"
+                     className="w-full px-4 py-3 bg-slate-50/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all disabled:bg-slate-100/50 disabled:cursor-not-allowed font-bold text-slate-800"
                    />
-                   {errors.schoolName && <p className="text-xs text-red-500 ml-1 mt-1">{errors.schoolName.message}</p>}
                 </div>
              </div>
 
-             {/* Class Selection */}
-             <div className="space-y-3 mt-4">
-                <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center justify-between">
-                   <div className="flex items-center gap-2">
-                    <BookOpen className="w-3.5 h-3.5 text-primary/60" /> Class Enrollment *
-                   </div>
+             {/* Class Enrollment */}
+             <div className="space-y-4 mt-6">
+                <label className="text-xs font-black text-slate-500 ml-1 uppercase tracking-widest flex items-center justify-between">
+                   <span>Session Subscriptions</span>
                    {fetchingClasses && <Loader2 className="w-3 h-3 animate-spin text-primary" />}
                 </label>
                 
                 {!selectedGrade ? (
-                  <div className="p-8 border-2 border-dashed border-slate-100 rounded-2xl text-center">
-                    <p className="text-xs text-slate-400">Please select a grade above to view available classes.</p>
-                  </div>
-                ) : fetchingClasses ? (
-                  <div className="space-y-2">
-                     {[1,2].map(i => <Skeleton key={i} className="w-full h-20 rounded-2xl" />)}
+                  <div className="py-12 border-2 border-dashed border-slate-100 rounded-[2rem] text-center">
+                    <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">Select grade to visualize sessions</p>
                   </div>
                 ) : availableClasses.length === 0 ? (
-                  <div className="p-8 border-2 border-dashed border-slate-100 rounded-2xl text-center">
-                    <p className="text-xs text-slate-400">No classes scheduled for this grade yet.</p>
-                    <a href="/admin/classes" className="text-[10px] text-primary font-bold uppercase hover:underline mt-2 block">Schedule a Class</a>
+                  <div className="py-12 border-2 border-dashed border-slate-100 rounded-[2rem] text-center italic text-slate-400 text-xs">
+                    No active sessions found for this classification.
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 gap-2">
-                    {availableClasses.map(cls => (
-                      <label 
-                        key={cls.id} 
-                        className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer group ${
-                          selectedClassIds.includes(cls.id) 
-                          ? 'bg-primary/5 border-primary shadow-sm' 
-                          : 'bg-white border-slate-100 hover:border-slate-200'
-                        }`}
-                      >
-                        <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${selectedClassIds.includes(cls.id) ? 'bg-primary text-white' : 'bg-slate-50 text-slate-400 group-hover:bg-slate-100'}`}>
-                            <BookOpen className="w-5 h-5" />
+                  <div className="grid grid-cols-1 gap-3">
+                    {availableClasses.map(cls => {
+                      const isEnrolled = selectedClassIds.includes(cls.id);
+                      const isOthersClass = !!(teacherId && cls.teacherId !== teacherId);
+                      const isDisabled = !!(isReadOnly || isOthersClass);
+
+                      return (
+                        <label 
+                          key={cls.id} 
+                          className={`flex items-center justify-between p-5 rounded-[1.5rem] border transition-all ${isDisabled ? 'cursor-default' : 'cursor-pointer'} group ${
+                            isEnrolled 
+                            ? 'bg-indigo-50/50 border-indigo-200 shadow-sm' 
+                            : 'bg-white border-slate-100'
+                          } ${!isDisabled && !isEnrolled ? 'hover:border-slate-200' : ''} ${isOthersClass ? 'opacity-50 grayscale' : ''}`}
+                        >
+                          <div className="flex items-center gap-5">
+                            <div className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${isEnrolled ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                              <BookOpen className="w-5 h-5" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className={`font-black text-sm uppercase tracking-tight ${isEnrolled ? 'text-indigo-900' : 'text-slate-700'}`}>{cls.name}</p>
+                                {isOthersClass && <span className="text-[8px] font-black uppercase px-1.5 py-0.5 bg-slate-200 text-slate-500 rounded">Restricted Access</span>}
+                              </div>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                                {cls.subject} • {cls.teacherName || 'Faculty Assigned'}
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className={`font-bold text-sm ${selectedClassIds.includes(cls.id) ? 'text-primary' : 'text-slate-700'}`}>{cls.name}</p>
-                            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">
-                              {cls.subject} • {cls.schedules?.map(s => s.dayOfWeek.substring(0,3)).join(', ')}
-                            </p>
-                          </div>
-                        </div>
-                        <input 
-                          type="checkbox"
-                          className="w-5 h-5 rounded-lg border-slate-200 text-primary focus:ring-primary/20 transition-all cursor-pointer"
-                          checked={selectedClassIds.includes(cls.id)}
-                          onChange={(e) => {
-                            const val = cls.id;
-                            const updated = e.target.checked 
-                              ? [...selectedClassIds, val]
-                              : selectedClassIds.filter(i => i !== val);
-                            setValue("enrolledClasses", updated, { shouldValidate: true });
-                          }}
-                        />
-                      </label>
-                    ))}
+                          <input 
+                            type="checkbox"
+                            disabled={isDisabled}
+                            className="w-5 h-5 rounded-lg border-slate-200 text-indigo-600 focus:ring-indigo-500/20 transition-all disabled:cursor-not-allowed"
+                            checked={isEnrolled}
+                            onChange={(e) => {
+                              const updated = e.target.checked 
+                                ? [...selectedClassIds, cls.id]
+                                : selectedClassIds.filter(i => i !== cls.id);
+                              setValue("enrolledClasses", updated, { shouldValidate: true });
+                            }}
+                          />
+                        </label>
+                      );
+                    })}
                   </div>
                 )}
-                {errors.enrolledClasses && <p className="text-xs text-red-500 ml-1 mt-1">{errors.enrolledClasses.message}</p>}
              </div>
           </div>
 
-          {/* Parent Info */}
-          <div className="space-y-4 col-span-full pt-4 border-t border-slate-50">
-             <h4 className="text-xs font-black uppercase tracking-widest text-primary/60 flex items-center gap-2">
-                <Phone className="w-3 h-3" /> Guardian Details
+          {/* Logistics */}
+          <div className="space-y-4 col-span-full pt-6 border-t border-slate-100/50">
+             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary/40 flex items-center gap-2 mb-2">
+                <Phone className="w-3.5 h-3.5" /> Emergency Contacts
              </h4>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Parent/Guardian Name *</label>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black text-slate-500 ml-1 uppercase tracking-wider">Guardian Name</label>
                   <input 
                     {...register("parentName")}
-                    placeholder="e.g. Mr. S. Kumara"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    disabled={isReadOnly}
+                    className="w-full px-4 py-3 bg-slate-50/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all disabled:bg-slate-100/50 disabled:cursor-not-allowed font-bold text-slate-800"
                   />
-                  {errors.parentName && <p className="text-xs text-red-500 ml-1 mt-1">{errors.parentName.message}</p>}
                 </div>
-
-                <div className="space-y-1">
-                  <label className="text-sm font-semibold text-slate-700 ml-1">Guardian Phone *</label>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black text-slate-500 ml-1 uppercase tracking-wider">Guardian Hotline</label>
                   <input 
                     {...register("parentPhone")}
-                    placeholder="e.g. 0712345678"
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                    disabled={isReadOnly}
+                    className="w-full px-4 py-3 bg-slate-50/50 border border-slate-200 rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all disabled:bg-slate-100/50 disabled:cursor-not-allowed font-bold text-slate-800"
                   />
-                  {errors.parentPhone && <p className="text-xs text-red-500 ml-1 mt-1">{errors.parentPhone.message}</p>}
                 </div>
              </div>
-          </div>
-
-          {/* Address & Misc */}
-          <div className="space-y-4 col-span-full pt-4 border-t border-slate-50">
-             <div className="space-y-1">
-               <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-2">
-                  <MapPin className="w-3.5 h-3.5 text-slate-400" /> Current Address *
+             <div className="space-y-1.5 pt-4">
+               <label className="text-xs font-black text-slate-500 ml-1 uppercase tracking-wider flex items-center gap-2">
+                  <MapPin className="w-3.5 h-3.5 text-slate-300" /> Physical Address
                </label>
                <textarea 
                   {...register("address")}
+                  disabled={isReadOnly}
                   rows={2}
-                  placeholder="Street name, City, Zip"
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none"
+                  className="w-full px-4 py-4 bg-slate-50/50 border border-slate-200 rounded-[1.5rem] focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all resize-none disabled:bg-slate-100/50 disabled:cursor-not-allowed font-semibold text-slate-700"
                ></textarea>
-               {errors.address && <p className="text-xs text-red-500 ml-1 mt-1">{errors.address.message}</p>}
              </div>
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-6 border-t border-slate-100 flex-col sm:flex-row">
+        <div className="flex items-center justify-end gap-3 pt-8 border-t border-slate-100 flex-col sm:flex-row">
           <button 
             type="button"
             onClick={onClose}
-            className="w-full sm:w-auto px-6 py-2.5 text-sm font-bold text-slate-500 hover:bg-slate-100 rounded-xl transition-all"
+            className="w-full sm:w-auto px-10 py-3 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all"
           >
-            Cancel
+            {isReadOnly ? "Close View" : "Cancel"}
           </button>
-          <button 
-            type="submit"
-            disabled={loading}
-            className="w-full sm:w-auto px-8 py-2.5 bg-primary text-white rounded-xl text-sm font-black hover:bg-primary-dark transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
-          >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Update Record" : "Complete Registration")}
-          </button>
+          {!isReadOnly && (
+            <button 
+              type="submit"
+              disabled={loading}
+              className="w-full sm:w-auto px-12 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-indigo-600 transition-all shadow-xl shadow-indigo-100 flex items-center justify-center gap-3 disabled:opacity-50"
+            >
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Commit Changes"}
+            </button>
+          )}
         </div>
       </form>
     </Modal>
