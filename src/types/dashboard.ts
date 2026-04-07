@@ -19,6 +19,7 @@ export interface DashboardStats {
   totalTeachers: number;
   feesCollected: number;
   unpaidFeesCount: number;
+  activeClassesCount: number;
   recentStudents: DashboardStudent[];
-  timetable: DashboardTimetableSlot[];
+  timetable: any[];
 }

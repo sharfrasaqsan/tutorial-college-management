@@ -3,29 +3,94 @@
 import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { DollarSign, Search, Filter, Download, CreditCard, User, MoreHorizontal, AlertCircle } from "lucide-react";
+import { DollarSign, Search, Filter, Download, CreditCard, User, AlertCircle, CheckCircle, Printer, Trash2, Eye } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
 import { Salary } from "@/types/models";
+import SalaryProcessModal from "@/components/admin/SalaryProcessModal";
+import ConfirmModal from "@/components/ui/ConfirmModal";
+import Modal from "@/components/ui/Modal";
+import toast from "react-hot-toast";
+import { doc, updateDoc, deleteDoc, where } from "firebase/firestore";
+
+interface SalaryBreakdownItem {
+  className: string;
+  sessionsConducted: number;
+  finalPayout: number;
+}
 
 export default function SalariesPage() {
   const [salaries, setSalaries] = useState<Salary[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activeTeachersCount, setActiveTeachersCount] = useState(0);
+
+  // Actions states
+  const [selectedSalary, setSelectedSalary] = useState<Salary | null>(null);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [salaryToDelete, setSalaryToDelete] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [salarySnap, teacherSnap] = await Promise.all([
+        getDocs(query(collection(db, "salaries"), orderBy("month", "desc"))),
+        getDocs(query(collection(db, "teachers"), where("status", "==", "active")))
+      ]);
+      setSalaries(salarySnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Salary)));
+      setActiveTeachersCount(teacherSnap.size);
+    } catch (error) {
+      console.error("Error loading payroll data", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    async function loadSalaries() {
-      try {
-        const q = query(collection(db, "salaries"), orderBy("month", "desc"));
-        const snap = await getDocs(q);
-        setSalaries(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Salary)));
-      } catch (error) {
-        console.error("Error loading salaries", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadSalaries();
+    loadData();
   }, []);
+
+  const toggleStatus = async (item: Salary) => {
+    try {
+      const newStatus = item.status === 'paid' ? 'pending' : 'paid';
+      await updateDoc(doc(db, "salaries", item.id), { status: newStatus });
+      toast.success(newStatus === 'paid' ? "Salary marked as settled." : "Salary reverted to pending.");
+      loadData();
+    } catch {
+      toast.error("Failed to update status.");
+    }
+  };
+
+  const confirmDelete = (id: string) => {
+    setSalaryToDelete(id);
+    setIsDeleteOpen(id !== null);
+  };
+
+  const handleDelete = async () => {
+    if (!salaryToDelete) return;
+    setActionLoading(true);
+    try {
+      await deleteDoc(doc(db, "salaries", salaryToDelete));
+      toast.success("Payroll record purged.");
+      setIsDeleteOpen(false);
+      setSalaryToDelete(null);
+      loadData();
+    } catch {
+      toast.error("Deletion failed.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handlePrint = (item: Salary) => {
+    toast.success(`Generating payslip for ${item.teacherName}...`);
+    // Logic for PDF generation can be added later
+  };
+
+  const totalPayout = salaries.reduce((sum, s) => s.status === 'paid' ? sum + (s.netAmount || 0) : sum, 0);
+  const pendingCount = salaries.filter(s => s.status === 'pending').length;
 
   const filteredSalaries = salaries.filter(s => 
     s.teacherName?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -42,11 +107,71 @@ export default function SalariesPage() {
            <button className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors flex items-center gap-2">
             <Download className="w-4 h-4" /> Export
            </button>
-           <button className="px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary-dark transition-colors flex items-center gap-2 shadow-sm shadow-primary/20">
+           <button 
+            onClick={() => setIsModalOpen(true)}
+            className="px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary-dark transition-colors flex items-center gap-2 shadow-sm shadow-primary/20"
+           >
             <CreditCard className="w-4 h-4" /> Process Salary
            </button>
         </div>
       </div>
+
+      <SalaryProcessModal 
+        isOpen={isModalOpen} 
+        onClose={() => setIsModalOpen(false)} 
+        onSuccess={loadData} 
+      />
+
+      <ConfirmModal 
+        isOpen={isDeleteOpen}
+        onClose={() => setIsDeleteOpen(false)}
+        onConfirm={handleDelete}
+        loading={actionLoading}
+        title="Purge Payroll Record"
+        message="This will permanently delete the calculated salary record. You will need to re-process the payroll if this was a mistake."
+      />
+
+      {/* View Breakdown Modal */}
+      <Modal 
+        isOpen={isViewOpen} 
+        onClose={() => setIsViewOpen(false)} 
+        title={`Earnings Breakdown: ${selectedSalary?.teacherName}`}
+      >
+        <div className="space-y-4">
+           <div className="flex justify-between items-end p-4 bg-slate-50 rounded-2xl border border-slate-100">
+             <div>
+                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Cycle</p>
+                <p className="text-sm font-bold text-slate-800">{selectedSalary?.month}</p>
+             </div>
+             <div className="text-right">
+                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Net Payable</p>
+                <p className="text-xl font-black text-primary">LKR {selectedSalary?.netAmount?.toLocaleString()}</p>
+             </div>
+           </div>
+
+           <div className="rounded-xl border border-slate-100 overflow-hidden">
+              <table className="w-full text-xs text-left">
+                <thead className="bg-slate-50 text-[10px] font-bold uppercase text-slate-400">
+                  <tr>
+                    <th className="px-4 py-3">Class</th>
+                    <th className="px-4 py-3 text-center">Sessions</th>
+                    <th className="px-4 py-3 text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {((selectedSalary as any)?.breakdown as SalaryBreakdownItem[] | undefined)?.map((b: SalaryBreakdownItem, i: number) => (
+                    <tr key={i}>
+                      <td className="px-4 py-3 font-medium">{b.className}</td>
+                      <td className="px-4 py-3 text-center">{b.sessionsConducted} / 8</td>
+                      <td className="px-4 py-3 text-right font-bold">LKR {b.finalPayout?.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+           </div>
+           <button onClick={() => setIsViewOpen(false)} className="w-full py-3 bg-slate-800 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-900 transition-all">Close Review</button>
+        </div>
+      </Modal>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="p-6 bg-blue-600 rounded-3xl text-white shadow-lg shadow-blue-200">
@@ -60,7 +185,7 @@ export default function SalariesPage() {
            {loading ? (
              <Skeleton variant="text" width="120px" height="32px" className="bg-white/20" />
            ) : (
-             <h3 className="text-3xl font-black">LKR 425,000</h3>
+             <h3 className="text-3xl font-black">LKR {totalPayout.toLocaleString()}</h3>
            )}
         </div>
         
@@ -75,7 +200,7 @@ export default function SalariesPage() {
            {loading ? (
              <Skeleton variant="text" width="100px" height="32px" className="bg-white/20" />
            ) : (
-             <h3 className="text-3xl font-black">04 Records</h3>
+             <h3 className="text-3xl font-black">{String(pendingCount).padStart(2, '0')} Records</h3>
            )}
         </div>
 
@@ -90,7 +215,7 @@ export default function SalariesPage() {
            {loading ? (
              <Skeleton variant="text" width="100px" height="32px" className="bg-white/20" />
            ) : (
-             <h3 className="text-3xl font-black">12 Teachers</h3>
+             <h3 className="text-3xl font-black">{activeTeachersCount} Teachers</h3>
            )}
         </div>
       </div>
@@ -175,9 +300,39 @@ export default function SalariesPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button className="p-2 text-slate-400 hover:text-slate-800 transition-all hover:bg-slate-100 rounded-lg">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        <button 
+                          onClick={() => {
+                            setSelectedSalary(item);
+                            setIsViewOpen(true);
+                          }}
+                          title="View Breakdown"
+                          className="p-2 text-slate-400 hover:text-primary transition-all hover:bg-primary/5 rounded-lg"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => toggleStatus(item)}
+                          title={item.status === 'paid' ? "Mark as Pending" : "Mark as Paid"}
+                          className={`p-2 transition-all rounded-lg ${item.status === 'paid' ? 'text-green-500 hover:bg-green-50' : 'text-slate-400 hover:text-green-600 hover:bg-green-50'}`}
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handlePrint(item)}
+                          title="Generate Payslip"
+                          className="p-2 text-slate-400 hover:text-blue-600 transition-all hover:bg-blue-50 rounded-lg"
+                        >
+                          <Printer className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => confirmDelete(item.id)}
+                          title="Delete Record"
+                          className="p-2 text-slate-400 hover:text-red-500 transition-all hover:bg-red-50 rounded-lg"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )) : (
