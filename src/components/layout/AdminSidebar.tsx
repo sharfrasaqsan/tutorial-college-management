@@ -34,6 +34,9 @@ const navItems = [
     { name: "Payments", href: "/admin/payments", icon: CreditCard },
     { name: "Salaries", href: "/admin/salaries", icon: Banknote },
   ]},
+  { label: "Settings", items: [
+    { name: "Profile", href: "/admin/profile", icon: Settings },
+  ]},
 ];
 
 export default function AdminSidebar() {

@@ -3,6 +3,7 @@
 import { useAuth } from "@/context/AuthContext";
 import { Bell, Search, User as UserIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
+import Link from "next/link";
 
 export default function AdminTopbar() {
   const { user } = useAuth();
@@ -35,15 +36,15 @@ export default function AdminTopbar() {
         
         <div className="h-8 w-px bg-slate-200 mx-2"></div>
         
-        <div className="flex items-center gap-3">
+        <Link href="/admin/profile" className="flex items-center gap-3 hover:opacity-80 transition-all group">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-semibold text-slate-800 leading-tight">Admin</p>
-            <p className="text-xs text-slate-500">{user?.email}</p>
+            <p className="text-sm font-black text-slate-800 leading-tight">Admin Identity</p>
+            <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">{user?.email}</p>
           </div>
-          <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center text-primary border border-primary/20">
+          <div className="w-10 h-10 bg-primary/10 rounded-2xl flex items-center justify-center text-primary border border-primary/20 group-hover:bg-primary group-hover:text-white transition-all">
             <UserIcon className="w-5 h-5" />
           </div>
-        </div>
+        </Link>
       </div>
     </header>
   );
