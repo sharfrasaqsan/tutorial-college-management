@@ -14,8 +14,8 @@ export default function TeacherTopbar() {
   const [teacherName, setTeacherName] = useState("Faculty User");
   
   // Format pathname loosely for header
-  const title = pathname.split("/").pop()?.replace(/-/g, " ") || "Overview";
-  const formattedTitle = title.charAt(0).toUpperCase() + title.slice(1);
+  const rawTitle = pathname.split("/").pop()?.replace(/-/g, " ") || "Overview";
+  const formattedTitle = rawTitle === "attendance" ? "Session History" : (rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1));
 
   useEffect(() => {
     async function fetchTeacher() {

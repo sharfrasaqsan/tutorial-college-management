@@ -7,18 +7,17 @@ import {
   Users, 
   Layers, 
   CalendarDays, 
-  ClipboardCheck,
+  History,
   Banknote,
   Settings,
-  LogOut,
-  GraduationCap
+  LogOut
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 const navItems = [
   { label: "Main", items: [
     { name: "Dashboard", href: "/teacher/dashboard", icon: LayoutDashboard },
-    { name: "Attendance", href: "/teacher/attendance", icon: ClipboardCheck },
+    { name: "Session Ledger", href: "/teacher/ledger", icon: History },
     { name: "My Classes", href: "/teacher/classes", icon: Layers },
   ]},
   { label: "Academic", items: [
@@ -96,7 +95,7 @@ export default function TeacherSidebar() {
       <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200 z-50 flex items-center justify-around px-2 pb-safe">
         {[
           { name: "Dash", href: "/teacher/dashboard", icon: LayoutDashboard },
-          { name: "Attendance", href: "/teacher/attendance", icon: ClipboardCheck },
+          { name: "Ledger", href: "/teacher/ledger", icon: History },
           { name: "Classes", href: "/teacher/classes", icon: Layers },
           { name: "Schedule", href: "/teacher/timetable", icon: CalendarDays },
           { name: "Salary", href: "/teacher/salary", icon: Banknote },

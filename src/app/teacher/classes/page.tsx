@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { collection, query, where, getDocs, doc, updateDoc, writeBatch, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { BookOpen, Users, Calendar, Clock, MapPin, Activity, ClipboardCheck, Plus, Edit, Trash2, Ban, CheckCircle, Filter, X, Search } from "lucide-react";
+import { BookOpen, Users, Calendar, Clock, MapPin, Activity, Plus, Edit, Trash2, Ban, CheckCircle, Filter, X, Search, History as HistoryIcon } from "lucide-react";
 import { Class, Grade, Subject } from "@/types/models";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
@@ -34,7 +34,7 @@ export default function MyClassesPage() {
   const [classToDelete, setClassToDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const loadTeacherClasses = async () => {
+  const loadTeacherClasses = useCallback(async () => {
     if (!user?.uid) return;
     setLoading(true);
     try {
@@ -53,18 +53,18 @@ export default function MyClassesPage() {
       subjectSnap.docs.forEach(d => subjectMap[d.id] = { id: d.id, ...d.data() } as Subject);
       setSubjects(subjectMap);
 
-      setClasses(classSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Class)));
+      setClasses(classSnap.docs.map(doc => ({ ...doc.data(), id: doc.id } as Class)));
     } catch (error) {
       console.error("Error loading teacher classes", error);
       toast.error("Failed to load classes.");
     } finally {
       setLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     loadTeacherClasses();
-  }, [user]);
+  }, [loadTeacherClasses]);
 
   const handleAdd = () => {
     setSelectedClass(null);
@@ -155,7 +155,7 @@ export default function MyClassesPage() {
             <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
                 <BookOpen className="w-7 h-7 text-indigo-600" /> Academic Portfolio
             </h2>
-            <p className="text-slate-500 text-sm font-medium max-w-lg">Manage your scheduled sessions and monitor batch progress.</p>
+            <p className="text-slate-500 text-sm font-bold tracking-tight">Manage your scheduled sessions and monitor batch progress.</p>
         </div>
         <div className="flex flex-col sm:flex-row items-center gap-3">
             <button 
@@ -369,10 +369,10 @@ export default function MyClassesPage() {
                     <div className="flex gap-2 pt-6 border-t border-slate-50">
                         {!isClassInactive && (
                             <Link 
-                                href={`/teacher/attendance/mark?classId=${item.id}`}
-                                className="flex-1 bg-slate-900 text-white rounded-xl py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100/50"
+                                href="/teacher/attendance"
+                                className="flex-1 bg-slate-900 text-white rounded-xl py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-md shadow-indigo-100/50"
                             >
-                                <ClipboardCheck className="w-3.5 h-3.5" /> Log Attendance
+                                <HistoryIcon className="w-3.5 h-3.5" /> View Ledger
                             </Link>
                         )}
                         <button 

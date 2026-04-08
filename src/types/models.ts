@@ -60,6 +60,8 @@ export interface Class {
   schedules: ClassSchedule[];
   monthlyFee: number;
   studentCount?: number;
+  completedSessions?: number;
+  sessionsSinceLastPayment?: number;
   status: 'active' | 'inactive';
 }
 

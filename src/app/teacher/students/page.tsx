@@ -100,7 +100,7 @@ export default function MyStudentsPage() {
             <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
                 <Users className="w-7 h-7 text-indigo-600" /> Enrollment Hub
             </h2>
-            <p className="text-slate-500 text-sm font-medium max-w-lg">Switch tabs to manage students across your sessions.</p>
+            <p className="text-slate-500 text-sm font-bold tracking-tight">Manage and monitor students across your assigned classifications.</p>
         </div>
         
         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
@@ -125,7 +125,7 @@ export default function MyStudentsPage() {
             <button
                 key={cls.id}
                 onClick={() => setActiveTab(cls.id)}
-                className={`flex-shrink-0 px-6 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all border ${activeTab === cls.id ? 'bg-slate-900 border-slate-900 text-white shadow-lg shadow-indigo-100' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}
+                className={`flex-shrink-0 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${activeTab === cls.id ? 'bg-slate-900 border-slate-900 text-white shadow-lg shadow-indigo-100' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}
             >
                 {cls.name}
             </button>
@@ -144,10 +144,10 @@ export default function MyStudentsPage() {
                 <table className="w-full border-collapse">
                     <thead>
                         <tr className="bg-slate-50/50 border-b border-slate-100">
-                            <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">Identity Details</th>
-                            <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">Student ID</th>
-                            <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">Academic State</th>
-                            <th className="px-8 py-5 text-right text-[10px] font-black uppercase tracking-[0.15em] text-slate-400">Interactive</th>
+                            <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Identity Details</th>
+                            <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Student ID</th>
+                            <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Academic State</th>
+                            <th className="px-8 py-5 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Interactive</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
