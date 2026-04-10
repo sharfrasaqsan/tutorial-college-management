@@ -11,12 +11,8 @@ import ConfirmModal from "@/components/ui/ConfirmModal";
 import Modal from "@/components/ui/Modal";
 import toast from "react-hot-toast";
 import { doc, updateDoc, deleteDoc, where } from "firebase/firestore";
+import { formatMonthYear, formatDate } from "@/lib/formatters";
 
-interface SalaryBreakdownItem {
-  className: string;
-  sessionsConducted: number;
-  finalPayout: number;
-}
 
 export default function SalariesPage() {
   const [salaries, setSalaries] = useState<Salary[]>([]);
@@ -24,6 +20,10 @@ export default function SalariesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [activeTeachersCount, setActiveTeachersCount] = useState(0);
+  
+  // Historical Filtering
+  const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
+  const [filterMonth, setFilterMonth] = useState("");
 
   // Actions states
   const [selectedSalary, setSelectedSalary] = useState<Salary | null>(null);
@@ -92,27 +92,40 @@ export default function SalariesPage() {
   const totalPayout = salaries.reduce((sum, s) => s.status === 'paid' ? sum + (s.netAmount || 0) : sum, 0);
   const pendingCount = salaries.filter(s => s.status === 'pending').length;
 
-  const filteredSalaries = salaries.filter(s => 
-    s.teacherName?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredSalaries = salaries.filter(s => {
+    const matchesSearch = s.teacherName?.toLowerCase().includes(searchTerm.toLowerCase());
+    const [sYear, sMonth] = s.month.split('-');
+    const matchesYear = filterYear === "" || sYear === filterYear;
+    const matchesMonth = filterMonth === "" || sMonth === filterMonth;
+    return matchesSearch && matchesYear && matchesMonth;
+  });
+
+  const availableYears = Array.from(new Set(salaries.map(s => s.month.split('-')[0]))).sort((a, b) => b.localeCompare(a));
+
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
-        <div>
-          <h2 className="text-2xl font-bold text-slate-800">Faculty Payroll</h2>
-          <p className="text-sm text-slate-500">Manage and track teacher salary payments.</p>
+      {/* Institutional Financial Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-2">
+        <div className="space-y-1.5">
+            <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-4 group">
+                <div className="bg-primary p-2.5 rounded-[1.25rem] shadow-xl shadow-primary/10 group-hover:rotate-6 transition-transform duration-500">
+                    <DollarSign className="w-7 h-7 text-white" />
+                </div>
+                Salary Dashboard
+            </h2>
+            <p className="text-slate-400 text-[11px] font-black uppercase tracking-[0.2em]">Live payroll management and fiscal oversight</p>
         </div>
-        <div className="flex gap-2">
-           <button className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-colors flex items-center gap-2">
-            <Download className="w-4 h-4" /> Export
-           </button>
-           <button 
-            onClick={() => setIsModalOpen(true)}
-            className="px-4 py-2 bg-primary text-white rounded-xl text-xs font-bold hover:bg-primary-dark transition-colors flex items-center gap-2 shadow-sm shadow-primary/20"
-           >
-            <CreditCard className="w-4 h-4" /> Process Salary
-           </button>
+        <div className="flex items-center gap-3">
+            <button className="px-5 py-3 bg-white border border-slate-200 rounded-2xl text-[10px] font-black text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-2.5 shadow-sm uppercase tracking-widest hover:border-primary/20 group">
+                <Download className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" /> Export Data
+            </button>
+            <button 
+                onClick={() => setIsModalOpen(true)}
+                className="px-5 py-3 bg-primary text-white rounded-2xl text-[10px] font-black hover:bg-primary-dark transition-all flex items-center gap-2.5 shadow-xl shadow-primary/20 uppercase tracking-widest group"
+            >
+                <CreditCard className="w-4 h-4 text-white group-hover:rotate-12 transition-transform" /> Process Salary
+            </button>
         </div>
       </div>
 
@@ -159,7 +172,7 @@ export default function SalariesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {((selectedSalary as any)?.breakdown as SalaryBreakdownItem[] | undefined)?.map((b: SalaryBreakdownItem, i: number) => (
+                  {selectedSalary?.breakdown?.map((b, i: number) => (
                     <tr key={i}>
                       <td className="px-4 py-3 font-medium">{b.className}</td>
                       <td className="px-4 py-3 text-center">{b.sessionsConducted} / 8</td>
@@ -173,162 +186,200 @@ export default function SalariesPage() {
         </div>
       </Modal>
 
+      {/* Glassmorphism Stat Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="p-6 bg-blue-600 rounded-3xl text-white shadow-lg shadow-blue-200">
-           <div className="flex justify-between items-start mb-6">
-              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                <DollarSign className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-[10px] font-bold tracking-widest uppercase opacity-70">Payouts</span>
+        <div className="bg-white/70 backdrop-blur-xl p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between hover:shadow-xl hover:translate-y-[-4px] transition-all duration-500 group relative overflow-hidden h-44">
+           <div className="absolute top-0 right-0 w-24 h-24 opacity-5 group-hover:opacity-10 transition-opacity translate-x-4 -translate-y-4">
+              <DollarSign className="w-full h-full text-primary" />
            </div>
-           <p className="text-sm font-medium opacity-80 mb-1">Total Payout (This Month)</p>
-           {loading ? (
-             <Skeleton variant="text" width="120px" height="32px" className="bg-white/20" />
-           ) : (
-             <h3 className="text-3xl font-black">LKR {totalPayout.toLocaleString()}</h3>
-           )}
+           <div className="flex justify-between items-start">
+              <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shadow-inner group-hover:scale-110 group-hover:rotate-6 transition-all duration-700">
+                <DollarSign className="w-7 h-7" />
+              </div>
+              <span className="text-[10px] font-black tracking-[0.2em] uppercase text-slate-400">Total Payouts</span>
+           </div>
+           <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Total for this month</p>
+              {loading ? (
+                <Skeleton variant="text" width="160px" height="32px" />
+              ) : (
+                <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-none">LKR {totalPayout.toLocaleString()}</h3>
+              )}
+           </div>
         </div>
         
-        <div className="p-6 bg-emerald-600 rounded-3xl text-white shadow-lg shadow-emerald-200">
-           <div className="flex justify-between items-start mb-6">
-              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                <AlertCircle className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-[10px] font-bold tracking-widest uppercase opacity-70">Unpaid</span>
+        <div className="bg-white/70 backdrop-blur-xl p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between hover:shadow-xl hover:translate-y-[-4px] transition-all duration-500 group relative overflow-hidden h-44">
+           <div className="absolute top-0 right-0 w-24 h-24 opacity-5 group-hover:opacity-10 transition-opacity translate-x-4 -translate-y-4">
+              <AlertCircle className="w-full h-full text-orange-500" />
            </div>
-           <p className="text-sm font-medium opacity-80 mb-1">Pending Salaries</p>
-           {loading ? (
-             <Skeleton variant="text" width="100px" height="32px" className="bg-white/20" />
-           ) : (
-             <h3 className="text-3xl font-black">{String(pendingCount).padStart(2, '0')} Records</h3>
-           )}
+           <div className="flex justify-between items-start">
+              <div className="w-14 h-14 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-600 shadow-inner group-hover:scale-110 group-hover:rotate-6 transition-all duration-700">
+                <AlertCircle className="w-7 h-7" />
+              </div>
+              <span className="text-[10px] font-black tracking-[0.2em] uppercase text-slate-400">Unpaid</span>
+           </div>
+           <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Pending payments</p>
+              {loading ? (
+                <Skeleton variant="text" width="120px" height="32px" />
+              ) : (
+                <h3 className="text-2xl font-black text-slate-900 tracking-tight leading-none">{String(pendingCount).padStart(2, '0')} Salaries</h3>
+              )}
+           </div>
         </div>
 
-        <div className="p-6 bg-slate-800 rounded-3xl text-white shadow-lg shadow-slate-200">
-           <div className="flex justify-between items-start mb-6">
-              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                <User className="w-5 h-5 text-white" />
+        <div className="bg-slate-900 p-8 rounded-[2.5rem] flex flex-col shadow-2xl shadow-slate-900/10 justify-between hover:translate-y-[-4px] transition-all duration-500 group relative overflow-hidden h-44">
+           <div className="absolute top-0 right-0 w-24 h-24 bg-primary/10 rounded-full blur-3xl -mr-12 -mt-12 group-hover:bg-primary/20 transition-all duration-700"></div>
+           <div className="flex justify-between items-start relative z-10">
+              <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center text-primary shadow-inner group-hover:scale-110 group-hover:rotate-6 transition-all duration-700">
+                <User className="w-7 h-7" />
               </div>
-              <span className="text-[10px] font-bold tracking-widest uppercase opacity-70">Staff</span>
+              <span className="text-[10px] font-black tracking-[0.2em] uppercase text-white/40">Total Staff</span>
            </div>
-           <p className="text-sm font-medium opacity-80 mb-1">Active Faculty</p>
-           {loading ? (
-             <Skeleton variant="text" width="100px" height="32px" className="bg-white/20" />
-           ) : (
-             <h3 className="text-3xl font-black">{activeTeachersCount} Teachers</h3>
-           )}
+           <div className="relative z-10">
+              <p className="text-[10px] font-bold text-white/30 uppercase tracking-widest mb-1.5 font-black flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Active Faculty
+              </p>
+              {loading ? (
+                <Skeleton variant="text" width="120px" height="32px" className="bg-white/5" />
+              ) : (
+                <h3 className="text-2xl font-black text-white tracking-tight leading-none">{activeTeachersCount} Teachers</h3>
+              )}
+           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
-        <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
-          <div className="relative w-full max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+      <div className="bg-white rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-100/30 overflow-hidden flex flex-col group/ledger hover:border-primary/20 transition-all duration-700">
+        <div className="px-10 py-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/30 gap-6">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-hover/ledger:text-primary transition-colors" />
             <input 
               type="text" 
-              placeholder="Filter by teacher name..." 
+              placeholder="Search faculty members..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-primary/20 transition-all font-medium"
+              className="w-full pl-14 pr-8 py-4 bg-white border border-slate-100 rounded-[1.5rem] text-[11px] font-black uppercase tracking-[0.1em] focus:ring-4 focus:ring-primary/5 transition-all shadow-inner placeholder:text-slate-300"
             />
           </div>
-          <button className="p-2 border border-slate-100 rounded-xl hover:bg-slate-50 transition-colors">
-            <Filter className="w-4 h-4 text-slate-400" />
-          </button>
+          
+          <div className="flex items-center gap-3">
+             <div className="flex bg-white p-1 rounded-2xl border border-slate-100 shadow-inner">
+                <select 
+                   value={filterYear}
+                   onChange={(e) => setFilterYear(e.target.value)}
+                   className="bg-transparent px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-600 outline-none"
+                >
+                   <option value="">All Years</option>
+                   {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+                <div className="w-px h-6 bg-slate-100 my-auto"></div>
+                <select 
+                   value={filterMonth}
+                   onChange={(e) => setFilterMonth(e.target.value)}
+                   className="bg-transparent px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-600 outline-none"
+                >
+                   <option value="">All Months</option>
+                   {[
+                      { v: "01", n: "Jan" }, { v: "02", n: "Feb" }, { v: "03", n: "Mar" }, 
+                      { v: "04", n: "Apr" }, { v: "05", n: "May" }, { v: "06", n: "Jun" },
+                      { v: "07", n: "Jul" }, { v: "08", n: "Aug" }, { v: "09", n: "Sep" },
+                      { v: "10", n: "Oct" }, { v: "11", n: "Nov" }, { v: "12", n: "Dec" }
+                   ].map(m => <option key={m.v} value={m.v}>{m.n}</option>)}
+                </select>
+             </div>
+             <button 
+                onClick={() => {
+                   setFilterYear("");
+                   setFilterMonth("");
+                   setSearchTerm("");
+                }}
+                className="w-12 h-12 flex items-center justify-center bg-white border border-slate-100 rounded-2xl hover:bg-slate-50 transition-all text-slate-400 hover:text-primary shadow-sm"
+             >
+                <Filter className="w-5 h-5" />
+             </button>
+          </div>
         </div>
         
         <div className="overflow-x-auto min-h-[400px]">
-          {loading ? (
-            <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-widest text-[10px] border-b border-slate-100">
-                <tr>
-                  <th className="px-6 py-5">Faculty Member</th>
-                  <th className="px-6 py-5">Month</th>
-                  <th className="px-6 py-5">Basic Salary</th>
-                  <th className="px-6 py-5">Net Payable</th>
-                  <th className="px-6 py-5">Status</th>
-                  <th className="px-6 py-5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <tr key={i} className="animate-pulse">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <Skeleton variant="rect" width="32px" height="32px" className="rounded-lg" />
-                        <Skeleton variant="text" width="120px" height="14px" />
-                      </div>
-                    </td>
-                    <td className="px-6 py-4"><Skeleton variant="text" width="60px" height="12px" /></td>
-                    <td className="px-6 py-4"><Skeleton variant="text" width="100px" height="14px" /></td>
-                    <td className="px-6 py-4"><Skeleton variant="text" width="100px" height="16px" /></td>
-                    <td className="px-6 py-4"><Skeleton variant="rect" width="70px" height="24px" className="rounded-md" /></td>
-                    <td className="px-6 py-4 text-right"><Skeleton variant="rect" width="32px" height="32px" className="ml-auto rounded-lg" /></td>
+          <table className="w-full text-xs text-left border-collapse">
+            <thead className="bg-slate-50/80 text-slate-400 font-black uppercase tracking-[0.2em] text-[10px] border-b border-slate-50">
+              <tr>
+                <th className="px-10 py-6">Faculty Identity</th>
+                <th className="px-10 py-6">Ledger Cycle</th>
+                <th className="px-10 py-6">Processed On</th>
+                <th className="px-10 py-6 text-right">Base Earning</th>
+                <th className="px-10 py-6 text-right">Net Settlement</th>
+                <th className="px-10 py-6 text-center">Status</th>
+                <th className="px-10 py-6 text-right">Operational Unit</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {loading ? (
+                [1, 2, 3, 4, 5].map((i) => (
+                  <tr key={i} className="animate-pulse bg-white">
+                    <td className="px-10 py-6" colSpan={6}><div className="h-10 bg-slate-50 rounded-2xl w-full"></div></td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          ) : (
-            <table className="w-full text-sm text-left">
-              <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-widest text-[10px] border-b border-slate-100">
-                <tr>
-                  <th className="px-6 py-5">Faculty Member</th>
-                  <th className="px-6 py-5">Month</th>
-                  <th className="px-6 py-5">Basic Salary</th>
-                  <th className="px-6 py-5">Net Payable</th>
-                  <th className="px-6 py-5">Status</th>
-                  <th className="px-6 py-5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredSalaries.length > 0 ? filteredSalaries.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold">
+                ))
+              ) : (
+                filteredSalaries.length > 0 ? filteredSalaries.map((item) => (
+                  <tr key={item.id} className="hover:bg-primary/5 transition-all duration-500 group/row">
+                    <td className="px-10 py-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-slate-50 text-slate-400 flex items-center justify-center font-black group-hover/row:bg-primary group-hover/row:text-white transition-all shadow-inner text-sm uppercase">
                           {item.teacherName?.charAt(0)}
                         </div>
-                        <p className="font-bold text-slate-800">{item.teacherName}</p>
+                        <div>
+                            <p className="font-black text-slate-800 tracking-tight text-sm group-hover/row:text-primary transition-colors">{item.teacherName}</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Employee Fac-0{item.teacherId?.slice(-3)}</p>
+                        </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 font-medium text-slate-500">{item.month}</td>
-                    <td className="px-6 py-4 font-bold text-slate-700">LKR {item.basicAmount?.toLocaleString()}</td>
-                    <td className="px-6 py-4 font-black text-slate-900">LKR {item.netAmount?.toLocaleString()}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${item.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                        {item.status || 'Pending'}
-                      </span>
+                    <td className="px-10 py-6">
+                        <span className="px-4 py-2 bg-slate-50 border border-slate-100 rounded-xl text-[10px] font-black text-slate-500 uppercase tracking-widest group-hover/row:border-primary/20 transition-all">
+                            {formatMonthYear(item.month)}
+                        </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-1">
+                    <td className="px-10 py-6 font-medium text-slate-400 uppercase tracking-widest tabular-nums">
+                        {formatDate(item.createdAt)}
+                    </td>
+                    <td className="px-10 py-6 text-right font-bold text-slate-400 tabular-nums uppercase">LKR {item.basicAmount?.toLocaleString()}</td>
+                    <td className="px-10 py-6 text-right">
+                        <p className="text-xl font-black text-primary tracking-tighter tabular-nums">LKR {item.netAmount?.toLocaleString()}</p>
+                    </td>
+                    <td className="px-10 py-6">
+                      <div className="flex justify-center">
+                        <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.15em] border ${item.status === 'paid' ? 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-sm' : 'bg-orange-50 text-orange-600 border-orange-100 shadow-sm'}`}>
+                            {item.status === 'paid' ? 'Settled' : 'Pending'}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-10 py-6 text-right">
+                      <div className="flex items-center justify-end gap-2 text-slate-400">
                         <button 
                           onClick={() => {
                             setSelectedSalary(item);
                             setIsViewOpen(true);
                           }}
-                          title="View Breakdown"
-                          className="p-2 text-slate-400 hover:text-primary transition-all hover:bg-primary/5 rounded-lg"
+                          className="w-10 h-10 flex items-center justify-center hover:bg-white hover:text-primary hover:border-primary/10 border border-transparent rounded-2xl transition-all shadow-hover"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
                         <button 
                           onClick={() => toggleStatus(item)}
-                          title={item.status === 'paid' ? "Mark as Pending" : "Mark as Paid"}
-                          className={`p-2 transition-all rounded-lg ${item.status === 'paid' ? 'text-green-500 hover:bg-green-50' : 'text-slate-400 hover:text-green-600 hover:bg-green-50'}`}
+                          className={`w-10 h-10 flex items-center justify-center rounded-2xl transition-all border border-transparent hover:bg-white ${item.status === 'paid' ? 'text-emerald-500 hover:border-emerald-100' : 'text-slate-400 hover:text-emerald-600 hover:border-emerald-100'}`}
                         >
                           <CheckCircle className="w-4 h-4" />
                         </button>
                         <button 
                           onClick={() => handlePrint(item)}
-                          title="Generate Payslip"
-                          className="p-2 text-slate-400 hover:text-blue-600 transition-all hover:bg-blue-50 rounded-lg"
+                          className="w-10 h-10 flex items-center justify-center hover:bg-white hover:text-blue-500 hover:border-blue-100 border border-transparent rounded-2xl transition-all shadow-hover"
                         >
                           <Printer className="w-4 h-4" />
                         </button>
                         <button 
                           onClick={() => confirmDelete(item.id)}
-                          title="Delete Record"
-                          className="p-2 text-slate-400 hover:text-red-500 transition-all hover:bg-red-50 rounded-lg"
+                          className="w-10 h-10 flex items-center justify-center hover:bg-rose-50 hover:text-rose-600 border border-transparent rounded-2xl transition-all"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -337,16 +388,18 @@ export default function SalariesPage() {
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan={6} className="px-6 py-20 text-center flex flex-col items-center">
-                       <DollarSign className="w-12 h-12 text-slate-100 mb-4" />
-                       <p className="text-slate-500 font-medium">No salary records found matching your selection.</p>
-                       <button className="mt-2 text-primary hover:underline text-xs font-bold">Show current month only</button>
+                    <td colSpan={6} className="px-10 py-32 text-center">
+                       <div className="w-20 h-20 bg-slate-50 rounded-[2.5rem] flex items-center justify-center text-slate-200 mx-auto mb-6">
+                            <DollarSign className="w-10 h-10" />
+                       </div>
+                       <p className="text-slate-400 font-black uppercase tracking-[0.2em] text-[10px]">No payroll segments match this query.</p>
+                       <button onClick={() => setSearchTerm("")} className="mt-4 text-primary font-black uppercase tracking-widest text-[9px] hover:underline transition-all">Clear All Filters</button>
                     </td>
                   </tr>
-                )}
-              </tbody>
+                )
+              )}
+            </tbody>
             </table>
-          )}
         </div>
       </div>
     </div>

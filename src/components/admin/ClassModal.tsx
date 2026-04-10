@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { collection, getDocs, query, orderBy, serverTimestamp, doc, writeBatch, increment } from "firebase/firestore";
+import { collection, getDocs, getDoc, query, orderBy, serverTimestamp, doc, writeBatch, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Loader2, BookOpen, Calendar, Clock, Plus, Trash2 } from "lucide-react";
 import { Teacher, Grade, Subject, Class } from "@/types/models";
@@ -44,6 +44,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [existingClasses, setExistingClasses] = useState<Class[]>([]);
   const [metaLoading, setMetaLoading] = useState(false);
 
   const {
@@ -74,13 +75,25 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
     async function loadData() {
       setMetaLoading(true);
       try {
-        const [teachersSnap, gradesSnap, subjectsSnap] = await Promise.all([
-          getDocs(query(collection(db, "teachers"), orderBy("name", "asc"))),
-          getDocs(query(collection(db, "grades"), orderBy("name", "asc"))),
-          getDocs(query(collection(db, "subjects"), orderBy("name", "asc")))
-        ]);
+        let teachersList: Teacher[] = [];
+        if (fixedTeacherId) {
+          const teacherSnap = await getDoc(doc(db, "teachers", fixedTeacherId));
+          if (teacherSnap.exists()) {
+            teachersList = [{ id: teacherSnap.id, ...teacherSnap.data() } as Teacher];
+          }
+        } else {
+          const snap = await getDocs(query(collection(db, "teachers"), orderBy("name", "asc")));
+          teachersList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Teacher));
+        }
 
-        setTeachers(teachersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Teacher)));
+        const [gradesSnap, subjectsSnap, classesSnap] = await Promise.all([
+          getDocs(query(collection(db, "grades"), orderBy("name", "asc"))),
+          getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
+          getDocs(collection(db, "classes"))
+        ]);
+        
+        setExistingClasses(classesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Class)));
+        setTeachers(teachersList);
         setGrades(gradesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Grade)));
         setSubjects(subjectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)));
       } catch (error) {
@@ -175,7 +188,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
         name: "",
         subjectId: "",
         gradeId: "",
-        teacherId: "",
+        teacherId: fixedTeacherId || "",
         schedules: [{ dayOfWeek: "monday", startTime: "", endTime: "", room: "" }],
         status: "active",
         monthlyFee: 0,
@@ -184,6 +197,40 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
   }, [initialData, reset, isOpen]);
 
   const onSubmit = async (data: ClassForm) => {
+    // Conflict Detection Logic
+    const hasOverlap = (s1: string, e1: string, s2: string, e2: string) => {
+        return s1 < e2 && s2 < e1;
+    };
+
+    for (const newSlot of data.schedules) {
+        for (const existing of existingClasses) {
+            // Skip the class being edited
+            if (initialData && existing.id === initialData.id) continue;
+            if (existing.status !== 'active') continue;
+
+            for (const existingSlot of (existing.schedules || [])) {
+                const sameDay = newSlot.dayOfWeek.toLowerCase() === existingSlot.dayOfWeek.toLowerCase();
+                if (!sameDay) continue;
+
+                const timeOverlap = hasOverlap(newSlot.startTime, newSlot.endTime, existingSlot.startTime, existingSlot.endTime);
+                if (!timeOverlap) continue;
+
+                // Case 1: Room Conflict
+                if (newSlot.room.toLowerCase() === existingSlot.room.toLowerCase()) {
+                    toast.error(`Room Conflict: ${newSlot.room} is occupied by "${existing.name}" on ${newSlot.dayOfWeek} at ${existingSlot.startTime}-${existingSlot.endTime}`);
+                    return;
+                }
+
+                // Case 2: Teacher Conflict
+                if (data.teacherId === existing.teacherId) {
+                    const teacherName = teachers.find(t => t.id === data.teacherId)?.name || "The teacher";
+                    toast.error(`Teacher Conflict: ${teacherName} is already teaching "${existing.name}" on ${newSlot.dayOfWeek} at ${existingSlot.startTime}-${existingSlot.endTime}`);
+                    return;
+                }
+            }
+        }
+    }
+
     setLoading(true);
     const batch = writeBatch(db);
     try {

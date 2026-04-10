@@ -16,6 +16,7 @@ import { useAuth } from "@/context/AuthContext";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
 import { Class } from "@/types/models";
+import { formatTime } from "@/lib/formatters";
 
 interface SessionCompletion {
   id: string;
@@ -29,8 +30,11 @@ interface SessionCompletion {
   startTime: string;
   room: string;
   subject: string;
-  grade: string;
   studentCount?: number;
+  isPaid?: boolean;
+  day: number;
+  month: number;
+  year: number;
 }
 
 export default function SessionHistoryPage() {
@@ -41,6 +45,8 @@ export default function SessionHistoryPage() {
   const [completionsLoading, setCompletionsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [filterMonth, setFilterMonth] = useState<string>("");
+  const [filterYear, setFilterYear] = useState<string>(new Date().getFullYear().toString());
 
   // 1. Initial Load: Fetch Teacher's Classes
   useEffect(() => {
@@ -95,7 +101,8 @@ export default function SessionHistoryPage() {
     try {
         await deleteDoc(doc(db, "session_completions", session.id));
         await updateDoc(doc(db, "classes", session.classId), {
-            completedSessions: increment(-1)
+            completedSessions: increment(-1),
+            sessionsSinceLastPayment: increment(-1)
         });
         toast.success("Log entry reverted successfully.");
     } catch {
@@ -103,10 +110,12 @@ export default function SessionHistoryPage() {
     }
   };
 
-  const filteredCompletions = completions.filter(c => 
-    (c.date.includes(searchTerm) || c.dayOfWeek.toLowerCase().includes(searchTerm.toLowerCase())) &&
-    c.classId === activeTab
-  );
+  const filteredCompletions = completions.filter(c => {
+    const matchesSearch = c.date.includes(searchTerm) || c.dayOfWeek.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesMonth = filterMonth === "" || c.month === parseInt(filterMonth);
+    const matchesYear = filterYear === "" || c.year === parseInt(filterYear);
+    return matchesSearch && matchesMonth && matchesYear && c.classId === activeTab;
+  });
 
   const currentClass = classes.find(c => c.id === activeTab);
 
@@ -125,15 +134,35 @@ export default function SessionHistoryPage() {
             <p className="text-slate-500 font-medium text-sm">Review your finalized academic footprint per classification.</p>
         </div>
         
-        <div className="relative w-full lg:w-72">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input 
-              type="text" 
-              placeholder="Search Ledger (YYYY-MM-DD)..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-2.5 bg-white border border-slate-200 rounded-[1.25rem] text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all font-medium shadow-sm"
-            />
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
+            <select 
+              value={filterYear}
+              onChange={(e) => setFilterYear(e.target.value)}
+              className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            >
+                <option value="">All Years</option>
+                {[2024, 2025, 2026].map(y => <option key={y} value={y.toString()}>{y}</option>)}
+            </select>
+            <select 
+              value={filterMonth}
+              onChange={(e) => setFilterMonth(e.target.value)}
+              className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            >
+                <option value="">All Months</option>
+                {Array.from({length: 12}, (_, i) => i + 1).map(m => (
+                    <option key={m} value={m.toString()}>{format(new Date(2000, m-1), "MMMM")}</option>
+                ))}
+            </select>
+            <div className="relative w-full lg:w-48">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder="Date Search..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-[1.25rem] text-xs focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all font-bold shadow-sm"
+                />
+            </div>
         </div>
       </div>
 
@@ -168,6 +197,7 @@ export default function SessionHistoryPage() {
                             <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Date Log</th>
                             <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Schedule Time</th>
                             <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Completion Marked Time</th>
+                            <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Salary Status</th>
                             <th className="px-8 py-5 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Audit Status</th>
                         </tr>
                     </thead>
@@ -189,7 +219,7 @@ export default function SessionHistoryPage() {
                                 <td className="px-8 py-5">
                                     <div className="flex items-center gap-2">
                                         <Clock size={14} className="text-indigo-500" />
-                                        <span className="text-sm font-black text-slate-700">{log.startTime}</span>
+                                        <span className="text-sm font-black text-slate-700">{formatTime(log.startTime)}</span>
                                     </div>
                                 </td>
                                 <td className="px-8 py-5">
@@ -199,6 +229,17 @@ export default function SessionHistoryPage() {
                                             {log.timestamp ? format(log.timestamp.toDate(), "hh:mm a") : "--:--"}
                                         </span>
                                     </div>
+                                </td>
+                                <td className="px-8 py-5">
+                                    {log.isPaid ? (
+                                        <div className="px-4 py-1.5 bg-indigo-50 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-indigo-100 w-fit">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> Settled
+                                        </div>
+                                    ) : (
+                                        <div className="px-4 py-1.5 bg-amber-50 text-amber-700 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-amber-100 w-fit">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" /> Pending Local
+                                        </div>
+                                    )}
                                 </td>
                                 <td className="px-8 py-5 text-right flex items-center justify-end gap-3">
                                     <button 

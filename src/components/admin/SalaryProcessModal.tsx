@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, where, doc, setDoc, serverTimestamp, orderBy } from "firebase/firestore";
+import { collection, query, getDocs, where, doc, setDoc, serverTimestamp, orderBy, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Loader2, TrendingUp, AlertCircle, CheckCircle2, Calculator } from "lucide-react";
 import Modal from "@/components/ui/Modal";
@@ -65,14 +65,13 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
         return;
       }
 
-      // Default to 8 sessions for each class as starting point
       const details: ClassEarnings[] = teacherClasses.map(cls => {
         const studentCount = cls.studentCount || 0;
         const monthlyFee = cls.monthlyFee || 0;
+        const sessionsConducted = cls.sessionsSinceLastPayment || 0;
         const totalMonthlyRevenue = studentCount * monthlyFee;
         const perSessionRate = totalMonthlyRevenue / 8;
-        const defaultSessions = 8;
-        const finalPayout = perSessionRate * defaultSessions;
+        const finalPayout = perSessionRate * sessionsConducted;
 
         return {
           classId: cls.id,
@@ -80,7 +79,7 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
           monthlyFee,
           studentCount,
           totalMonthlyRevenue,
-          sessionsConducted: defaultSessions,
+          sessionsConducted,
           perSessionRate,
           finalPayout: Math.round(finalPayout)
         };
@@ -114,7 +113,9 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
     setLoading(true);
     try {
       const teacher = teachers.find(t => t.id === selectedTeacherId);
+      const batch = writeBatch(db);
       const salaryId = `${selectedTeacherId}-${selectedMonth}`;
+      const salaryRef = doc(collection(db, "salaries"), salaryId);
       
       const salaryDoc = {
         teacherId: selectedTeacherId,
@@ -124,11 +125,23 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
         basicAmount: totalNet, 
         netAmount: totalNet,
         breakdown: earningsDetails,
+        createdAt: serverTimestamp(),
         processedAt: serverTimestamp(),
         paymentMethod: "Bank Transfer",
       };
 
-      await setDoc(doc(db, "salaries", salaryId), salaryDoc);
+      batch.set(salaryRef, salaryDoc);
+      
+      // Reset sessionsSinceLastPayment for the processed classes
+      earningsDetails.forEach(item => {
+        if (item.sessionsConducted > 0) {
+            batch.update(doc(db, "classes", item.classId), {
+                sessionsSinceLastPayment: 0
+            });
+        }
+      });
+
+      await batch.commit();
       
       toast.success(`Payroll generated for ${teacher?.name} (${selectedMonth})`);
       onSuccess();

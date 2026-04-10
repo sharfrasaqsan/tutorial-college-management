@@ -11,7 +11,8 @@ import {
   CheckCircle,
   GraduationCap,
   MapPin,
-  RotateCcw
+  RotateCcw,
+  Clock
 } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
 import { useState, useEffect, useMemo } from "react";
@@ -27,13 +28,17 @@ import {
   serverTimestamp, 
   setDoc, 
   onSnapshot, 
-  deleteDoc
+  deleteDoc,
+  Timestamp
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Class, Teacher, Salary } from "@/types/models";
 import { format } from "date-fns";
 import Link from "next/link";
 import toast from "react-hot-toast";
+import { formatTime } from "@/lib/formatters";
+import { processTeacherPayroll } from "@/lib/payroll";
+import { getDocs } from "firebase/firestore";
 
 interface SessionCompletion {
   id: string;
@@ -43,7 +48,7 @@ interface SessionCompletion {
   teacherName: string;
   date: string;
   dayOfWeek: string;
-  timestamp: any;
+  timestamp: Timestamp;
   startTime: string;
   room: string;
   subject: string;
@@ -150,13 +155,25 @@ export default function TeacherDashboard() {
     };
   }, [allClasses, completions]);
 
-  const toggleClassCompletion = async (classItem: any) => {
+  const toggleClassCompletion = async (classItem: TodayClass) => {
     if (!user?.uid) return;
     
     const todayStr = format(new Date(), "yyyy-MM-dd");
     const startTimeSafe = (classItem.currentSlot?.startTime || '00-00').replace(/:/g, '-');
     const completionId = `${classItem.id}_${todayStr}_${startTimeSafe}`;
     const isCurrentlyCompleted = classItem.isCompleted;
+
+    // Validation: Prevent marking future classes
+    const now = new Date();
+    const [startH, startM] = (classItem.currentSlot?.startTime || "00:00").split(':').map(Number);
+    const slotStartTime = (startH * 60) + startM;
+    const currentTimeMinutes = (now.getHours() * 60) + now.getMinutes();
+    const isFuture = currentTimeMinutes < slotStartTime;
+
+    if (isFuture && !isCurrentlyCompleted) {
+        toast.error("This session hasn't started yet.");
+        return;
+    }
 
     // Optimistic Update: Update local completions state immediately
     const optimisticCompletion = {
@@ -196,16 +213,36 @@ export default function TeacherDashboard() {
             dayOfWeek: currentDay,
             timestamp: serverTimestamp(),
             startTime: classItem.currentSlot?.startTime || "--:--",
-            room: classItem.currentSlot?.room || "---",
             subject: classItem.subject,
             grade: classItem.grade,
-            studentCount: classItem.studentCount || 0
+            studentCount: classItem.studentCount || 0,
+            isPaid: false,
+            day: new Date().getDate(),
+            month: new Date().getMonth() + 1,
+            year: new Date().getFullYear()
         });
         await updateDoc(classRef, {
             completedSessions: increment(1),
             sessionsSinceLastPayment: increment(1)
         });
         toast.success(`Session for ${classItem.name} completed successfully!`);
+
+        // Check for automatic salary request (8-session cycle)
+        try {
+            const classQ = query(collection(db, "classes"), where("teacherId", "==", user.uid));
+            const freshClassesSnap = await getDocs(classQ);
+            const freshClasses = freshClassesSnap.docs.map(d => ({ ...d.data(), id: d.id } as Class));
+            const totalPending = freshClasses.reduce((acc, c) => acc + (c.sessionsSinceLastPayment || 0), 0);
+
+            if (totalPending >= 8) {
+                const payroll = await processTeacherPayroll(user.uid, teacherData?.name || "Teacher", freshClasses);
+                if (payroll.success) {
+                    toast.success("Cycle completed! Automatic salary request generated.", { icon: "💰", duration: 5000 });
+                }
+            }
+        } catch (err) {
+            console.error("Auto-payroll check failed:", err);
+        }
       }
     } catch (error) {
        // Revert optimistic update on failure
@@ -248,38 +285,49 @@ export default function TeacherDashboard() {
   ];
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-700">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-1000 pb-20">
       
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-black text-slate-800 tracking-tight">
-            {getGreeting()}, <span className="text-indigo-600">{teacherData?.name?.split(' ')[0] || 'Teacher'}</span>
+      {/* Premium Institutional Greeting */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-3 mb-1">
+             <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
+             <p className="text-[11px] font-black uppercase tracking-[0.3em] text-indigo-600/80">Faculty Portal Access</p>
+          </div>
+          <h2 className="text-3xl font-black text-slate-800 tracking-tight leading-tight">
+            {getGreeting()}, <span className="text-indigo-600 italic">{teacherData?.name?.split(' ')[0] || 'Professor'}</span>
           </h2>
-          <p className="text-sm text-slate-500 font-bold tracking-tight uppercase tracking-widest text-[10px]">
-            {format(currentTime, "EEEE, MMMM dd, yyyy")} • {format(currentTime, "hh:mm a")}
-          </p>
+          <div className="flex items-center gap-3 text-slate-400">
+             <span className="text-[10px] font-black uppercase tracking-widest">{format(currentTime, "EEEE, MMMM dd")}</span>
+             <div className="w-1 h-1 rounded-full bg-slate-200"></div>
+             <div className="flex items-center gap-1.5 text-slate-500 font-bold text-[10px] bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
+                <Clock className="w-3 h-3 text-indigo-500 animate-pulse" /> {format(currentTime, "hh:mm a")}
+             </div>
+          </div>
         </div>
-        <div className="flex gap-2">
-            <Link href="/teacher/timetable" className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm uppercase tracking-widest">
-                <Calendar className="w-4 h-4" /> Timetable
+        <div className="flex items-center gap-3">
+            <Link href="/teacher/timetable" className="px-5 py-3 bg-white border border-slate-200 rounded-2xl text-[10px] font-black text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-2.5 shadow-sm uppercase tracking-widest hover:border-indigo-200 group">
+                <Calendar className="w-4 h-4 text-indigo-500 group-hover:scale-110 transition-transform" /> Full Schedule
             </Link>
-            <Link href="/teacher/salary" className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-xs font-black hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-600/20 uppercase tracking-widest">
-                <Wallet className="w-4 h-4" /> My Wallet
+            <Link href="/teacher/salary" className="px-5 py-3 bg-indigo-600 text-white rounded-2xl text-[10px] font-black hover:bg-indigo-700 transition-all flex items-center gap-2.5 shadow-xl shadow-indigo-600/20 uppercase tracking-widest group">
+                <Wallet className="w-4 h-4 text-indigo-200 group-hover:rotate-12 transition-transform" /> Financials
             </Link>
         </div>
       </div>
 
-      {/* Modern Stats Grid */}
+      {/* Glassmorphism Stat Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((card, idx) => (
-          <div key={idx} className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center gap-4 hover:shadow-md transition-all group">
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110 duration-300 ${card.bg} ${card.color}`}>
-              <card.icon className="w-6 h-6" />
+          <div key={idx} className="bg-white/70 backdrop-blur-xl p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-5 hover:shadow-xl hover:translate-y-[-4px] transition-all duration-500 group relative overflow-hidden">
+            <div className={`absolute top-0 right-0 w-20 h-20 opacity-5 group-hover:opacity-10 transition-opacity translate-x-4 -translate-y-4`}>
+                <card.icon className="w-full h-full" />
+            </div>
+            <div className={`w-14 h-14 rounded-3xl flex items-center justify-center transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 ${card.bg} ${card.color} shadow-lg shadow-current/10`}>
+              <card.icon className="w-7 h-7" />
             </div>
             <div>
-              <p className="text-[10px] font-black tracking-widest uppercase text-slate-400">{card.title}</p>
-              <p className="text-xl font-black text-slate-800 tracking-tight">{card.value}</p>
+              <p className="text-[9px] font-black tracking-[0.2em] uppercase text-slate-400 mb-0.5">{card.title}</p>
+              <p className="text-2xl font-black text-slate-900 tracking-tight leading-none">{card.value}</p>
             </div>
           </div>
         ))}
@@ -287,61 +335,65 @@ export default function TeacherDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column: My Classes Summary */}
-        <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden flex flex-col min-h-[400px]">
-          <div className="px-8 py-6 border-b border-slate-50 flex items-center justify-between">
+        <div className="bg-white rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-100/30 overflow-hidden flex flex-col group/table hover:border-indigo-100 transition-all duration-700">
+          <div className="px-10 py-8 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
             <div>
-              <h3 className="font-black text-slate-800 tracking-tight uppercase text-sm">My Classes</h3>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active assignments in the registry</p>
+              <h3 className="font-black text-slate-800 tracking-[0.15em] uppercase text-sm flex items-center gap-3">
+                <Activity className="w-5 h-5 text-indigo-600" /> My Registry
+              </h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Active assignment lifecycle tracking</p>
             </div>
-            <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center text-slate-400">
-               <Layers className="w-4 h-4" />
+            <div className="w-12 h-12 rounded-2xl bg-slate-50/50 flex items-center justify-center text-slate-400 border border-slate-100">
+               <Layers className="w-6 h-6" />
             </div>
           </div>
           <div className="p-0 flex-1">
-            <table className="w-full text-xs text-left">
-              <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-widest text-slate-400 border-b border-slate-50">
+            <table className="w-full text-xs text-left border-collapse">
+              <thead className="bg-slate-50/80 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 border-b border-slate-100">
                 <tr>
-                  <th className="px-5 py-4">Class Identification</th>
-                  <th className="px-5 py-4 text-center">Students</th>
-                  <th className="px-5 py-4 text-right">Progression</th>
+                  <th className="px-8 py-5">Classification</th>
+                  <th className="px-8 py-5 text-center">Enrollment</th>
+                  <th className="px-8 py-5 text-right">Cycle Progression</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {allClasses.map((cls) => (
-                  <tr key={cls.id} className="hover:bg-slate-50/30 transition-colors group">
-                    <td className="px-5 py-5">
-                      <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                  <tr key={cls.id} className="hover:bg-indigo-50/20 transition-all duration-500 group/row">
+                    <td className="px-8 py-6">
+                      <div className="flex items-center gap-4">
+                         <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black group-hover/row:bg-indigo-600 group-hover/row:text-white transition-all duration-700 shadow-sm text-sm uppercase">
                             {cls.name.charAt(0)}
                          </div>
                          <div>
-                            <p className="font-black text-slate-800 text-sm tracking-tight">{cls.name}</p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{cls.subject} • Grade {cls.grade}</p>
+                            <p className="font-black text-slate-800 text-sm tracking-tight group-hover/row:text-indigo-600 transition-colors">{cls.name}</p>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{cls.subject} • Grade {cls.grade}</p>
                          </div>
                       </div>
                     </td>
-                    <td className="px-5 py-5 text-center">
-                       <span className="px-3 py-1 bg-slate-100 rounded-full text-[10px] font-black text-slate-600 uppercase tracking-widest">
-                          {cls.studentCount || 0} Reg.
+                    <td className="px-8 py-6 text-center">
+                       <span className="px-4 py-1.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-600 uppercase tracking-[0.1em] border border-slate-200">
+                          {cls.studentCount || 0}
                        </span>
                     </td>
-                    <td className="px-5 py-5 text-right">
-                       <div className="flex flex-col items-end gap-1">
-                          <span className="text-xl font-black text-indigo-600 tracking-tight">
-                             {cls.completedSessions || 0}
+                    <td className="px-8 py-6 text-right">
+                       <div className="flex flex-col items-end gap-1.5">
+                          <span className="text-2xl font-black text-indigo-600 tracking-tighter tabular-nums">
+                             {cls.sessionsSinceLastPayment || 0}
                           </span>
-                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                             {cls.sessionsSinceLastPayment || 0}/8 to Next Pay
-                          </span>
+                          <div className="w-20 h-1 bg-slate-100 rounded-full overflow-hidden">
+                             <div className="bg-indigo-600 h-full transition-all duration-1000" style={{ width: `${Math.min(100, ((cls.sessionsSinceLastPayment || 0) / 8) * 100)}%` }}></div>
+                          </div>
                        </div>
                     </td>
                   </tr>
                 ))}
                 {allClasses.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="px-8 py-20 text-center">
-                       <Activity className="w-12 h-12 text-slate-100 mx-auto mb-4" />
-                       <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">No active classifications found.</p>
+                    <td colSpan={3} className="px-8 py-24 text-center">
+                       <div className="w-16 h-16 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-200 mx-auto mb-4">
+                          <Activity className="w-8 h-8" />
+                       </div>
+                       <p className="text-slate-400 font-black uppercase tracking-[0.2em] text-[10px]">No classifications assigned.</p>
                     </td>
                   </tr>
                 )}
@@ -351,75 +403,99 @@ export default function TeacherDashboard() {
         </div>
 
         {/* Right Column: Today's Schedule */}
-        <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
-          <div className="px-8 py-6 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
+        <div className="bg-white rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-100/30 overflow-hidden flex flex-col hover:border-indigo-100 transition-all duration-700">
+          <div className="px-10 py-8 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
             <div>
-              <h3 className="font-black text-slate-800 tracking-tight uppercase text-sm">Today's Schedule</h3>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active operational status</p>
+              <h3 className="font-black text-slate-800 tracking-[0.15em] uppercase text-sm flex items-center gap-3">
+                <Calendar className="w-5 h-5 text-indigo-600" /> Daily Matrix
+              </h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Institutional time synchronized</p>
             </div>
-            <div className={`px-2 py-1 rounded-md text-[9px] font-black uppercase tracking-widest ${todayClasses.some(c => !c.isCompleted) ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'}`}>
+            <div className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.15em] shadow-sm border ${todayClasses.some(c => !c.isCompleted) ? 'bg-amber-100 text-amber-600 border-amber-200' : 'bg-emerald-100 text-emerald-600 border-emerald-200'}`}>
                 {todayClasses.filter(c => !c.isCompleted).length} Remaining
             </div>
           </div>
-          <div className="p-4 flex-1">
-            <div className="space-y-3">
+          <div className="p-6 flex-1 bg-slate-50/20">
+            <div className="space-y-4">
                {todayClasses.length > 0 ? todayClasses.map((item, idx) => (
-                 <div key={`${item.id}-${idx}`} className={`group p-4 rounded-[2rem] transition-all border relative shadow-sm ${item.isCompleted ? 'bg-indigo-50/50 border-indigo-100' : 'bg-white border-slate-100 hover:border-indigo-200'}`}>
-                    <div className="flex justify-between items-start mb-3">
-                       <div className="flex items-center gap-2">
-                          <div className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest border ${item.isCompleted ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-indigo-50 border-indigo-100 text-indigo-600'}`}>
-                              {item.currentSlot?.startTime || '--:--'}
+                 <div key={`${item.id}-${idx}`} className={`group p-6 rounded-[2.5rem] transition-all duration-500 border relative shadow-xl ${item.isCompleted ? 'bg-white border-indigo-100 grayscale hover:grayscale-0' : 'bg-white border-white hover:border-indigo-200'}`}>
+                    <div className="flex justify-between items-start mb-5">
+                       <div className="flex items-center gap-3">
+                          <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all duration-500 ${item.isCompleted ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-indigo-50 border-indigo-100 text-indigo-600 shadow-sm'}`}>
+                              {formatTime(item.currentSlot?.startTime || '--:--')}
                           </div>
-                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
-                             <MapPin size={10} className="text-orange-400" /> {item.currentSlot?.room}
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                             <MapPin size={12} className="text-orange-500" /> {item.currentSlot?.room}
                           </span>
                        </div>
                        {item.isCompleted ? (
-                          <div className="flex items-center gap-1">
-                              <span className="text-[9px] font-black text-indigo-600 uppercase tracking-widest mr-1">Finalized</span>
-                              <CheckCircle className="w-4 h-4 text-indigo-600" />
+                          <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
+                              <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Finalized</span>
+                              <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
                           </div>
                        ) : (
-                          <div className="flex h-2 w-2 relative">
-                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                             <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
+                          <div className="flex h-3 w-3 relative">
+                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-500 opacity-75"></span>
+                             <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-600"></span>
                           </div>
                        )}
                     </div>
                     
-                    <h4 className={`font-black text-sm tracking-tight uppercase mb-1 ${item.isCompleted ? 'text-indigo-900' : 'text-slate-800'}`}>{item.name}</h4>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-4">{item.subject} • Grade {item.grade}</p>
+                    <h4 className={`font-black text-base tracking-tight uppercase mb-1 transition-colors ${item.isCompleted ? 'text-slate-400 group-hover:text-indigo-900' : 'text-slate-800'}`}>{item.name}</h4>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">{item.subject} • Grade {item.grade}</p>
                     
-                    <div className="flex gap-2 pt-2">
-                      {!item.isCompleted ? (
-                         <button 
-                             onClick={() => toggleClassCompletion(item)}
-                             className="w-full py-2 bg-indigo-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-indigo-700 transition-all shadow-md"
-                         >
-                            <CheckCircle2 className="w-3.5 h-3.5" /> Mark Done
-                         </button>
-                      ) : (
-                        <button 
-                            onClick={() => toggleClassCompletion(item)}
-                            className="w-full py-2 bg-indigo-100 text-indigo-600 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 border border-transparent transition-all"
-                        >
-                           <RotateCcw className="w-3.5 h-3.5" /> Made a mistake? Mark Incomplete
-                        </button>
-                      )}
+                    <div className="flex gap-2">
+                      {(() => {
+                         const nowMinutes = (currentTime.getHours() * 60) + currentTime.getMinutes();
+                         const [sH, sM] = (item.currentSlot?.startTime || "00:00").split(':').map(Number);
+                         const sTime = (sH * 60) + sM;
+                         const isPreemptive = nowMinutes < sTime;
+
+                         if (item.isCompleted) {
+                           return (
+                              <button 
+                                  onClick={() => toggleClassCompletion(item)}
+                                  className="w-full py-3 bg-slate-50 text-slate-400 rounded-2xl text-[9px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2.5 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 border border-slate-100 transition-all duration-500"
+                              >
+                                 <RotateCcw className="w-4 h-4" /> Undo Completion
+                              </button>
+                           );
+                         }
+
+                         if (isPreemptive) {
+                           return (
+                              <button 
+                                  disabled
+                                  className="w-full py-3 bg-slate-100 text-slate-400 rounded-2xl text-[9px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2.5 cursor-not-allowed border border-slate-200"
+                              >
+                                 <Clock className="w-4 h-4" /> Pending Start
+                              </button>
+                           );
+                         }
+
+                         return (
+                            <button 
+                                onClick={() => toggleClassCompletion(item)}
+                                className="w-full py-3 bg-indigo-600 text-white rounded-2xl text-[9px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2.5 hover:bg-slate-900 transition-all duration-500 shadow-xl shadow-indigo-600/20 active:scale-95"
+                            >
+                               <CheckCircle2 className="w-4 h-4" /> Mark as Done
+                            </button>
+                         );
+                      })()}
                     </div>
                  </div>
                )) : (
-                 <div className="h-48 flex flex-col items-center justify-center text-center p-6 bg-slate-50 rounded-[32px] border-2 border-dashed border-slate-100">
-                    <Calendar className="w-8 h-8 text-slate-200 mb-3" />
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No Operational Units Today</p>
+                 <div className="h-64 flex flex-col items-center justify-center text-center p-8 bg-slate-50/80 rounded-[3rem] border-2 border-dashed border-slate-200">
+                    <Calendar className="w-10 h-10 text-slate-200 mb-4" />
+                    <p className="text-slate-400 font-black uppercase tracking-[0.2em] text-[10px]">No Assignments Record Today</p>
                  </div>
                )}
             </div>
             
             {todayClasses.length > 0 && (
-              <div className="mt-8 pt-6 border-t border-slate-100">
-                <Link href="/teacher/timetable" className="flex items-center justify-center gap-2 py-3 bg-slate-50 hover:bg-slate-100 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-600 transition-all border border-slate-100">
-                   View Full Timetable <ArrowRightIcon className="w-4 h-4 ml-1" />
+              <div className="mt-8 pt-8 border-t border-slate-100">
+                <Link href="/teacher/timetable" className="flex items-center justify-center gap-3 py-4 bg-white hover:bg-slate-900 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] text-slate-600 transition-all duration-500 border border-slate-200 shadow-sm group">
+                   Visit Full Matrix <Calendar className="w-4 h-4 group-hover:rotate-12 transition-transform" />
                 </Link>
               </div>
             )}
@@ -448,7 +524,7 @@ export default function TeacherDashboard() {
             <div className="text-center">
                <p className="text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Sync Status</p>
                <p className="text-sm font-black text-emerald-400 flex items-center gap-1.5 uppercase tracking-widest text-[10px]">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></div>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                   Real-Time
                </p>
             </div>
@@ -457,9 +533,3 @@ export default function TeacherDashboard() {
     </div>
   );
 }
-
-const ArrowRightIcon = ({ className }: { className?: string }) => (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-    </svg>
-);

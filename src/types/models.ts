@@ -85,6 +85,11 @@ export interface Salary {
   basicAmount: number;
   netAmount: number;
   status: string;
+  breakdown?: Array<{
+    className: string;
+    sessionsConducted: number;
+    finalPayout: number;
+  }>;
   createdAt: FirestoreTimestamp;
 }
 

@@ -11,6 +11,7 @@ import ClassModal from "@/components/admin/ClassModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import Skeleton from "@/components/ui/Skeleton";
 import toast from "react-hot-toast";
+import { formatTime } from "@/lib/formatters";
 
 export default function MyClassesPage() {
   const { user } = useAuth();
@@ -354,7 +355,7 @@ export default function MyClassesPage() {
                                 <div className="flex items-center gap-3">
                                     <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
                                         <Clock className="w-3.5 h-3.5 text-indigo-400" />
-                                        {schedule.startTime} - {schedule.endTime}
+                                        {formatTime(schedule.startTime)} - {formatTime(schedule.endTime)}
                                     </div>
                                     <div className="flex items-center gap-1 text-[10px] font-bold text-amber-500">
                                         <MapPin className="w-3 h-3 child" />
