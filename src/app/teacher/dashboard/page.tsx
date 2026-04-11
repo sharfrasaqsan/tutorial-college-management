@@ -12,7 +12,8 @@ import {
   GraduationCap,
   MapPin,
   RotateCcw,
-  Clock
+  Clock,
+  Lock
 } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
 import { useState, useEffect, useMemo } from "react";
@@ -29,7 +30,9 @@ import {
   setDoc, 
   onSnapshot, 
   deleteDoc,
-  Timestamp
+  getDoc,
+  Timestamp,
+  getDocs
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Class, Teacher, Salary } from "@/types/models";
@@ -38,7 +41,6 @@ import Link from "next/link";
 import toast from "react-hot-toast";
 import { formatTime } from "@/lib/formatters";
 import { processTeacherPayroll } from "@/lib/payroll";
-import { getDocs } from "firebase/firestore";
 
 interface SessionCompletion {
   id: string;
@@ -54,6 +56,7 @@ interface SessionCompletion {
   subject: string;
   grade: string;
   studentCount?: number;
+  isPaid?: boolean;
 }
 
 interface TodayClass extends Class {
@@ -63,12 +66,14 @@ interface TodayClass extends Class {
     room: string;
   };
   isCompleted: boolean;
+  isPaid?: boolean;
 }
 
 export default function TeacherDashboard() {
   const { user } = useAuth();
   const [allClasses, setAllClasses] = useState<Class[]>([]);
-  const [completions, setCompletions] = useState<SessionCompletion[]>([]);
+  const [todayCompletions, setTodayCompletions] = useState<SessionCompletion[]>([]);
+  const [recentCompletions, setRecentCompletions] = useState<SessionCompletion[]>([]);
   const [latestSalary, setLatestSalary] = useState<Salary | null>(null);
   const [teacherData, setTeacherData] = useState<Teacher | null>(null);
   const [loading, setLoading] = useState(true);
@@ -82,15 +87,26 @@ export default function TeacherDashboard() {
   useEffect(() => {
     if (!user?.uid) return;
     
+    const todayStr = format(new Date(), "yyyy-MM-dd");
+
     const tRef = doc(db, "teachers", user.uid);
     const qClasses = query(collection(db, "classes"), where("teacherId", "==", user.uid));
-    const completionsRef = collection(db, "session_completions");
+    
+    // FIX: Query today's completions specifically (not a global limit)
+    const qTodayComp = query(
+        collection(db, "session_completions"), 
+        where("teacherId", "==", user.uid),
+        where("date", "==", todayStr)
+    );
+
+    // Separate query for recent activity feed
     const qRecentComp = query(
-        completionsRef, 
+        collection(db, "session_completions"), 
         where("teacherId", "==", user.uid),
         orderBy("timestamp", "desc"),
         limit(10)
     );
+
     const salaryRef = collection(db, "salaries");
     const salaryQuery = query(salaryRef, where("teacherId", "==", user.uid), orderBy("createdAt", "desc"), limit(1));
 
@@ -104,9 +120,12 @@ export default function TeacherDashboard() {
         setLoading(false);
     });
 
-    const unsubscribeRecent = onSnapshot(qRecentComp, (snap) => {
-        const history = snap.docs.map(d => ({ ...d.data(), id: d.id } as SessionCompletion));
-        setCompletions(history);
+    const unsubscribeTodayComp = onSnapshot(qTodayComp, (snap) => {
+        setTodayCompletions(snap.docs.map(d => ({ ...d.data(), id: d.id } as SessionCompletion)));
+    });
+
+    const unsubscribeRecentComp = onSnapshot(qRecentComp, (snap) => {
+        setRecentCompletions(snap.docs.map(d => ({ ...d.data(), id: d.id } as SessionCompletion)));
     });
 
     const unsubscribeSalary = onSnapshot(salaryQuery, (snap) => {
@@ -116,12 +135,13 @@ export default function TeacherDashboard() {
     return () => {
         unsubscribeTeacher();
         unsubscribeClasses();
-        unsubscribeRecent();
+        unsubscribeTodayComp();
+        unsubscribeRecentComp();
         unsubscribeSalary();
     };
   }, [user]);
 
-  // Derived state for Today's specific sessions
+  // Derived state for Today's specific sessions — uses today-specific completions
   const todayClasses = useMemo(() => {
     const todayStr = format(currentTime, "yyyy-MM-dd");
     const currentDay = format(currentTime, "EEEE").toLowerCase();
@@ -130,40 +150,46 @@ export default function TeacherDashboard() {
     allClasses.forEach(c => {
        const todaySlots = c.schedules?.filter(s => s.dayOfWeek.toLowerCase() === currentDay) || [];
        todaySlots.forEach(slot => {
+          const completion = todayCompletions.find(h => 
+             h.classId === c.id && 
+             h.date === todayStr && 
+             h.startTime === slot.startTime
+          );
           sessions.push({
              ...c,
              currentSlot: slot,
-             isCompleted: completions.some(h => 
-                h.classId === c.id && 
-                h.date === todayStr && 
-                h.startTime === slot.startTime
-             )
+             isCompleted: !!completion,
+             isPaid: !!completion?.isPaid
           });
        });
     });
 
     return sessions.sort((a, b) => a.currentSlot.startTime.localeCompare(b.currentSlot.startTime));
-  }, [allClasses, completions, currentTime]);
+  }, [allClasses, todayCompletions, currentTime]);
 
-  // Derived stats for the header
+  // Derived stats
   const stats = useMemo(() => {
-    const todayStr = format(new Date(), "yyyy-MM-dd");
     return {
       totalStudents: allClasses.reduce((acc, curr) => acc + (curr.studentCount || 0), 0),
       activeClasses: allClasses.length,
-      completedToday: completions.filter(h => h.date === todayStr).length
+      completedToday: todayCompletions.length
     };
-  }, [allClasses, completions]);
+  }, [allClasses, todayCompletions]);
 
   const toggleClassCompletion = async (classItem: TodayClass) => {
     if (!user?.uid) return;
     
+    // AUDIT LOCK: Prevent reverting financially settled sessions
+    if (classItem.isPaid) {
+        toast.error("Audit Locked: This session has been financially settled and cannot be reverted.");
+        return;
+    }
+
     const todayStr = format(new Date(), "yyyy-MM-dd");
     const startTimeSafe = (classItem.currentSlot?.startTime || '00-00').replace(/:/g, '-');
     const completionId = `${classItem.id}_${todayStr}_${startTimeSafe}`;
     const isCurrentlyCompleted = classItem.isCompleted;
 
-    // Validation: Prevent marking future classes
     const now = new Date();
     const [startH, startM] = (classItem.currentSlot?.startTime || "00:00").split(':').map(Number);
     const slotStartTime = (startH * 60) + startM;
@@ -175,35 +201,23 @@ export default function TeacherDashboard() {
         return;
     }
 
-    // Optimistic Update: Update local completions state immediately
-    const optimisticCompletion = {
-      classId: classItem.id,
-      date: todayStr,
-      startTime: classItem.currentSlot?.startTime || "--:--",
-      id: completionId
-    } as SessionCompletion;
-
-    if (isCurrentlyCompleted) {
-       setCompletions(prev => prev.filter(c => c.id !== completionId));
-    } else {
-       setCompletions(prev => [optimisticCompletion, ...prev]);
-    }
-
     try {
       const currentDay = format(new Date(), "EEEE").toLowerCase();
       const completionRef = doc(db, "session_completions", completionId);
       const classRef = doc(db, "classes", classItem.id);
 
       if (isCurrentlyCompleted) {
-        // Mark as Incomplete (Undo)
+        // FIX: Read FRESH counter from Firestore to avoid stale state causing negatives
+        const freshClassSnap = await getDoc(classRef);
+        const freshPending = freshClassSnap.data()?.sessionsSinceLastPayment || 0;
+        
         await deleteDoc(completionRef);
         await updateDoc(classRef, {
             completedSessions: increment(-1),
-            sessionsSinceLastPayment: increment(-1)
+            sessionsSinceLastPayment: increment(freshPending > 0 ? -1 : 0)
         });
-        toast.success(`Session for ${classItem.name} marked as incomplete.`);
+        toast.success(`Session for ${classItem.name} reverted.`);
       } else {
-        // Mark as Completed
         await setDoc(completionRef, {
             classId: classItem.id,
             className: classItem.name,
@@ -225,19 +239,21 @@ export default function TeacherDashboard() {
             completedSessions: increment(1),
             sessionsSinceLastPayment: increment(1)
         });
-        toast.success(`Session for ${classItem.name} completed successfully!`);
+        toast.success(`Session for ${classItem.name} completed!`);
 
-        // Check for automatic salary request (8-session cycle)
+        // Check for automatic salary request (milestone)
         try {
             const classQ = query(collection(db, "classes"), where("teacherId", "==", user.uid));
             const freshClassesSnap = await getDocs(classQ);
             const freshClasses = freshClassesSnap.docs.map(d => ({ ...d.data(), id: d.id } as Class));
-            const totalPending = freshClasses.reduce((acc, c) => acc + (c.sessionsSinceLastPayment || 0), 0);
+            const hasReachedMilestone = freshClasses.some(c => 
+                (c.sessionsSinceLastPayment || 0) >= (c.sessionsPerCycle || 8)
+            );
 
-            if (totalPending >= 8) {
+            if (hasReachedMilestone) {
                 const payroll = await processTeacherPayroll(user.uid, teacherData?.name || "Teacher", freshClasses);
                 if (payroll.success) {
-                    toast.success("Cycle completed! Automatic salary request generated.", { icon: "💰", duration: 5000 });
+                    toast.success("Milestone reached! Salary request generated.", { icon: "💰", duration: 5000 });
                 }
             }
         } catch (err) {
@@ -245,10 +261,8 @@ export default function TeacherDashboard() {
         }
       }
     } catch (error) {
-       // Revert optimistic update on failure
        console.error("Sync Error:", error);
-       toast.error("Process failed. Syncing status...");
-       // The onSnapshot will eventually correct the state
+       toast.error("Process failed.");
     }
   };
 
@@ -315,7 +329,6 @@ export default function TeacherDashboard() {
         </div>
       </div>
 
-      {/* Glassmorphism Stat Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.map((card, idx) => (
           <div key={idx} className="bg-white/70 backdrop-blur-xl p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-5 hover:shadow-xl hover:translate-y-[-4px] transition-all duration-500 group relative overflow-hidden">
@@ -334,7 +347,7 @@ export default function TeacherDashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Column: My Classes Summary */}
+        {/* My Classes Summary with Cycle Progression */}
         <div className="bg-white rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-100/30 overflow-hidden flex flex-col group/table hover:border-indigo-100 transition-all duration-700">
           <div className="px-10 py-8 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
             <div>
@@ -357,36 +370,41 @@ export default function TeacherDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {allClasses.map((cls) => (
-                  <tr key={cls.id} className="hover:bg-indigo-50/20 transition-all duration-500 group/row">
-                    <td className="px-8 py-6">
-                      <div className="flex items-center gap-4">
-                         <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black group-hover/row:bg-indigo-600 group-hover/row:text-white transition-all duration-700 shadow-sm text-sm uppercase">
-                            {cls.name.charAt(0)}
+                {allClasses.map((cls) => {
+                  const cycleProgress = Math.max(0, cls.sessionsSinceLastPayment || 0);
+                  const cycleBenchmark = cls.sessionsPerCycle || 8;
+                  const progressPct = Math.min(100, (cycleProgress / cycleBenchmark) * 100);
+                  return (
+                    <tr key={cls.id} className="hover:bg-indigo-50/20 transition-all duration-500 group/row">
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-4">
+                           <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black group-hover/row:bg-indigo-600 group-hover/row:text-white transition-all duration-700 shadow-sm text-sm uppercase">
+                              {cls.name.charAt(0)}
+                           </div>
+                           <div>
+                              <p className="font-black text-slate-800 text-sm tracking-tight group-hover/row:text-indigo-600 transition-colors">{cls.name}</p>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{cls.subject} • Grade {cls.grade}</p>
+                           </div>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6 text-center">
+                         <span className="px-4 py-1.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-600 uppercase tracking-[0.1em] border border-slate-200">
+                            {cls.studentCount || 0}
+                         </span>
+                      </td>
+                      <td className="px-8 py-6 text-right">
+                         <div className="flex flex-col items-end gap-1.5">
+                            <span className="text-2xl font-black text-indigo-600 tracking-tighter tabular-nums">
+                               {cycleProgress}<span className="text-sm text-slate-300 font-bold">/{cycleBenchmark}</span>
+                            </span>
+                            <div className="w-20 h-1 bg-slate-100 rounded-full overflow-hidden">
+                               <div className="bg-indigo-600 h-full transition-all duration-1000" style={{ width: `${progressPct}%` }}></div>
+                            </div>
                          </div>
-                         <div>
-                            <p className="font-black text-slate-800 text-sm tracking-tight group-hover/row:text-indigo-600 transition-colors">{cls.name}</p>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{cls.subject} • Grade {cls.grade}</p>
-                         </div>
-                      </div>
-                    </td>
-                    <td className="px-8 py-6 text-center">
-                       <span className="px-4 py-1.5 bg-slate-100 rounded-full text-[10px] font-black text-slate-600 uppercase tracking-[0.1em] border border-slate-200">
-                          {cls.studentCount || 0}
-                       </span>
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                       <div className="flex flex-col items-end gap-1.5">
-                          <span className="text-2xl font-black text-indigo-600 tracking-tighter tabular-nums">
-                             {cls.sessionsSinceLastPayment || 0}
-                          </span>
-                          <div className="w-20 h-1 bg-slate-100 rounded-full overflow-hidden">
-                             <div className="bg-indigo-600 h-full transition-all duration-1000" style={{ width: `${Math.min(100, ((cls.sessionsSinceLastPayment || 0) / 8) * 100)}%` }}></div>
-                          </div>
-                       </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
                 {allClasses.length === 0 && (
                   <tr>
                     <td colSpan={3} className="px-8 py-24 text-center">
@@ -402,7 +420,7 @@ export default function TeacherDashboard() {
           </div>
         </div>
 
-        {/* Right Column: Today's Schedule */}
+        {/* Today's Schedule */}
         <div className="bg-white rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-100/30 overflow-hidden flex flex-col hover:border-indigo-100 transition-all duration-700">
           <div className="px-10 py-8 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
             <div>
@@ -428,9 +446,14 @@ export default function TeacherDashboard() {
                              <MapPin size={12} className="text-orange-500" /> {item.currentSlot?.room}
                           </span>
                        </div>
-                       {item.isCompleted ? (
+                       {item.isPaid ? (
+                          <div className="flex items-center gap-2 bg-amber-50 px-3 py-1 rounded-full border border-amber-100">
+                             <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest">Settled</span>
+                             <Lock className="w-3.5 h-3.5 text-amber-600" />
+                          </div>
+                       ) : item.isCompleted ? (
                           <div className="flex items-center gap-2 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100">
-                              <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Finalized</span>
+                              <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Verified</span>
                               <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
                           </div>
                        ) : (
@@ -451,26 +474,31 @@ export default function TeacherDashboard() {
                          const sTime = (sH * 60) + sM;
                          const isPreemptive = nowMinutes < sTime;
 
+                         if (item.isPaid) {
+                            return (
+                               <button disabled className="w-full py-3 bg-slate-100 text-slate-400 rounded-2xl text-[9px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2.5 cursor-not-allowed grayscale">
+                                  <Lock className="w-4 h-4" /> Audit Locked
+                               </button>
+                            );
+                         }
+
                          if (item.isCompleted) {
-                           return (
-                              <button 
-                                  onClick={() => toggleClassCompletion(item)}
-                                  className="w-full py-3 bg-slate-50 text-slate-400 rounded-2xl text-[9px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2.5 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 border border-slate-100 transition-all duration-500"
-                              >
-                                 <RotateCcw className="w-4 h-4" /> Undo Completion
-                              </button>
-                           );
+                            return (
+                               <button 
+                                   onClick={() => toggleClassCompletion(item)}
+                                   className="w-full py-3 bg-slate-50 text-slate-400 rounded-2xl text-[9px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2.5 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-100 border border-slate-100 transition-all duration-500"
+                               >
+                                  <RotateCcw className="w-4 h-4" /> Undo Completion
+                               </button>
+                            );
                          }
 
                          if (isPreemptive) {
-                           return (
-                              <button 
-                                  disabled
-                                  className="w-full py-3 bg-slate-100 text-slate-400 rounded-2xl text-[9px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2.5 cursor-not-allowed border border-slate-200"
-                              >
-                                 <Clock className="w-4 h-4" /> Pending Start
-                              </button>
-                           );
+                            return (
+                               <button disabled className="w-full py-3 bg-slate-100 text-slate-400 rounded-2xl text-[9px] font-black uppercase tracking-[0.15em] flex items-center justify-center gap-2.5 cursor-not-allowed border border-slate-200">
+                                  <Clock className="w-4 h-4" /> Pending Start
+                               </button>
+                            );
                          }
 
                          return (
@@ -503,7 +531,6 @@ export default function TeacherDashboard() {
         </div>
       </div>
 
-      {/* Micro Analytics Bar */}
       <div className="bg-slate-900 rounded-[2.5rem] p-6 text-white flex flex-col sm:flex-row items-center justify-between gap-6 relative overflow-hidden shadow-2xl">
          <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl -mr-32 -mt-32"></div>
          <div className="flex items-center gap-6">
@@ -513,20 +540,6 @@ export default function TeacherDashboard() {
             <div>
                <p className="text-[9px] font-black text-white/50 uppercase tracking-widest mb-1">Teaching Progress</p>
                <h4 className="text-xl font-black">Overall Average Rank: <span className="text-indigo-400">98.4%</span></h4>
-            </div>
-         </div>
-         <div className="flex items-center gap-8">
-            <div className="text-center">
-               <p className="text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Attendance Rate</p>
-               <p className="text-sm font-black">92%</p>
-            </div>
-            <div className="w-px h-8 bg-white/10"></div>
-            <div className="text-center">
-               <p className="text-[8px] font-black text-white/40 uppercase tracking-widest mb-1">Sync Status</p>
-               <p className="text-sm font-black text-emerald-400 flex items-center gap-1.5 uppercase tracking-widest text-[10px]">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                  Real-Time
-               </p>
             </div>
          </div>
       </div>

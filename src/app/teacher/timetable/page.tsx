@@ -1,28 +1,46 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, where, getDocs, doc, setDoc, deleteDoc, updateDoc, increment, serverTimestamp, onSnapshot } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, setDoc, deleteDoc, updateDoc, increment, serverTimestamp, onSnapshot, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Calendar, Clock, MapPin, Share2, Printer, ArrowRight, CheckCircle2, RotateCcw, History as HistoryIcon, ChevronLeft, ChevronRight, CalendarDays, ChevronDown, ChevronUp } from "lucide-react";
+import { 
+  CalendarDays, 
+  MapPin, 
+  Clock, 
+  Zap,
+  RotateCcw,
+  CheckCircle2,
+  History,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Layers,
+  Calendar,
+  Lock
+} from "lucide-react";
 import { Class, ClassSchedule } from "@/types/models";
 import { useAuth } from "@/context/AuthContext";
 import Skeleton from "@/components/ui/Skeleton";
 import Link from "next/link";
 import { formatTime } from "@/lib/formatters";
-import { format, addMonths, subMonths, isSameDay, isAfter, isToday, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, setYear, setMonth } from "date-fns";
+import { format, addMonths, subMonths, isSameDay, isAfter, isToday, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth } from "date-fns";
 import toast from "react-hot-toast";
+import { processTeacherPayroll } from "@/lib/payroll";
 
 interface SessionCompletion {
   classId: string;
   date: string;
   startTime: string;
   id: string;
+  isPaid?: boolean;
 }
 
 interface TimetableSlot extends Class, ClassSchedule {
   classId: string;
   uniqueSlotId: string;
   isCompleted?: boolean;
+  isPaid?: boolean;
 }
 
 export default function TimetablePage() {
@@ -33,22 +51,21 @@ export default function TimetablePage() {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [completions, setCompletions] = useState<SessionCompletion[]>([]);
   
-  // Toggle & Picker States
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
-  const [isYearPickerOpen, setIsYearPickerOpen] = useState(false);
-  const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
+  const brandColor = "#4f39f6";
 
   const selectedDayName = format(selectedDate, "eeee").toLowerCase();
   const currentDayName = format(currentTime, "eeee").toLowerCase();
 
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    const timer = setInterval(() => setCurrentTime(new Date()), 10000); 
     return () => clearInterval(timer);
   }, []);
 
   useEffect(() => {
     if (!user?.uid) return;
     
+    setLoading(true);
     const qClasses = query(collection(db, "classes"), where("teacherId", "==", user.uid));
     const unsubClasses = onSnapshot(qClasses, (snap) => {
       setClasses(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Class)));
@@ -71,9 +88,14 @@ export default function TimetablePage() {
     };
   }, [user, selectedDate]);
 
-  const toggleClassCompletion = async (classItem: Class, slot: ClassSchedule) => {
+  const toggleClassCompletion = async (classItem: Class, slot: TimetableSlot) => {
     if (!user?.uid) return;
     
+    if (slot.isPaid) {
+        toast.error("Audit Lock: This session has been financially settled and cannot be modified.");
+        return;
+    }
+
     const [startH, startM] = slot.startTime.split(':').map(Number);
     const slotDateTime = new Date(selectedDate);
     slotDateTime.setHours(startH, startM, 0, 0);
@@ -85,7 +107,7 @@ export default function TimetablePage() {
     const isCurrentlyCompleted = completions.some(c => c.id === completionId);
 
     if (isFuture && !isCurrentlyCompleted) {
-        toast.error("Temporal violation: Future sessions cannot be settled yet.");
+        toast.error("Process Blocked: Future session.");
         return;
     }
 
@@ -94,12 +116,16 @@ export default function TimetablePage() {
       const classRef = doc(db, "classes", classItem.id);
 
       if (isCurrentlyCompleted) {
+        // FIX: Read FRESH counter from Firestore to avoid stale state causing negatives
+        const freshClassSnap = await getDoc(classRef);
+        const freshPending = freshClassSnap.data()?.sessionsSinceLastPayment || 0;
+        
         await deleteDoc(completionRef);
         await updateDoc(classRef, {
             completedSessions: increment(-1),
-            sessionsSinceLastPayment: increment(-1)
+            sessionsSinceLastPayment: increment(freshPending > 0 ? -1 : 0)
         });
-        toast.success(`Session for ${classItem.name} reverted.`);
+        toast.success(`Session reverted.`);
       } else {
         await setDoc(completionRef, {
             classId: classItem.id,
@@ -122,7 +148,25 @@ export default function TimetablePage() {
             completedSessions: increment(1),
             sessionsSinceLastPayment: increment(1)
         });
-        toast.success(`Session for ${classItem.name} settled!`);
+        toast.success(`Session completed!`);
+
+        // Check for automatic salary request (milestone)
+        try {
+            const classQ = query(collection(db, "classes"), where("teacherId", "==", user.uid));
+            const freshClassesSnap = await getDocs(classQ);
+            const freshClasses = freshClassesSnap.docs.map(d => ({ ...d.data(), id: d.id } as Class));
+            const hasReachedMilestone = freshClasses.some(c => 
+                (c.sessionsSinceLastPayment || 0) >= (c.sessionsPerCycle || 8)
+            );
+            if (hasReachedMilestone) {
+                const payroll = await processTeacherPayroll(user.uid, classItem.teacherName || "Teacher", freshClasses);
+                if (payroll.success) {
+                    toast.success("Milestone reached! Salary request generated.", { icon: "💰", duration: 5000 });
+                }
+            }
+        } catch (err) {
+            console.error("Auto-payroll check failed:", err);
+        }
       }
     } catch (error) {
        console.error("Sync Error:", error);
@@ -146,9 +190,11 @@ export default function TimetablePage() {
         const dateStr = format(selectedDate, "yyyy-MM-dd");
         const startTimeSafe = slot.startTime.replace(/:/g, '-');
         const completionId = `${slot.classId}_${dateStr}_${startTimeSafe}`;
+        const completion = completions.find(c => c.id === completionId);
         return {
             ...slot,
-            isCompleted: completions.some(c => c.id === completionId)
+            isCompleted: !!completion,
+            isPaid: !!completion?.isPaid
         };
     });
 
@@ -156,12 +202,16 @@ export default function TimetablePage() {
     const dayMatches = isToday(selectedDate) && slotDay.toLowerCase() === currentDayName.toLowerCase();
     if (!dayMatches) return false;
 
-    const now = currentTime.getHours() * 60 + currentTime.getMinutes();
+    const [nowH, nowM] = [currentTime.getHours(), currentTime.getMinutes()];
+    const now = nowH * 60 + nowM;
     const [startH, startM] = startTime.split(':').map(Number);
     const [endH, endM] = endTime.split(':').map(Number);
     
     return now >= (startH * 60 + startM) && now <= (endH * 60 + endM);
   };
+
+  const completedCount = filteredSlots.filter(s => s.isCompleted).length;
+  const progressPercent = filteredSlots.length > 0 ? (completedCount / filteredSlots.length) * 100 : 0;
 
   // Calendar logic
   const monthStart = startOfMonth(selectedDate);
@@ -174,124 +224,150 @@ export default function TimetablePage() {
   const handleNextMonth = () => setSelectedDate(addMonths(selectedDate, 1));
   const handleJumpToToday = () => setSelectedDate(new Date());
 
-  const years = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - 2 + i);
-  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-20 animate-in fade-in duration-700">
-      {/* Premium Compact Faculty HUD */}
-      <div className="bg-white p-8 rounded-[3rem] border border-slate-100 shadow-xl shadow-indigo-100/30 space-y-8">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-            <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-indigo-600 rounded-2xl shadow-lg flex items-center justify-center">
-                    <CalendarDays className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                    <h2 className="text-2xl font-black text-slate-800 tracking-tight">Faculty Roadmap</h2>
-                    <p className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em]">{format(currentTime, "EEEE, MMMM d")}</p>
-                </div>
+    <div className="max-w-[1200px] mx-auto space-y-6 pb-20 px-4">
+      {/* 🔮 Dashboard Header */}
+      <div className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6 group">
+        <div className="flex items-center gap-5">
+            <div style={{ backgroundColor: brandColor }} className="w-12 h-12 rounded-xl shadow-lg flex items-center justify-center group-hover:scale-110 transition-transform">
+                <CalendarDays className="w-6 h-6 text-white" />
             </div>
-
-            <div className="flex items-center gap-3">
-                <div className="flex bg-indigo-50/50 p-1 rounded-xl border border-indigo-100">
-                    <button onClick={handlePrevMonth} className="p-2 hover:bg-white rounded-lg transition-all text-indigo-400 hover:text-indigo-600"><ChevronLeft className="w-4 h-4" /></button>
-                    <button 
-                        onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
-                        className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-700 hover:text-indigo-600 transition-all flex items-center gap-2"
-                    >
-                        {format(selectedDate, "MMMM yyyy")}
-                        {isCalendarExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                    </button>
-                    <button onClick={handleNextMonth} className="p-2 hover:bg-white rounded-lg transition-all text-indigo-400 hover:text-indigo-600"><ChevronRight className="w-4 h-4" /></button>
-                </div>
-                {!isToday(selectedDate) && (
-                    <button onClick={handleJumpToToday} className="px-5 py-2.5 bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest rounded-xl hover:bg-indigo-600 transition-all">Today</button>
-                )}
+            <div>
+                <h2 className="text-lg font-black text-slate-800 tracking-tight">Academic Timeline</h2>
+                <p style={{ color: brandColor }} className="text-[9px] font-black uppercase tracking-[0.2em] mt-1 opacity-80">Faculty Logistics Terminal</p>
             </div>
         </div>
 
-        {isCalendarExpanded && (
-            <div className="pt-8 border-t border-slate-50 animate-in slide-in-from-top-4 duration-500">
-                <div className="flex items-center justify-end gap-2 mb-6 text-[9px] font-black uppercase tracking-widest">
-                    <div className="relative">
-                        <button onClick={() => { setIsMonthPickerOpen(!isMonthPickerOpen); setIsYearPickerOpen(false); }} className="px-4 py-2 bg-slate-50 rounded-lg hover:text-indigo-600 transition-all">Month Matrix</button>
-                        {isMonthPickerOpen && (
-                            <div className="absolute top-full right-0 mt-2 bg-white border border-indigo-100 shadow-2xl rounded-2xl p-3 z-50 grid grid-cols-3 gap-2 min-w-[300px] animate-in slide-in-from-top-2">
-                                {months.map((m, i) => (
-                                    <button 
-                                        key={m} 
-                                        onClick={() => { setSelectedDate(setMonth(selectedDate, i)); setIsMonthPickerOpen(false); }}
-                                        className={`px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${format(selectedDate, "MMMM") === m ? 'bg-indigo-600 text-white' : 'hover:bg-slate-50 text-slate-500'}`}
-                                    >
-                                        {m.substring(0, 3)}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                    <div className="relative">
-                        <button onClick={() => { setIsYearPickerOpen(!isYearPickerOpen); setIsMonthPickerOpen(false); }} className="px-4 py-2 bg-slate-50 rounded-lg hover:text-indigo-600 transition-all">Year Cycle</button>
-                        {isYearPickerOpen && (
-                            <div className="absolute top-full right-0 mt-2 bg-white border border-indigo-100 shadow-2xl rounded-2xl p-3 z-50 grid grid-cols-3 gap-2 min-w-[200px] animate-in slide-in-from-top-2">
-                                {years.map((y) => (
-                                    <button 
-                                        key={y} 
-                                        onClick={() => { setSelectedDate(setYear(selectedDate, y)); setIsYearPickerOpen(false); }}
-                                        className={`px-3 py-2 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${format(selectedDate, "yyyy") === y.toString() ? 'bg-indigo-600 text-white' : 'hover:bg-slate-50 text-slate-500'}`}
-                                    >
-                                        {y}
-                                    </button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-7 border border-slate-100 rounded-[2rem] overflow-hidden bg-slate-50/20">
-                    <div className="col-span-full grid grid-cols-7 bg-white border-b border-slate-50">
-                        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(day => (
-                            <div key={day} className="py-4 text-center text-[9px] font-black uppercase text-slate-400">{day}</div>
-                        ))}
-                    </div>
-                    {calendarDays.map((date) => {
-                        const isSelected = isSameDay(date, selectedDate);
-                        const isDayMonth = isSameMonth(date, selectedDate);
-                        return (
-                            <button 
-                                key={date.toString()}
-                                onClick={() => { setSelectedDate(date); setIsCalendarExpanded(false); }}
-                                className={`p-4 flex flex-col items-center justify-center transition-all border-r border-b border-slate-50 last:border-r-0 ${!isDayMonth ? 'opacity-10 pointer-events-none' : 'hover:bg-white'} ${isSelected ? 'bg-white' : ''}`}
-                            >
-                                <span className={`text-[13px] font-black tabular-nums transition-all ${isSelected ? 'bg-indigo-600 text-white w-8 h-8 rounded-xl flex items-center justify-center shadow-lg' : 'text-slate-800'} ${isToday(date) && !isSelected ? 'text-indigo-600' : ''}`}>
-                                    {format(date, "d")}
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
+        <div className="flex items-center gap-3">
+            <div className="flex bg-slate-50 p-1 rounded-xl border border-slate-100 shadow-inner">
+                <button onClick={handlePrevMonth} className="w-9 h-9 flex items-center justify-center hover:bg-white rounded-lg transition-all text-slate-400 hover:text-[#4f39f6]"><ChevronLeft className="w-4 h-4" /></button>
+                <button 
+                    onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
+                    className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-700 hover:text-[#4f39f6] transition-all flex items-center gap-2"
+                >
+                    {format(selectedDate, "MMMM yyyy")}
+                    {isCalendarExpanded ? <ChevronUp className="w-3.5 h-3.5 text-[#4f39f6]" /> : <ChevronDown className="w-3.5 h-3.5 text-[#4f39f6]" />}
+                </button>
+                <button onClick={handleNextMonth} className="w-9 h-9 flex items-center justify-center hover:bg-white rounded-lg transition-all text-slate-400 hover:text-[#4f39f6]"><ChevronRight className="w-4 h-4" /></button>
             </div>
-        )}
+            {!isToday(selectedDate) && (
+                <button onClick={handleJumpToToday} style={{ backgroundColor: brandColor }} className="px-5 py-2.5 text-white text-[9px] font-black uppercase tracking-widest rounded-xl transition-all hover:scale-105">Today</button>
+            )}
+        </div>
       </div>
 
-      {/* Main Schedule Container */}
-      <div className="space-y-8">
-        <div className="flex items-center justify-between px-6 pt-4">
-             <h4 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-4">
-                <span className="w-1.5 h-10 bg-indigo-600 rounded-full"></span>
-                {format(selectedDate, "eeee, d'th' MMMM")}
+      {isCalendarExpanded && (
+        <div className="p-6 bg-white border border-slate-100 rounded-[2rem] shadow-2xl animate-in fade-in zoom-in-95 duration-500">
+            <div className="grid grid-cols-7 border border-slate-50 rounded-2xl overflow-hidden bg-white shadow-inner">
+                <div className="col-span-full grid grid-cols-7 bg-slate-50 border-b border-slate-100">
+                    {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(day => (
+                        <div key={day} className="py-2.5 text-center text-[8px] font-black uppercase text-slate-400">{day}</div>
+                    ))}
+                </div>
+                {calendarDays.map((date) => {
+                    const isSelected = isSameDay(date, selectedDate);
+                    const isDayMonth = isSameMonth(date, selectedDate);
+                    return (
+                        <button 
+                            key={date.toString()}
+                            onClick={() => { setSelectedDate(date); setIsCalendarExpanded(false); }}
+                            className={`h-14 flex flex-col items-center justify-center transition-all border-r border-b border-slate-50 last:border-r-0 ${!isDayMonth ? 'opacity-10 pointer-events-none' : 'hover:bg-slate-50/50'} ${isSelected ? 'bg-indigo-50/20' : ''}`}
+                        >
+                            <span 
+                                style={{ backgroundColor: isSelected ? brandColor : 'transparent' }} 
+                                className={`text-xs font-black tabular-nums transition-all ${isSelected ? 'text-white w-8 h-8 rounded-lg flex items-center justify-center shadow-lg' : 'text-slate-800'} ${isToday(date) && !isSelected ? 'text-[#4f39f6]' : ''}`}
+                            >
+                                {format(date, "d")}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+      )}
+
+      {/* 📊 Achievement HUD */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="md:col-span-3 bg-white p-5 rounded-[2rem] border border-slate-100 shadow-sm flex items-center gap-6">
+              <div className="relative w-12 h-12 flex-shrink-0">
+                {loading ? (
+                    <Skeleton variant="circle" className="w-12 h-12" />
+                ) : (
+                    <>
+                        <svg className="w-full h-full" viewBox="0 0 100 100">
+                            <circle className="text-slate-100 stroke-current" strokeWidth="12" fill="transparent" r="40" cx="50" cy="50" />
+                            <circle 
+                                style={{ color: brandColor }}
+                                className="stroke-current transition-all duration-1000 ease-out" 
+                                strokeWidth="12" 
+                                strokeDasharray={251.2} 
+                                strokeDashoffset={251.2 - (251.2 * progressPercent) / 100} 
+                                strokeLinecap="round" 
+                                fill="transparent" 
+                                r="40" cx="50" cy="50" 
+                            />
+                        </svg>
+                        <div className="absolute inset-0 flex items-center justify-center text-[9px] font-black text-slate-800">{Math.round(progressPercent)}%</div>
+                    </>
+                )}
+              </div>
+              <div className="flex-1">
+                  {loading ? (
+                      <div className="space-y-2">
+                          <Skeleton className="h-2 w-24" />
+                          <Skeleton className="h-1.5 w-full" />
+                      </div>
+                  ) : (
+                      <>
+                        <div className="flex justify-between items-center mb-1.5">
+                            <p className="text-[8px] font-black uppercase text-slate-400 tracking-widest">Progress Density</p>
+                            <p style={{ color: brandColor }} className="text-[9px] font-black uppercase tracking-widest">{completedCount}/{filteredSlots.length} Settled</p>
+                        </div>
+                        <div className="h-1 w-full bg-slate-50 rounded-full overflow-hidden">
+                            <div className="h-full transition-all duration-1000 ease-out" style={{ width: `${progressPercent}%`, backgroundColor: brandColor }} />
+                        </div>
+                      </>
+                  )}
+              </div>
+          </div>
+          <Link href="/teacher/ledger" className="bg-slate-900 px-6 rounded-[2rem] shadow-lg flex items-center justify-between hover:bg-slate-800 transition-all group">
+              <div>
+                <p className="text-[8px] font-black uppercase text-slate-500 tracking-widest">Ledger</p>
+                <p className="text-white font-black uppercase tracking-widest text-[9px]">Audit</p>
+              </div>
+              <div className="w-8 h-8 bg-slate-800 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform"><History className="w-4 h-4 text-slate-400" /></div>
+          </Link>
+      </div>
+
+      {/* 📅 Compact Schedule List */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-3 px-2 pt-2">
+             <div style={{ backgroundColor: brandColor }} className="w-1.5 h-6 rounded-full"></div>
+             <h4 className="text-lg font-black text-slate-800 tracking-tight capitalize">
+                {format(selectedDate, "eeee, MMMM d")}
              </h4>
-             <Link href="/teacher/ledger" className="hidden lg:flex px-6 py-3 bg-white border border-slate-100 rounded-2xl text-[10px] font-black text-slate-500 uppercase tracking-widest hover:bg-slate-50 transition-all shadow-sm">
-                <HistoryIcon className="w-4 h-4 mr-2" /> Settlement History
-             </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {loading ? (
-             [1, 2].map(i => <div key={i} className="bg-white rounded-[3rem] border border-slate-50 h-40 animate-pulse" />)
+             [1, 2, 3, 4].map(i => (
+                <div key={i} className="bg-white rounded-[1.5rem] border border-slate-100 p-5 space-y-4">
+                   <div className="flex justify-between">
+                      <Skeleton className="h-10 w-20 rounded-xl" />
+                      <Skeleton className="h-4 w-12 ml-auto" />
+                   </div>
+                   <Skeleton className="h-5 w-3/4" />
+                   <div className="flex gap-4">
+                      <Skeleton className="h-3 w-20" />
+                      <Skeleton className="h-3 w-20 ml-auto" />
+                   </div>
+                   <Skeleton className="h-12 w-full rounded-2xl" />
+                </div>
+             ))
           ) : filteredSlots.length > 0 ? (
             filteredSlots.map((slot) => {
-              const matchesLive = isSlotLive(slot.dayOfWeek, slot.startTime, slot.endTime);
-              const [sH, sM] = slot.startTime.split(':').map(Number);
+              const highlights = isSlotLive(slot.dayOfWeek, slot.startTime, slot.endTime);
+              const [sH, sM] = (slot.startTime || "00:00").split(':').map(Number);
               const slotDT = new Date(selectedDate);
               slotDT.setHours(sH, sM, 0, 0);
               const isPreemptive = isAfter(slotDT, currentTime);
@@ -299,74 +375,91 @@ export default function TimetablePage() {
               return (
                 <div 
                     key={slot.uniqueSlotId} 
-                    className={`bg-white rounded-[3rem] border p-8 transition-all duration-700 flex flex-col gap-6 relative overflow-hidden group/slot ${
+                    className={`bg-white rounded-[1.5rem] border p-5 transition-all duration-500 flex flex-col gap-4 relative group/slot ${
                         slot.isCompleted 
-                        ? 'border-emerald-100 bg-emerald-50/20' 
-                        : matchesLive 
-                            ? 'border-indigo-600 shadow-2xl shadow-indigo-100 ring-4 ring-indigo-500/5' 
-                            : 'border-slate-100 hover:shadow-xl'
+                        ? 'border-emerald-100 bg-emerald-50/10' 
+                        : highlights 
+                            ? 'shadow-xl shadow-indigo-100 ring-4 ring-indigo-500/5' 
+                            : 'border-slate-100 hover:border-slate-200 hover:shadow-lg'
                     }`}
+                    style={{ borderColor: highlights && !slot.isCompleted ? brandColor : undefined }}
                 >
-                  <div className="flex items-center justify-between z-10">
-                    <div className={`px-5 py-3 rounded-2xl flex flex-col items-center justify-center ${matchesLive ? 'bg-indigo-600 shadow-xl' : 'bg-slate-50 border border-slate-100'}`}>
-                        <span className={`text-sm font-black tabular-nums transition-colors ${matchesLive ? 'text-white' : 'text-slate-800'}`}>{formatTime(slot.startTime)}</span>
-                        <span className={`text-[9px] font-black uppercase tracking-widest ${matchesLive ? 'text-white/60' : 'text-slate-400'}`}>{formatTime(slot.endTime)}</span>
+                  <div className="flex items-center justify-between relative">
+                    <div style={{ backgroundColor: highlights ? brandColor : '#0f172a' }} className="px-5 py-2.5 rounded-2xl flex items-center gap-3 shadow-xl">
+                        <Clock className={`w-4 h-4 ${highlights ? 'text-white/60' : 'text-slate-400'}`} />
+                        <div className="flex flex-col">
+                            <span className="text-[12px] font-black tabular-nums text-white leading-tight">
+                                {formatTime(slot.startTime)} — {formatTime(slot.endTime)}
+                            </span>
+                            <span className="text-[7px] font-black uppercase text-white/40 tracking-[0.2em]">
+                                Full Session Segment
+                            </span>
+                        </div>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                        <span className="px-3 py-1 bg-white border border-slate-100 rounded-lg text-[9px] font-black text-indigo-600 uppercase tracking-widest">{slot.grade}</span>
-                        <span className="px-3 py-1 bg-white border border-slate-100 rounded-lg text-[9px] font-black text-slate-500 uppercase tracking-widest">{slot.subject}</span>
+
+                    <div className="flex flex-col items-end gap-1">
+                        {highlights && !slot.isCompleted && (
+                            <span style={{ backgroundColor: `${brandColor}15`, color: brandColor }} className="px-2.5 py-1 text-[8px] font-black uppercase tracking-widest rounded-full animate-pulse flex items-center gap-1">
+                                <Zap style={{ fill: brandColor }} className="w-2 h-2" /> Live Now
+                            </span>
+                        )}
+                        <span className="text-[10px] font-black text-slate-800 uppercase tracking-widest">{slot.grade}</span>
+                        <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{slot.subject}</span>
                     </div>
                   </div>
 
-                  <div className="space-y-4 z-10">
-                    <h3 className="text-2xl font-black text-slate-800 tracking-tight group-hover/slot:text-indigo-600 transition-colors uppercase">{slot.name}</h3>
-                    <div className="flex items-center gap-6 text-[10px] font-black uppercase tracking-widest text-slate-400">
-                        <div className="flex items-center gap-2">
-                            <MapPin className="w-4 h-4 text-emerald-500" /> {slot.room || "Room 101"}
-                        </div>
-                        <div className="flex items-center gap-2 text-indigo-400">
-                            <Clock className="w-4 h-4" /> Academic Unit
-                        </div>
-                    </div>
+                  <div className="min-h-[20px]">
+                     <h3 style={{ color: highlights ? brandColor : undefined }} className="text-base font-black text-slate-800 tracking-tight transition-colors uppercase leading-none truncate">{slot.name}</h3>
                   </div>
 
-                  <div className="pt-6 border-t border-slate-50 flex items-center justify-between z-10 mt-auto">
+                  <div className="flex items-center gap-2 pb-1 justify-between">
+                    <div className="flex items-center gap-2">
+                        <MapPin className="w-3.5 h-3.5 text-emerald-500" /> 
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider">{slot.room || "Room 01"}</span>
+                    </div>
+                    {slot.isPaid && (
+                        <span className="px-3 py-1 bg-amber-50 text-amber-600 text-[8px] font-black uppercase tracking-widest rounded-lg flex items-center gap-1.5 border border-amber-100 transition-all scale-110 origin-right">
+                             <Lock className="w-2.5 h-2.5" /> Financially Settled
+                        </span>
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-50">
                      <button
                         onClick={() => toggleClassCompletion(slot, slot)}
-                        disabled={isPreemptive && !slot.isCompleted}
-                        className={`min-w-[180px] py-4 rounded-[1.5rem] text-[10px] font-black uppercase tracking-widest transition-all ${
-                        slot.isCompleted 
-                            ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200' 
+                        disabled={(isPreemptive && !slot.isCompleted) || slot.isPaid}
+                        style={{ backgroundColor: slot.isPaid ? undefined : slot.isCompleted ? undefined : isPreemptive ? undefined : brandColor }}
+                        className={`w-full py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-[0.15em] transition-all flex items-center justify-center gap-2.5 ${
+                        slot.isPaid
+                            ? 'bg-slate-100 text-slate-400 cursor-not-allowed grayscale'
+                        : slot.isCompleted 
+                            ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-50 hover:bg-emerald-600' 
                             : isPreemptive
-                            ? 'bg-slate-50 text-slate-300 cursor-not-allowed'
-                            : 'bg-slate-900 text-white hover:bg-indigo-600 shadow-xl shadow-slate-200'
+                            ? 'bg-slate-50 text-slate-200 cursor-not-allowed border border-slate-50'
+                            : 'text-white hover:opacity-90 shadow-xl shadow-indigo-100'
                         }`}
                      >
-                        {slot.isCompleted ? (
-                             <><RotateCcw className="w-4 h-4 mr-2" /> Revert settlement</>
+                        {slot.isPaid ? (
+                             <><Lock className="w-4 h-4" /> Locked</>
+                        ) : slot.isCompleted ? (
+                             <><RotateCcw className="w-4 h-4" /> Revert Verification</>
                         ) : isPreemptive ? (
-                             <><Clock className="w-4 h-4 mr-2" /> Pending Slot</>
+                             <><Clock className="w-4 h-4" /> Pending</>
                         ) : (
-                             <><CheckCircle2 className="w-4 h-4 mr-2" /> Settlement Sync</>
+                             <><CheckCircle2 className="w-4 h-4" /> Mark Completion</>
                         )}
                      </button>
-                     {matchesLive && !slot.isCompleted && (
-                        <span className="text-[9px] font-black uppercase text-indigo-600 animate-pulse tracking-widest">Active Conduct</span>
-                     )}
                   </div>
                 </div>
               );
             })
           ) : (
-            <div className="col-span-full py-32 text-center bg-slate-50/50 rounded-[4rem] border-4 border-dotted border-slate-100">
-                <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-xl mx-auto mb-6">
-                    <Calendar className="w-10 h-10 text-slate-200" />
+            <div className="col-span-full py-20 text-center bg-white rounded-[2.5rem] border border-slate-100 border-dashed">
+                <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                    <Calendar className="w-8 h-8 text-slate-200" />
                 </div>
-                <h4 className="text-xl font-black text-slate-700 uppercase tracking-widest">Atmospheric Recess</h4>
-                <p className="text-[10px] font-black text-slate-400 mt-2 uppercase tracking-[0.2em] leading-loose">
-                    No active modules assigned for <span className="text-indigo-600">{format(selectedDate, "EEEE")}</span>.<br/>
-                    Open the <button onClick={() => setIsCalendarExpanded(true)} className="text-indigo-600 hover:underline">Matrix Toggle</button> to find a date.
-                </p>
+                <h4 className="text-sm font-black text-slate-400 uppercase tracking-widest">Atmospheric Recess</h4>
+                <p style={{ color: brandColor }} className="text-[9px] font-black mt-2 uppercase tracking-widest underline cursor-pointer" onClick={() => setIsCalendarExpanded(true)}>Change Temporal Coordinates</p>
             </div>
           )}
         </div>

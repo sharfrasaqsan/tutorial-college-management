@@ -98,13 +98,15 @@ export default function TeacherProfilePage() {
 
   const getJoinYear = () => {
     if (!teacherData?.createdAt) return "2024";
-    const date = teacherData.createdAt.toDate ? teacherData.createdAt.toDate() : new Date(teacherData.createdAt);
+    const raw = teacherData.createdAt as any;
+    const date = raw?.toDate ? raw.toDate() : new Date(raw);
     return format(date, "yyyy");
   };
 
   const getLastUpdateText = () => {
     if (!teacherData?.updatedAt) return "Original Registry";
-    const date = teacherData.updatedAt.toDate ? teacherData.updatedAt.toDate() : new Date(teacherData.updatedAt);
+    const raw = teacherData.updatedAt as any;
+    const date = raw?.toDate ? raw.toDate() : new Date(raw);
     return `Update: ${format(date, "MMM dd, hh:mm a")}`;
   };
 

@@ -136,7 +136,7 @@ export default function AdminDashboard() {
                         <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-[10px] font-black group-hover/row:bg-primary group-hover/row:text-white transition-all shadow-inner">{student.name.charAt(0)}</div>
                         <div>
                             <p className="text-sm tracking-tight">{student.name}</p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ID: {student.studentId || 'Pending'}</p>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ID: {student.id.slice(-6).toUpperCase() || 'Pending'}</p>
                         </div>
                       </button>
                     </td>

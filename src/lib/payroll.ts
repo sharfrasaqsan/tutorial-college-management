@@ -1,6 +1,6 @@
-import { collection, doc, writeBatch, serverTimestamp, query, where, getDocs } from "firebase/firestore";
+import { collection, doc, writeBatch, serverTimestamp, query, where, getDocs, increment } from "firebase/firestore";
 import { db } from "./firebase";
-import { Class, Teacher, Salary } from "@/types/models";
+import { Class } from "@/types/models";
 
 export interface TeacherPayrollResult {
     success: boolean;
@@ -9,8 +9,8 @@ export interface TeacherPayrollResult {
 }
 
 /**
- * Automatically or manually processes payroll for a teacher based on their current pending sessions.
- * Resets the sessionsSinceLastPayment counter for all processed classes.
+ * Processes payroll for a single class that has reached its session milestone.
+ * Creates one salary record per class, locks sessions, and decrements the counter.
  */
 export async function processTeacherPayroll(
     teacherId: string, 
@@ -18,64 +18,83 @@ export async function processTeacherPayroll(
     classes: Class[],
     month: string = new Date().toISOString().substring(0, 7)
 ): Promise<TeacherPayrollResult> {
-    const batch = writeBatch(db);
     
     try {
-        const pendingClasses = classes.filter(c => (c.sessionsSinceLastPayment || 0) > 0);
+        // Find the class(es) that reached the milestone
+        const readyClasses = classes.filter(c => 
+            (c.sessionsSinceLastPayment || 0) >= (c.sessionsPerCycle || 8)
+        );
         
-        if (pendingClasses.length === 0) {
-            return { success: false, error: "No pending sessions to process." };
+        if (readyClasses.length === 0) {
+            return { success: false, error: "No classes have reached their session milestone." };
         }
 
-        const breakdown = pendingClasses.map(cls => {
+        // Process each ready class as a separate salary record (1 class = 1 salary)
+        for (const cls of readyClasses) {
+            const batch = writeBatch(db);
+
             const studentCount = cls.studentCount || 0;
             const monthlyFee = cls.monthlyFee || 0;
             const sessionsConducted = cls.sessionsSinceLastPayment || 0;
             const totalMonthlyRevenue = studentCount * monthlyFee;
-            const perSessionRate = totalMonthlyRevenue / 8;
+            const cycleValue = cls.sessionsPerCycle || 8;
+            const perSessionRate = cycleValue > 0 ? totalMonthlyRevenue / cycleValue : 0;
             const finalPayout = Math.round(perSessionRate * sessionsConducted);
 
-            return {
+            // Unique salary ID: teacher-class-month
+            const salaryId = `${teacherId}-${cls.id}-${month}`;
+            const salaryRef = doc(db, "salaries", salaryId);
+            
+            const salaryDoc = {
+                teacherId,
+                teacherName,
                 classId: cls.id,
                 className: cls.name,
+                month,
+                status: "pending",
+                sessionsConducted,
+                sessionsPerCycle: cycleValue,
                 monthlyFee,
                 studentCount,
                 totalMonthlyRevenue,
-                sessionsConducted,
                 perSessionRate,
-                finalPayout
+                basicAmount: finalPayout,
+                netAmount: finalPayout,
+                createdAt: serverTimestamp(),
+                processedAt: serverTimestamp(),
+                paymentMethod: "Bank Transfer",
+                type: "automatic"
             };
-        });
 
-        const totalNet = breakdown.reduce((sum, item) => sum + item.finalPayout, 0);
-        const salaryRef = doc(collection(db, "salaries"));
-        
-        const salaryDoc = {
-            teacherId,
-            teacherName,
-            month,
-            status: "pending",
-            basicAmount: totalNet,
-            netAmount: totalNet,
-            breakdown,
-            createdAt: serverTimestamp(),
-            processedAt: serverTimestamp(),
-            paymentMethod: "Bank Transfer",
-            type: "automatic" // or "manual" depending on caller, but we'll flag it
-        };
+            // 1. Create the salary record
+            batch.set(salaryRef, salaryDoc);
 
-        // 1. Create the salary record
-        batch.set(salaryRef, salaryDoc);
-
-        // 2. Reset sessionsSinceLastPayment for all processed classes
-        pendingClasses.forEach(cls => {
+            // 2. Decrement sessionsSinceLastPayment (don't hard-reset to 0, preserve any new sessions)
             batch.update(doc(db, "classes", cls.id), {
-                sessionsSinceLastPayment: 0
+                sessionsSinceLastPayment: increment(-sessionsConducted)
             });
-        });
 
-        await batch.commit();
-        return { success: true, salaryId: salaryRef.id };
+            // 3. Lock all unpaid session completions for this class
+            const completionsQ = query(
+                collection(db, "session_completions"),
+                where("classId", "==", cls.id),
+                where("teacherId", "==", teacherId)
+            );
+            const completionsSnap = await getDocs(completionsQ);
+            completionsSnap.docs.forEach(compDoc => {
+                const data = compDoc.data();
+                if (!data.isPaid) {
+                    batch.update(doc(db, "session_completions", compDoc.id), {
+                        isPaid: true,
+                        salaryId: salaryId
+                    });
+                }
+            });
+
+            await batch.commit();
+        }
+
+        return { success: true };
     } catch (error) {
         console.error("Payroll processing error:", error);
         return { success: false, error: "Failed to process payroll batch." };

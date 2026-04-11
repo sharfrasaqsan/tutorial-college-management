@@ -139,7 +139,6 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
 
         reset({
           name: initialData.name || "",
-          studentId: initialData.studentId || "",
           phone: initialData.phone || "",
           parentName: initialData.parentName || "",
           parentPhone: initialData.parentPhone || "",
@@ -155,7 +154,6 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
       } else {
         reset({
           name: "",
-          studentId: "AUTO-GENERATED",
           phone: "",
           parentName: "",
           parentPhone: "",

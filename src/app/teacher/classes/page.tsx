@@ -346,7 +346,17 @@ export default function MyClassesPage() {
                            </p>
                         </div>
                         <div className="space-y-2">
-                        {item.schedules?.map((schedule, idx) => (
+                        {(item.schedules || [])
+                            .sort((a, b) => {
+                                const dayOrder: Record<string, number> = { 
+                                    "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, 
+                                    "friday": 4, "saturday": 5, "sunday": 6 
+                                };
+                                const dayCompare = dayOrder[a.dayOfWeek.toLowerCase()] - dayOrder[b.dayOfWeek.toLowerCase()];
+                                if (dayCompare !== 0) return dayCompare;
+                                return a.startTime.localeCompare(b.startTime);
+                            })
+                            .map((schedule, idx) => (
                             <div key={idx} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/30 border border-slate-100/50">
                                 <div className="flex items-center gap-2">
                                     <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div>

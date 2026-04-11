@@ -62,6 +62,7 @@ export interface Class {
   studentCount?: number;
   completedSessions?: number;
   sessionsSinceLastPayment?: number;
+  sessionsPerCycle?: number;
   status: 'active' | 'inactive';
 }
 
@@ -81,15 +82,18 @@ export interface Salary {
   id: string;
   teacherId: string;
   teacherName: string;
-  month: string;
-  basicAmount: number;
-  netAmount: number;
-  status: string;
-  breakdown?: Array<{
-    className: string;
-    sessionsConducted: number;
-    finalPayout: number;
-  }>;
+  classId: string;
+  className: string;
+  month: string; // Ledger cycle (YYYY-MM)
+  sessionsConducted: number;
+  sessionsPerCycle: number;
+  monthlyFee: number;
+  studentCount: number;
+  totalMonthlyRevenue: number;
+  perSessionRate: number;
+  basicAmount: number; // calculated payout
+  netAmount: number;   // final payout
+  status: string;      // 'paid' | 'pending'
   createdAt: FirestoreTimestamp;
 }
 

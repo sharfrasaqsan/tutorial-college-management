@@ -52,7 +52,8 @@ export default function SalaryHistoryPage() {
 
   const totalEarnings = salaries.reduce((acc, curr) => acc + (curr.netAmount || 0), 0);
   const lastPayment = salaries[0];
-  const pendingSessions = classes.reduce((acc, curr) => acc + (curr.sessionsSinceLastPayment || 0), 0);
+  const pendingSessions = classes.reduce((acc, curr) => acc + Math.max(0, curr.sessionsSinceLastPayment || 0), 0);
+  const totalCycleBenchmark = classes.reduce((acc, curr) => acc + (curr.sessionsPerCycle || 8), 0) || 8;
 
   const filteredSalaries = salaries.filter(s => {
     const matchesMonth = filterMonth === "" || s.month.toLowerCase().includes(filterMonth.toLowerCase());
@@ -180,9 +181,9 @@ export default function SalaryHistoryPage() {
              </div>
              <div>
                 <div className="w-full bg-slate-100 h-1 rounded-full overflow-hidden mb-3">
-                    <div className="bg-indigo-600 h-full transition-all duration-1000" style={{ width: `${Math.min(100, (pendingSessions / 8) * 100)}%` }}></div>
+                    <div className="bg-indigo-600 h-full transition-all duration-1000" style={{ width: `${Math.min(100, (pendingSessions / totalCycleBenchmark) * 100)}%` }}></div>
                 </div>
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Progress toward next cycle (8 sessions)</p>
+                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Progress toward next cycle ({totalCycleBenchmark} sessions total)</p>
              </div>
         </div>
       </div>
