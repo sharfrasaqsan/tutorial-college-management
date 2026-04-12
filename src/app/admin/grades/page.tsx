@@ -98,17 +98,19 @@ export default function GradesPage() {
   );
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Grade Management</h2>
-          <p className="text-sm text-slate-500">Configure academic levels and their requirements.</p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Grade Management</h1>
+          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-widest">
+            Configure academic levels and their requirements
+          </p>
         </div>
         <button 
           onClick={handleAdd}
-          className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-dark transition-colors flex items-center gap-2 shadow-sm shadow-primary/20"
+          className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-bold hover:bg-black transition-all flex items-center gap-2"
         >
-          <Plus className="w-4 h-4" /> Add Grade Level
+          <Plus className="w-3.5 h-3.5" /> Add Grade Level
         </button>
       </div>
 

@@ -156,23 +156,20 @@ export default function ClassesPage() {
   };
 
   return (
-    <div className="space-y-6">
-      {/* Institutional Schedule Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-2">
-        <div className="space-y-1.5">
-            <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-4 group">
-                <div className="bg-primary p-2.5 rounded-[1.25rem] shadow-xl shadow-primary/10 group-hover:rotate-6 transition-transform duration-500">
-                    <BookOpen className="w-7 h-7 text-white" />
-                </div>
-                Campus Schedule
-            </h2>
-            <p className="text-slate-400 text-[11px] font-black uppercase tracking-[0.2em]">Manage academic sessions and room assignments</p>
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-4">
+        <div>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Campus Schedule</h1>
+            <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-widest">
+              Manage academic sessions and room assignments
+            </p>
         </div>
         <button 
           onClick={handleAdd}
-          className="px-5 py-3 bg-primary text-white rounded-2xl text-[10px] font-black hover:bg-primary-dark transition-all flex items-center gap-2.5 shadow-xl shadow-primary/20 uppercase tracking-widest group"
+          className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-bold hover:bg-black transition-all flex items-center gap-2"
         >
-          <Plus className="w-4 h-4 text-white group-hover:scale-125 transition-transform" /> Create Class
+          <Plus className="w-3.5 h-3.5" /> Create Class
         </button>
       </div>
 

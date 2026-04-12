@@ -29,7 +29,6 @@ import {
   serverTimestamp, 
   setDoc, 
   onSnapshot, 
-  deleteDoc,
   getDoc,
   Timestamp,
   getDocs,
@@ -41,7 +40,6 @@ import { Class, Teacher, Salary } from "@/types/models";
 import { format } from "date-fns";
 import Link from "next/link";
 import toast from "react-hot-toast";
-import { formatTime } from "@/lib/formatters";
 import { processTeacherPayroll } from "@/lib/payroll";
 
 interface SessionCompletion {

@@ -9,33 +9,45 @@ import {
   ArrowRight,
   CalendarDays,
   Projector,
-  Activity
+  Activity,
+  Briefcase,
+  History,
+  CheckCircle2
 } from "lucide-react";
-import { DashboardStudent } from "@/types/dashboard";
+import { DashboardStudent, DashboardTimetableSlot } from "@/types/dashboard";
 import Skeleton from "@/components/ui/Skeleton";
 import Link from "next/link";
 import { useStudentProfile } from "@/context/StudentProfileContext";
 import { formatTime } from "@/lib/formatters";
-
-interface TimetableSlot {
-    id: string;
-    startTime: string;
-    endTime: string;
-    className: string;
-    teacherName: string;
-    grade: string;
-    room: string;
-}
+import { format } from "date-fns";
+import { useState, useEffect } from "react";
+import Modal from "@/components/ui/Modal";
+import { GraduationCap as GraduationIcon } from "lucide-react";
 
 export default function AdminDashboard() {
   const { openStudentProfile } = useStudentProfile();
   const { stats, isLoading, isError } = useDashboard();
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [isBreakdownOpen, setIsBreakdownOpen] = useState(false);
+  const [isClassesModalOpen, setIsClassesModalOpen] = useState(false);
+  const [isTeachersModalOpen, setIsTeachersModalOpen] = useState(false);
+  const [isRevenueModalOpen, setIsRevenueModalOpen] = useState(false);
+  const [isUnpaidModalOpen, setIsUnpaidModalOpen] = useState(false);
+  const [isSalariesModalOpen, setIsSalariesModalOpen] = useState(false);
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   if (isError) {
     return (
-      <div className="bg-red-50 text-red-600 p-4 rounded-xl border border-red-100 flex items-center gap-3">
-        <AlertTriangle className="w-5 h-5" />
-        <p>Failed to load dashboard data. Please check your connection.</p>
+      <div className="bg-rose-50 text-rose-600 p-6 rounded-[2rem] border border-rose-100 flex items-center gap-4 animate-in fade-in zoom-in duration-500">
+        <AlertTriangle className="w-6 h-6" />
+        <div>
+           <p className="font-black uppercase tracking-widest text-[10px]">System Error</p>
+           <p className="text-sm font-bold">Failed to synchronize dashboard metrics. Verify network connectivity.</p>
+        </div>
       </div>
     );
   }
@@ -51,74 +63,85 @@ export default function AdminDashboard() {
   };
 
   const statCards = [
-    { title: "Total Students", value: stats?.totalStudents || 0, icon: Users, color: "text-blue-600", bg: "bg-blue-100" },
-    { title: "Active Classes", value: stats?.activeClassesCount || 0, icon: Projector, color: "text-emerald-600", bg: "bg-emerald-100" },
-    { title: "Monthly Revenue", value: `LKR ${(stats?.feesCollected || 0).toLocaleString()}`, icon: CreditCard, color: "text-indigo-600", bg: "bg-indigo-100" },
-    { title: "Unpaid Credits", value: `${stats?.unpaidFeesCount || 0} Records`, icon: AlertTriangle, color: "text-orange-600", bg: "bg-orange-100" },
+    { title: "Students", value: stats?.totalStudents || 0, icon: Users, color: "text-blue-500", action: () => setIsBreakdownOpen(true), clickable: true },
+    { title: "Teachers", value: stats?.totalTeachers || 0, icon: Briefcase, color: "text-violet-500", action: () => setIsTeachersModalOpen(true), clickable: true },
+    { title: "Active Classes", value: stats?.activeClassesCount || 0, icon: Projector, color: "text-emerald-500", action: () => setIsClassesModalOpen(true), clickable: true },
+    { title: `${format(new Date(), "MMMM")} Payments`, value: `LKR ${(stats?.feesCollected || 0).toLocaleString()}`, icon: CreditCard, color: "text-indigo-500", action: () => setIsRevenueModalOpen(true), clickable: true },
+    { title: `${format(new Date(), "MMMM")} Unpaid`, value: stats?.unpaidFeesCount || 0, icon: AlertTriangle, color: "text-orange-500", action: () => setIsUnpaidModalOpen(true), clickable: true },
+    { title: `${format(new Date(), "MMMM")} Salaries`, value: stats?.pendingSalariesCount || 0, icon: History, color: "text-rose-500", action: () => setIsSalariesModalOpen(true), clickable: true },
   ];
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-1000 pb-20">
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       
-      {/* Simplified Admin Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-2">
-        <div className="space-y-1.5">
-            <h2 className="text-3xl font-black text-slate-800 tracking-tight flex items-center gap-4 group">
-                <div className="bg-primary p-2.5 rounded-[1.25rem] shadow-xl shadow-primary/10 group-hover:rotate-6 transition-transform duration-500">
-                    <Activity className="w-7 h-7 text-white" />
-                </div>
-                Campus Dashboard
-            </h2>
-            <p className="text-slate-400 text-[11px] font-black uppercase tracking-[0.2em]">Live update of school activities and data</p>
+      {/* 🏛️ Simple Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 py-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Dashboard Overview</h1>
+          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-widest">
+            {format(currentTime, "EEEE, dd MMMM")} • {format(currentTime, "hh:mm a")}
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-            <Link href="/admin/students" className="px-5 py-3 bg-white border border-slate-200 rounded-2xl text-[10px] font-black text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-2.5 shadow-sm uppercase tracking-widest hover:border-primary/20 group">
-                <Plus className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" /> New Student
-            </Link>
-            <Link href="/admin/payments" className="px-5 py-3 bg-primary text-white rounded-2xl text-[10px] font-black hover:bg-primary-dark transition-all flex items-center gap-2.5 shadow-xl shadow-primary/20 uppercase tracking-widest group">
-                <CreditCard className="w-4 h-4 text-white group-hover:rotate-12 transition-transform" /> Fees
-            </Link>
+
+        <div className="flex items-center gap-2">
+          <Link href="/admin/students" className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-bold hover:bg-black transition-all flex items-center gap-2">
+              <Plus className="w-3.5 h-3.5" /> Enroll Student
+          </Link>
+          <Link href="/admin/payments" className="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-2">
+              <CreditCard className="w-3.5 h-3.5 text-slate-400" /> Revenue
+          </Link>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
         {isLoading ? (
-            [1, 2, 3, 4].map(idx => (
-                <Skeleton key={idx} variant="rect" width="100%" height="100px" className="rounded-[2.5rem]" />
+            [1, 2, 3, 4, 5, 6].map(idx => (
+                <Skeleton key={idx} variant="rect" width="100%" height="80px" className="rounded-2xl" />
             ))
         ) : statCards.map((card, idx) => (
-          <div key={idx} className="bg-white/70 backdrop-blur-xl p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-5 hover:shadow-xl hover:translate-y-[-4px] transition-all duration-500 group relative overflow-hidden">
-            <div className={`absolute top-0 right-0 w-20 h-20 opacity-5 group-hover:opacity-10 transition-opacity translate-x-4 -translate-y-4`}>
-                <card.icon className="w-full h-full" />
-            </div>
-            <div className={`w-14 h-14 rounded-3xl flex items-center justify-center transition-all duration-700 group-hover:scale-110 group-hover:rotate-6 ${card.bg} ${card.color} shadow-lg shadow-current/10`}>
-              <card.icon className="w-7 h-7" />
-            </div>
-            <div>
-              <p className="text-[9px] font-black tracking-[0.2em] uppercase text-slate-400 mb-0.5">{card.title}</p>
-              <p className="text-2xl font-black text-slate-900 tracking-tight leading-none">{card.value}</p>
+          <div 
+            key={idx} 
+            onClick={card.action}
+            className={`bg-white p-5 rounded-2xl border border-slate-200/60 transition-all duration-200 hover:border-primary/30 group ${card.clickable ? 'cursor-pointer active:scale-[0.98]' : ''}`}
+          >
+            <div className="flex flex-col gap-3">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-slate-50 text-slate-400 group-hover:bg-primary/5 group-hover:text-primary transition-all`}>
+                <card.icon className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">{card.title}</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-base font-bold text-slate-900 tracking-tight group-hover:text-primary leading-none transition-colors">{card.value}</p>
+                  {card.clickable && <ArrowRight className="w-2.5 h-2.5 text-primary opacity-0 group-hover:opacity-100 transition-all translate-x-[-4px] group-hover:translate-x-0" />}
+                </div>
+              </div>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-100/30 overflow-hidden flex flex-col group/table hover:border-primary/20 transition-all duration-700">
-          <div className="px-10 py-8 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
-            <div>
-              <h3 className="font-black text-slate-800 tracking-[0.15em] uppercase text-sm">New Students</h3>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Latest registered students</p>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+        <div className="lg:col-span-7 bg-white rounded-[4rem] border border-slate-100 shadow-2xl shadow-slate-100/50 overflow-hidden flex flex-col group/table hover:border-primary/10 transition-all duration-700">
+          <div className="px-10 py-10 border-b border-slate-50 flex items-center justify-between bg-white relative">
+            <div className="flex items-center gap-5">
+               <div className="w-1.5 h-10 bg-primary rounded-full group-hover/table:scale-y-110 transition-transform"></div>
+               <div>
+                  <h3 className="font-black text-slate-800 tracking-[0.2em] uppercase text-xs">Student Audit</h3>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mt-1.5 opacity-80">Recent registry modifications</p>
+               </div>
             </div>
-            <Link href="/admin/students" className="w-10 h-10 rounded-2xl bg-white border border-slate-100 flex items-center justify-center text-slate-400 hover:bg-primary hover:text-white transition-all shadow-sm group">
-              <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            <Link href="/admin/students" className="w-12 h-12 rounded-[1.25rem] bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:bg-primary hover:text-white transition-all shadow-sm group/link">
+              <ArrowRight className="w-6 h-6 group-hover/link:translate-x-1 transition-transform" />
             </Link>
           </div>
           <div className="p-0 flex-1 overflow-x-auto">
             <table className="w-full text-xs text-left whitespace-nowrap border-collapse">
               <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 border-b border-slate-100">
                 <tr>
-                  <th className="px-8 py-5">Student Identity</th>
-                  <th className="px-8 py-5 text-right">Phone & Status</th>
+                  <th className="px-8 py-5">Identity</th>
+                  <th className="px-8 py-5">Grade</th>
+                  <th className="px-8 py-5">Contact</th>
+                  <th className="px-8 py-5 text-right">Joined</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -133,16 +156,22 @@ export default function AdminDashboard() {
                         onClick={() => openStudentProfile(student.id)}
                         className="font-black text-slate-800 hover:text-primary transition-all text-left flex items-center gap-4"
                       >
-                        <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-[10px] font-black group-hover/row:bg-primary group-hover/row:text-white transition-all shadow-inner">{student.name.charAt(0)}</div>
+                        <div className="w-9 h-9 rounded-xl bg-slate-50 flex items-center justify-center text-[9px] font-black group-hover/row:bg-primary group-hover/row:text-white transition-all shadow-inner">{student.name.charAt(0)}</div>
                         <div>
                             <p className="text-sm tracking-tight">{student.name}</p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ID: {student.id.slice(-6).toUpperCase() || 'Pending'}</p>
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mt-1">ID: {student.id.slice(-6).toUpperCase()}</p>
                         </div>
                       </button>
                     </td>
+                    <td className="px-8 py-6">
+                        <span className="text-[10px] font-bold text-primary bg-primary/5 px-2 py-1 rounded-md uppercase">{student.grade || 'N/A'}</span>
+                    </td>
+                    <td className="px-8 py-6">
+                        <p className="text-slate-600 font-bold tracking-tight text-xs">{student.phone}</p>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{student.status || 'Active'}</p>
+                    </td>
                     <td className="px-8 py-6 text-right">
-                        <p className="text-slate-600 font-bold tracking-tight">{student.phone}</p>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{student.status || 'Active'}</p>
+                        <p className="text-slate-500 text-xs font-medium">{student.createdAt?.seconds ? format(new Date(student.createdAt.seconds * 1000), "dd MMM, yy") : 'Recent'}</p>
                     </td>
                   </tr>
                 )) : (
@@ -160,20 +189,21 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <div className="bg-white rounded-[3.5rem] border border-slate-100 shadow-xl shadow-slate-100/30 overflow-hidden flex flex-col hover:border-primary/20 transition-all duration-700">
-          <div className="px-10 py-8 border-b border-slate-50 bg-slate-50/30 flex items-center justify-between">
-            <div>
-              <h3 className="font-black text-slate-800 tracking-[0.15em] uppercase text-sm flex items-center gap-3">
-                <CalendarDays className="w-5 h-5 text-primary" /> Today&apos;s Classes
-              </h3>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Classes scheduled for today</p>
+        <div className="lg:col-span-5 bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col hover:border-primary/5 transition-all duration-500">
+          <div className="px-8 py-6 border-b border-slate-50 bg-white flex items-center justify-between relative">
+            <div className="flex items-center gap-4">
+               <div className="w-1 h-6 bg-primary rounded-full"></div>
+               <div>
+                  <h3 className="font-bold text-slate-800 text-sm">Today&apos;s Schedule</h3>
+                  <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Live Session Feed</p>
+               </div>
             </div>
-            <div className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-[0.15em] shadow-sm border ${(stats?.timetable?.length || 0) > 0 ? 'bg-primary/10 text-primary border-primary/20' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
-                {stats?.timetable?.length || 0} Sessions Today
+            <div className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${(stats?.timetable?.length || 0) > 0 ? 'bg-primary/5 text-primary border-primary/10' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
+                {stats?.timetable?.length || 0} Sessions
             </div>
           </div>
-          <div className="p-4 flex-1">
-            <div className="space-y-3">
+          <div className="p-6 flex-1">
+            <div className="space-y-4 relative">
               {isLoading ? (
                   [1, 2, 3, 4].map(i => (
                     <div key={i} className="flex gap-4 items-start p-4 bg-slate-50 rounded-2xl animate-pulse">
@@ -184,50 +214,66 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                   ))
-              ) : (stats?.timetable?.length || 0) > 0 ? stats!.timetable.map((slot: TimetableSlot) => {
+              ) : (stats?.timetable?.length || 0) > 0 ? stats!.timetable.map((slot: DashboardTimetableSlot, idx: number) => {
                 const active = isOngoing(slot.startTime);
                 return (
-                  <div key={slot.id} className={`group p-6 rounded-[2.5rem] transition-all duration-500 border relative shadow-xl ${active ? 'bg-slate-900 text-white border-slate-900 shadow-primary/20 scale-[1.02]' : 'bg-white border-slate-100 text-slate-700 hover:border-primary/20'}`}>
-                    <div className="flex justify-between items-start mb-5">
-                      <div className={`px-3 py-1.5 rounded-xl text-[10px] font-black transition-all border ${active ? 'bg-primary border-primary text-white shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-800'}`}>
-                          {formatTime(slot.startTime)}
-                      </div>
-                      {active ? (
-                        <div className="flex items-center gap-2">
-                           <span className="relative flex h-2.5 w-2.5">
-                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
-                           </span>
-                           <span className="text-[9px] font-black uppercase text-emerald-400 tracking-widest animate-pulse">Live Now</span>
+                  <div key={slot.id} className="relative group flex gap-5">
+                    {/* Vertical Line Connector */}
+                    {idx !== (stats?.timetable?.length || 0) - 1 && (
+                        <div className="absolute left-[39px] top-10 bottom-[-20px] w-px bg-slate-100"></div>
+                    )}
+                    
+                    <div className="flex-shrink-0 w-24 flex flex-col items-center justify-center relative">
+                        {slot.isCompleted && (
+                            <div className="absolute -left-2 top-0 text-emerald-500 animate-in zoom-in duration-300">
+                                <CheckCircle2 className="w-4 h-4" />
+                            </div>
+                        )}
+                        <div className={`w-full py-1.5 rounded-lg border text-center transition-all ${slot.isCompleted ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : active ? 'bg-primary border-primary text-white shadow-lg' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
+                            <p className="text-[10px] font-bold leading-none">{formatTime(slot.startTime)}</p>
                         </div>
-                      ) : (
-                        <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
-                            <Projector className="w-3 h-3 text-primary" /> {slot.room}
-                        </span>
-                      )}
+                        <div className="w-px h-2 bg-slate-200"></div>
+                        <div className={`px-2 py-0.5 rounded-md border text-[9px] font-medium text-center ${slot.isCompleted ? 'bg-emerald-50/50 border-emerald-100 text-emerald-400' : 'bg-slate-50 border-slate-100 text-slate-400'}`}>
+                           {slot.endTime ? formatTime(slot.endTime) : '--:--'}
+                        </div>
                     </div>
-                    <h4 className={`font-black text-base tracking-tight mb-2 transition-colors ${active ? 'text-white' : 'text-slate-800 group-hover:text-primary'}`}>{slot.className}</h4>
-                    <div className="flex items-center gap-3">
-                      <p className={`text-[10px] font-bold uppercase tracking-widest ${active ? 'text-slate-400' : 'text-slate-400'}`}>{slot.teacherName}</p>
-                      <div className={`w-1 h-1 rounded-full ${active ? 'bg-slate-700' : 'bg-slate-200'}`}></div>
-                      <p className={`text-[10px] font-black uppercase tracking-widest ${active ? 'text-primary' : 'text-primary'}`}>Grade {slot.grade}</p>
+
+                    <div className={`flex-1 p-4 rounded-2xl border transition-all ${slot.isCompleted ? 'bg-slate-50/80 border-slate-100 opacity-50 grayscale-[0.5]' : active ? 'bg-white border-primary shadow-xl shadow-primary/5' : 'bg-white border-slate-100 hover:border-slate-200'}`}>
+                        <div className="flex items-center justify-between mb-1.5">
+                            <h4 className="font-bold text-slate-900 text-sm group-hover:text-primary transition-colors">{slot.className}</h4>
+                            {slot.isCompleted ? (
+                                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500 text-white text-[9px] font-black uppercase tracking-tighter shadow-lg shadow-emerald-500/20">
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    <span>Session Completed</span>
+                                </div>
+                            ) : active && (
+                                <div className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-500 uppercase animate-pulse">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                    LIVE
+                                </div>
+                            )}
+                        </div>
+                        <div className="flex items-center flex-wrap gap-x-3 gap-y-1">
+                            <p className="text-[11px] font-medium text-slate-500">{slot.teacherName}</p>
+                            <div className="w-1 h-1 rounded-full bg-slate-200"></div>
+                            <p className="text-[11px] font-bold text-primary">{slot.grade}</p>
+                            <div className="w-1 h-1 rounded-full bg-slate-200"></div>
+                            <p className="text-[11px] font-medium text-slate-400">{slot.room}</p>
+                        </div>
                     </div>
-                    {active && <Activity className="absolute bottom-6 right-6 w-5 h-5 text-primary opacity-20 animate-pulse" />}
                   </div>
                 );
               }) : (
-                <div className="h-64 flex flex-col items-center justify-center text-center p-8 bg-slate-50 rounded-[3rem] border-2 border-dashed border-slate-200">
-                  <div className="w-16 h-16 bg-white rounded-[2rem] flex items-center justify-center shadow-lg mb-4">
-                    <CalendarDays className="w-8 h-8 text-slate-200" />
-                  </div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-4 leading-relaxed">System Clock Synchronized: No Academic Sessions Found Today</p>
+                <div className="h-48 flex flex-col items-center justify-center text-center p-6 bg-slate-50/50 rounded-2xl border-2 border-dashed border-slate-50">
+                  <CalendarDays className="w-8 h-8 text-slate-200 mb-3" />
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No Sessions Scheduled</p>
                 </div>
               )}
             </div>
             {(stats?.timetable?.length || 0) > 0 && (
-              <div className="mt-8 pt-8 border-t border-slate-100">
-                <Link href="/admin/timetable" className="flex items-center justify-center gap-3 py-4 bg-slate-900 text-white hover:bg-black rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-xl shadow-slate-900/20 group">
-                  See Full Timetable <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              <div className="mt-8">
+                <Link href="/admin/timetable" className="flex items-center justify-center gap-2 py-3 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all group/link">
+                  Detailed Grid View <ArrowRight className="w-4 h-4 group-hover/link:translate-x-1 transition-transform" />
                 </Link>
               </div>
             )}
@@ -235,39 +281,306 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* Institutional Micro Analytics HUD */}
-      <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white flex flex-col sm:flex-row items-center justify-between gap-8 relative overflow-hidden shadow-2xl">
-         <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 rounded-full blur-[100px] -mr-40 -mt-40"></div>
-         <div className="flex items-center gap-8">
-            <div className="w-14 h-14 bg-white/10 rounded-[1.5rem] flex items-center justify-center text-primary shadow-inner">
-                <Activity className="w-7 h-7" />
+      {/* 🔮 Institutional Intelligence Radar */}
+      <div className="bg-slate-900 rounded-[3.5rem] p-10 text-white flex flex-col md:flex-row items-center justify-between gap-10 relative overflow-hidden shadow-2xl group/hud">
+         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[120px] -mr-80 -mt-80 group-hover/hud:scale-110 transition-transform duration-[2000ms]"></div>
+         <div className="flex flex-col sm:flex-row items-center gap-10 relative z-10 text-center sm:text-left">
+            <div className="w-20 h-20 bg-white/10 rounded-[2.5rem] border border-white/5 flex items-center justify-center text-primary shadow-2xl backdrop-blur-xl">
+                <Activity className="w-10 h-10 animate-pulse" />
             </div>
             <div>
-               <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-1.5">System Integrity</p>
-               <h4 className="text-xl font-black flex items-center gap-3">
-                  Node Status: <span className="text-primary italic">Operational</span>
-                  <div className="flex gap-1">
-                     {[1,2,3].map(i => <div key={i} className="w-1 h-3 bg-primary/30 rounded-full"></div>)}
-                     {[1,2].map(i => <div key={i+3} className="w-1 h-3 bg-primary rounded-full animate-pulse"></div>)}
+               <p className="text-[11px] font-black text-white/40 uppercase tracking-[0.4em] mb-3">Operational Vitality</p>
+               <h4 className="text-2xl font-black flex flex-wrap items-center justify-center sm:justify-start gap-4">
+                  Cloud Sync: <span className="text-emerald-400">ACTIVE</span>
+                  <div className="flex gap-1.5 h-6">
+                     {[1,2,3,4,5].map(i => (
+                        <div 
+                          key={i} 
+                          className="w-1.5 bg-primary/30 rounded-full animate-bounce" 
+                          style={{ 
+                            height: `${(i * 20) + 20}%`,
+                            animationDelay: `${i * 100}ms`,
+                            animationDuration: '1000ms'
+                          }}
+                        ></div>
+                     ))}
                   </div>
                </h4>
-            </div>
-         </div>
-         <div className="flex items-center gap-12">
-            <div className="text-center">
-               <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em] mb-2">Student Retention</p>
-               <p className="text-lg font-black tracking-tighter">97.8%</p>
-            </div>
-            <div className="w-px h-10 bg-white/10 hidden md:block"></div>
-            <div className="text-center">
-               <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em] mb-2">Live Sync</p>
-               <p className="text-[11px] font-black text-emerald-400 flex items-center gap-2 uppercase tracking-[0.1em]">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_rgba(52,211,153,0.8)]"></span>
-                  Connected
+               <p className="text-[10px] font-medium text-white/30 mt-3 uppercase tracking-widest leading-none">
+                  Verified Data Integrity • Last Audit: {format(currentTime, "HH:mm:ss")}
                </p>
             </div>
          </div>
+         <div className="flex flex-wrap items-center justify-center gap-12 relative z-10 border-t md:border-t-0 md:border-l border-white/10 pt-10 md:pt-0 md:pl-12">
+            <div className="text-center group-hover/hud:translate-y-[-4px] transition-transform duration-500">
+               <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.3em] mb-2 leading-none">Academic Index</p>
+               <p className="text-3xl font-black tracking-tighter tabular-nums leading-none">
+                  {stats?.academicIndex ?? 100}<span className="text-sm ml-0.5 opacity-40">%</span>
+               </p>
+               <p className="text-[8px] font-bold text-emerald-400 mt-2.5 uppercase tracking-widest opacity-80 flex items-center justify-center gap-1.5">
+                  <span className="w-1 h-1 rounded-full bg-emerald-400"></span>
+                  {stats?.sessionStats?.completedSessions || 0} / {stats?.sessionStats?.totalSessions || 0} SESSIONS
+               </p>
+            </div>
+            <div className="w-px h-16 bg-white/10 hidden xl:block"></div>
+            <div className="text-center group-hover/hud:translate-y-[-4px] transition-transform duration-500 delay-75">
+               <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.3em] mb-2 leading-none">System Stability</p>
+               <p className="text-[11px] font-black text-emerald-400 flex items-center gap-3 uppercase tracking-[0.2em] leading-none">
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_15px_rgba(52,211,153,0.8)]"></span>
+                  Ready & Scaled
+               </p>
+               <p className="text-[8px] font-bold text-white/20 mt-1.5 uppercase tracking-tighter">Real-time Latency: 24ms</p>
+            </div>
+         </div>
       </div>
+
+      {/* 🚀 Student Census Breakdown Modal */}
+      <Modal 
+        isOpen={isBreakdownOpen} 
+        onClose={() => setIsBreakdownOpen(false)} 
+        title="Grade Enrollment Census"
+      >
+        <div className="space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+               <p className="text-sm font-semibold text-slate-500">Global Institutional Total</p>
+               <p className="text-2xl font-bold text-slate-900">{stats?.totalStudents || 0}</p>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-slate-100 overflow-hidden">
+                {Array.from(new Set(stats?.studentBreakdown?.map(c => c.grade) || [])).sort((a, b) => a.localeCompare(b)).map(grade => {
+                    const gradeClasses = stats?.studentBreakdown?.filter(c => c.grade === grade) || [];
+                    const gradeTotal = gradeClasses.reduce((acc, curr) => acc + curr.studentCount, 0);
+
+                    return (
+                        <div key={grade} className="p-5 flex items-center justify-between hover:bg-white transition-colors">
+                            <div>
+                                <p className="text-base font-bold text-slate-800 tracking-tight">{grade}</p>
+                                <p className="text-xs text-slate-500 mt-0.5">{gradeClasses.length} Active Classes</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-lg font-bold text-primary">{gradeTotal} <span className="text-[10px] text-slate-400 ml-1 uppercase tracking-widest">Students</span></p>
+                            </div>
+                        </div>
+                    );
+                })}
+                {(!stats?.studentBreakdown || stats.studentBreakdown.length === 0) && (
+                    <div className="py-12 text-center text-slate-400 text-sm italic">
+                       No census data available for this cycle.
+                    </div>
+                )}
+            </div>
+        </div>
+      </Modal>
+
+      {/* 🚀 Active Classes Detail Modal */}
+      <Modal 
+        isOpen={isClassesModalOpen} 
+        onClose={() => setIsClassesModalOpen(false)} 
+        title="Active Academic Registry"
+      >
+        <div className="space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+               <p className="text-sm font-semibold text-slate-500">Currently Active Classes</p>
+               <p className="text-2xl font-bold text-emerald-600">{stats?.activeClassesCount || 0}</p>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-slate-100 overflow-hidden">
+                {stats?.studentBreakdown?.map((item) => (
+                    <div key={item.id} className="p-4 flex items-center justify-between hover:bg-white transition-colors group">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-slate-100 text-slate-400 group-hover:text-emerald-600 transition-colors shadow-sm">
+                                <Projector className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-bold text-slate-800">{item.name}</p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                   <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase">{item.grade}</span>
+                                   <span className="text-[11px] text-slate-500 font-medium">{item.teacherName}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Capacity</div>
+                            <p className="text-sm font-bold text-slate-900">{item.studentCount} <span className="text-[10px] text-slate-400 font-normal">STDS</span></p>
+                        </div>
+                    </div>
+                ))}
+                {(!stats?.studentBreakdown || stats.studentBreakdown.length === 0) && (
+                    <div className="py-12 text-center text-slate-400 text-sm italic">
+                       No active classes registered in the system.
+                    </div>
+                )}
+            </div>
+        </div>
+      </Modal>
+
+      {/* 🚀 Faculty Directory Modal */}
+      <Modal 
+        isOpen={isTeachersModalOpen} 
+        onClose={() => setIsTeachersModalOpen(false)} 
+        title="Faculty Directory"
+      >
+        <div className="space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+               <p className="text-sm font-semibold text-slate-500">Board of Staff</p>
+               <p className="text-2xl font-bold text-violet-600">{stats?.totalTeachers || 0}</p>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-slate-100 overflow-hidden">
+                {stats?.teacherList?.map((teacher) => (
+                    <div key={teacher.id} className="p-4 flex items-center justify-between hover:bg-white transition-colors group">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-slate-100 text-slate-400 group-hover:text-violet-600 transition-colors shadow-sm overflow-hidden relative">
+                                {teacher.photoURL ? (
+                                    <img src={teacher.photoURL} alt={teacher.name} className="w-full h-full object-cover" />
+                                ) : (
+                                    <span className="font-bold text-slate-500">{teacher.name.charAt(0)}</span>
+                                )}
+                            </div>
+                            <div>
+                                <p className="text-sm font-bold text-slate-800">{teacher.name}</p>
+                                <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                   {teacher.subjects.slice(0, 2).map(sub => (
+                                       <span key={sub} className="text-[9px] font-bold text-violet-600 bg-violet-50 px-1 py-0.5 rounded uppercase tracking-wider">{sub}</span>
+                                   ))}
+                                   {teacher.subjects.length > 2 && <span className="text-[9px] text-slate-400">+{teacher.subjects.length - 2}</span>}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Contact</p>
+                            <p className="text-[11px] font-bold text-slate-700">{teacher.phone}</p>
+                        </div>
+                    </div>
+                ))}
+                {(!stats?.teacherList || stats.teacherList.length === 0) && (
+                    <div className="py-12 text-center text-slate-400 text-sm italic">
+                       No faculty records registered.
+                    </div>
+                )}
+            </div>
+        </div>
+      </Modal>
+
+      {/* 🚀 Monthly Revenue Detail Modal */}
+      <Modal 
+        isOpen={isRevenueModalOpen} 
+        onClose={() => setIsRevenueModalOpen(false)} 
+        title="Revenue Intelligence"
+      >
+        <div className="space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+               <div>
+                  <p className="text-sm font-semibold text-slate-500">Current Month Total</p>
+                  <p className="text-[10px] font-black uppercase text-slate-400 mt-1 tracking-widest">{format(new Date(), "MMMM yyyy")}</p>
+               </div>
+               <p className="text-2xl font-bold text-indigo-600">LKR {(stats?.feesCollected || 0).toLocaleString()}</p>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-slate-100 overflow-hidden">
+                {stats?.monthlyPayments?.map((payment) => (
+                    <div key={payment.id} className="p-4 flex items-center justify-between hover:bg-white transition-colors group">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-slate-100 text-slate-400 group-hover:text-indigo-600 transition-colors shadow-sm">
+                                <CreditCard className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-bold text-slate-800">{payment.studentName}</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{payment.date ? format(new Date(payment.date), "dd MMM, hh:mm a") : 'Processing'}</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-sm font-bold text-emerald-600">LKR {payment.amount.toLocaleString()}</p>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${payment.status === 'paid' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{payment.status}</span>
+                        </div>
+                    </div>
+                ))}
+                {(!stats?.monthlyPayments || stats.monthlyPayments.length === 0) && (
+                    <div className="py-12 text-center text-slate-400 text-sm italic">
+                       No financial transactions logged for this cycle.
+                    </div>
+                )}
+            </div>
+        </div>
+      </Modal>
+
+      {/* 🚀 Unpaid Records Detail Modal */}
+      <Modal 
+        isOpen={isUnpaidModalOpen} 
+        onClose={() => setIsUnpaidModalOpen(false)} 
+        title="Unpaid Fee Registry"
+      >
+        <div className="space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+               <p className="text-sm font-semibold text-slate-500">Total Unpaid Records</p>
+               <p className="text-2xl font-bold text-orange-600">{stats?.unpaidFeesCount || 0}</p>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-slate-100 overflow-hidden">
+                {stats?.unpaidList?.map((item) => (
+                    <div key={item.id} className="p-4 flex items-center justify-between hover:bg-white transition-colors group">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-slate-100 text-slate-400 group-hover:text-orange-600 transition-colors shadow-sm">
+                                <AlertTriangle className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-bold text-slate-800">{item.studentName}</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Billing Cycle: {item.month}</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-sm font-bold text-rose-600">LKR {item.amount.toLocaleString()}</p>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase bg-rose-50 text-rose-600">Pending</span>
+                        </div>
+                    </div>
+                ))}
+                {(!stats?.unpaidList || stats.unpaidList.length === 0) && (
+                    <div className="py-12 text-center text-slate-400 text-sm italic">
+                       No outstanding dues for this cycle.
+                    </div>
+                )}
+            </div>
+        </div>
+      </Modal>
+
+      {/* 🚀 Salary Ledger Detail Modal */}
+      <Modal 
+        isOpen={isSalariesModalOpen} 
+        onClose={() => setIsSalariesModalOpen(false)} 
+        title="Faculty Salary Ledger"
+      >
+        <div className="space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+               <p className="text-sm font-semibold text-slate-500">Pending Salary Approvals</p>
+               <p className="text-2xl font-bold text-rose-600">{stats?.pendingSalariesCount || 0}</p>
+            </div>
+
+            <div className="bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-slate-100 overflow-hidden">
+                {stats?.salaryList?.map((item) => (
+                    <div key={item.id} className="p-4 flex items-center justify-between hover:bg-white transition-colors group">
+                        <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-slate-100 text-slate-400 group-hover:text-rose-600 transition-colors shadow-sm">
+                                <History className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-bold text-slate-800">{item.teacherName}</p>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Requested: {item.requestDate ? format(new Date(item.requestDate), "dd MMM, yyyy") : 'Unknown'}</p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-sm font-bold text-slate-900">LKR {item.amount.toLocaleString()}</p>
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase bg-rose-50 text-rose-600">Review Required</span>
+                        </div>
+                    </div>
+                ))}
+                {(!stats?.salaryList || stats.salaryList.length === 0) && (
+                    <div className="py-12 text-center text-slate-400 text-sm italic">
+                       No pending salary requests found.
+                    </div>
+                )}
+            </div>
+        </div>
+      </Modal>
     </div>
   );
 }

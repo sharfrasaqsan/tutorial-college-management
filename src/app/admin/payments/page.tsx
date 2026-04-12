@@ -51,15 +51,17 @@ export default function PaymentsPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4">
         <div>
-          <h2 className="text-2xl font-bold text-slate-800">Financial Records</h2>
-          <p className="text-sm text-slate-500">Track all student fee payments and transactions.</p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Financial Records</h1>
+          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-widest">
+            Track all student fee payments and transactions
+          </p>
         </div>
         <div className="flex gap-2">
-            <Link href="/admin/payments/record" className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-medium hover:bg-primary-dark transition-colors flex items-center gap-2 shadow-sm shadow-primary/20">
-                <Plus className="w-4 h-4" /> Record New Payment
+            <Link href="/admin/payments/record" className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-bold hover:bg-black transition-all flex items-center gap-2">
+                <Plus className="w-3.5 h-3.5" /> Record Payment
             </Link>
         </div>
       </div>

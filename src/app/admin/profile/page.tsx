@@ -9,14 +9,12 @@ import {
   User, 
   Mail, 
   Shield, 
-  Clock, 
   Camera, 
   Loader2, 
   CheckCircle, 
   Key,
   Smartphone,
   MapPin,
-  Calendar,
   Zap,
   Activity
 } from "lucide-react";

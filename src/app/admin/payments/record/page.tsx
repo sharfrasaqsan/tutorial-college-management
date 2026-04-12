@@ -82,10 +82,15 @@ export default function RecordPaymentPage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-slate-800">Record Fee Payment</h2>
-        <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">LIVE TRANSACTION</div>
+    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20">
+      <div className="flex items-center justify-between py-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Record Fee Payment</h1>
+          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-widest">
+            Process student fee transactions
+          </p>
+        </div>
+        <div className="px-3 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl text-[10px] font-bold uppercase tracking-widest">Live Transaction</div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
