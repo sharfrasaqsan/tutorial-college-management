@@ -9,10 +9,26 @@ import { useTeacherProfile } from "@/context/TeacherProfileContext";
 import { Class, ClassSchedule } from "@/types/models";
 import { format, addMonths, subMonths, isSameDay, isToday, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, setYear, setMonth } from "date-fns";
 import { formatTime } from "@/lib/formatters";
+import { where } from "firebase/firestore";
+
+interface ExtraSession {
+  id: string;
+  classId: string;
+  className: string;
+  teacherId: string;
+  teacherName: string;
+  grade: string;
+  subject: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  room: string;
+}
 
 export default function TimetablePage() {
   const { openTeacherProfile } = useTeacherProfile();
   const [classes, setClasses] = useState<Class[]>([]);
+  const [extraSessions, setExtraSessions] = useState<ExtraSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -31,36 +47,65 @@ export default function TimetablePage() {
   }, []);
 
   useEffect(() => {
-    async function loadClasses() {
+    async function loadData() {
       try {
         setLoading(true);
-        const q = query(collection(db, "classes"));
-        const snap = await getDocs(q);
-        const fetchedClasses = snap.docs
+        const dateStr = format(selectedDate, "yyyy-MM-dd");
+
+        const qClasses = query(collection(db, "classes"));
+        const qExtras = query(collection(db, "extra_sessions"), where("date", "==", dateStr));
+
+        const [classesSnap, extrasSnap] = await Promise.all([
+            getDocs(qClasses),
+            getDocs(qExtras)
+        ]);
+
+        const fetchedClasses = classesSnap.docs
           .map(doc => ({ id: doc.id, ...doc.data() } as Class))
           .filter(c => c.status === "active");
         
+        const fetchedExtras = extrasSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as ExtraSession));
+        
         setClasses(fetchedClasses);
+        setExtraSessions(fetchedExtras);
       } catch (error) {
-        console.error("Error loading timetable classes:", error);
+        console.error("Error loading timetable data:", error);
       } finally {
         setLoading(false);
       }
     }
-    loadClasses();
-  }, []);
+    loadData();
+  }, [selectedDate]);
 
-  const allSlots = classes.flatMap(cls => 
+  const regularSlots = classes.flatMap(cls => 
     (cls.schedules || []).map((schedule: ClassSchedule) => ({
       ...cls,
       ...schedule,
       classId: cls.id,
-      uniqueSlotId: `${cls.id}-${schedule.dayOfWeek}-${schedule.startTime}`
+      uniqueSlotId: `${cls.id}-${schedule.dayOfWeek}-${schedule.startTime}`,
+      isExtra: false
     }))
   );
 
-  const filteredSlots = allSlots
-    .filter(slot => slot.dayOfWeek.toLowerCase() === selectedDayName.toLowerCase())
+  const extraSlots = extraSessions.map(extra => ({
+    classId: extra.classId,
+    name: extra.className,
+    grade: extra.grade,
+    subject: extra.subject,
+    teacherId: extra.teacherId,
+    teacherName: extra.teacherName,
+    startTime: extra.startTime,
+    endTime: extra.endTime,
+    room: extra.room,
+    dayOfWeek: extra.dayOfWeek,
+    uniqueSlotId: extra.id,
+    isExtra: true
+  }));
+
+  const allSlotsMerged = [...regularSlots, ...extraSlots];
+
+  const filteredSlots = allSlotsMerged
+    .filter(slot => slot.isExtra || (slot.dayOfWeek && slot.dayOfWeek.toLowerCase() === selectedDayName.toLowerCase()))
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 
   // Calendar Logic (Full Month Grid)
@@ -80,7 +125,7 @@ export default function TimetablePage() {
 
   const isSlotLive = (slotDay: string, startTime: string, endTime: string) => {
     if (!isToday(selectedDate)) return false;
-    const dayMatches = slotDay.toLowerCase() === currentDayName.toLowerCase();
+    const dayMatches = slotDay?.toLowerCase() === currentDayName.toLowerCase();
     if (!dayMatches) return false;
 
     const now = currentTime.getHours() * 60 + currentTime.getMinutes();
@@ -235,8 +280,11 @@ export default function TimetablePage() {
                         <span className={`text-sm font-black tabular-nums tracking-tighter ${isLive ? 'text-white' : 'text-slate-800'}`}>{formatTime(slot.startTime)}</span>
                         <span className={`text-[9px] font-black uppercase tracking-widest ${isLive ? 'text-white/60' : 'text-slate-400'}`}>{formatTime(slot.endTime)}</span>
                      </div>
-                     <div className="flex flex-col items-end gap-1.5">
+                      <div className="flex flex-col items-end gap-1.5">
                         <span className="px-3 py-1 bg-primary/5 text-primary text-[9px] font-black uppercase tracking-widest rounded-lg border border-primary/10">{slot.subject}</span>
+                        {slot.isExtra && (
+                            <span className="px-3 py-1 bg-indigo-600 text-white text-[9px] font-black uppercase tracking-widest rounded-lg shadow-lg shadow-indigo-100">Extra Session</span>
+                        )}
                         <span className="px-3 py-1 bg-slate-50 text-slate-400 text-[9px] font-black uppercase tracking-widest rounded-lg border border-slate-100">{slot.grade}</span>
                      </div>
                   </div>

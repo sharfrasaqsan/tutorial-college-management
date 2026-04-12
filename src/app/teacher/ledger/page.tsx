@@ -1,22 +1,25 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, where, orderBy, limit, onSnapshot, deleteDoc, doc, updateDoc, increment, getDocs, Timestamp } from "firebase/firestore";
+import { collection, query, where, orderBy, getDocs, doc, deleteDoc, updateDoc, increment, writeBatch, deleteField } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { 
   CheckCircle2, 
   Clock, 
-  X, 
   History, 
-  Search,
+  Calendar,
+  Layers,
+  Banknote,
+  Navigation,
   BookOpen
 } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
+import Modal from "@/components/ui/Modal";
 import { useAuth } from "@/context/AuthContext";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
-import { Class } from "@/types/models";
-import { formatTime } from "@/lib/formatters";
+import { Class, Salary } from "@/types/models";
+import { formatTime, formatMonthYear, formatDate } from "@/lib/formatters";
 
 interface SessionCompletion {
   id: string;
@@ -26,27 +29,28 @@ interface SessionCompletion {
   teacherName: string;
   date: string;
   dayOfWeek: string;
-  timestamp: Timestamp;
+  timestamp: any;
   startTime: string;
+  endTime?: string;
   room: string;
   subject: string;
-  studentCount?: number;
+  grade?: string;
   isPaid?: boolean;
-  day: number;
-  month: number;
-  year: number;
 }
 
 export default function SessionHistoryPage() {
   const { user } = useAuth();
   const [classes, setClasses] = useState<Class[]>([]);
-  const [completions, setCompletions] = useState<SessionCompletion[]>([]);
+  const [salaries, setSalaries] = useState<Salary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [completionsLoading, setCompletionsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterMonth, setFilterMonth] = useState<string>("");
-  const [filterYear, setFilterYear] = useState<string>(new Date().getFullYear().toString());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedSalary, setSelectedSalary] = useState<Salary | null>(null);
+  const [cycleSessions, setCycleSessions] = useState<SessionCompletion[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
 
   // 1. Initial Load: Fetch Teacher's Classes
   useEffect(() => {
@@ -69,104 +73,97 @@ export default function SessionHistoryPage() {
     loadClasses();
   }, [user]);
 
-  // 2. Tab Listener: Fetch Completions for Active Class
+  // 2. Fetch Salaries for Active Class & Year
   useEffect(() => {
     if (!user?.uid || !activeTab) return;
 
-    setCompletionsLoading(true);
-    const completionsRef = collection(db, "session_completions");
-    const q = query(
-        completionsRef, 
+    async function fetchSalaries() {
+      const yearStart = `${selectedYear}-01`;
+      const yearEnd = `${selectedYear}-12`;
+      
+      const q = query(
+        collection(db, "salaries"),
         where("teacherId", "==", user.uid),
         where("classId", "==", activeTab),
-        orderBy("timestamp", "desc"),
-        limit(100)
-    );
+        where("month", ">=", yearStart),
+        where("month", "<=", yearEnd),
+        orderBy("month", "desc")
+      );
+      try {
+        const snap = await getDocs(q);
+        setSalaries(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Salary)));
+      } catch (err) {
+        console.error("Failed to load cycles", err);
+      }
+    }
+    fetchSalaries();
+  }, [user, activeTab, selectedYear]);
 
-    const unsubscribe = onSnapshot(q, (snap) => {
-        const logs = snap.docs.map(doc => ({ ...doc.data(), id: doc.id } as SessionCompletion));
-        setCompletions(logs);
-        setCompletionsLoading(false);
-    }, () => {
-        setCompletionsLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [user, activeTab]);
-
-  const deleteSession = async (session: SessionCompletion) => {
-    const confirmed = window.confirm(`Are you sure you want to mark this session from ${session.date} as incomplete?`);
-    if (!confirmed) return;
-
+  // 3. Open Modal and Fetch Sessions for Cycle
+  const openCycleModal = async (salary: Salary) => {
+    setSelectedSalary(salary);
+    setIsModalOpen(true);
+    setSessionsLoading(true);
     try {
-        await deleteDoc(doc(db, "session_completions", session.id));
-        await updateDoc(doc(db, "classes", session.classId), {
-            completedSessions: increment(-1),
-            sessionsSinceLastPayment: increment(-1)
+        // REMOVED orderBy to avoid composite index requirements
+        const q = query(
+            collection(db, "session_completions"),
+            where("salaryId", "==", salary.id)
+        );
+        const snap = await getDocs(q);
+        const docs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as SessionCompletion));
+        
+        // Sort locally by timestamp
+        docs.sort((a, b) => {
+            const t1 = a.timestamp?.seconds || 0;
+            const t2 = b.timestamp?.seconds || 0;
+            return t1 - t2;
         });
-        toast.success("Log entry reverted successfully.");
-    } catch {
-        toast.error("Correction failed. Check permissions.");
+        
+        setCycleSessions(docs);
+    } catch (err) {
+        console.error("Failed to load sessions", err);
+    } finally {
+        setSessionsLoading(false);
     }
   };
-
-  const filteredCompletions = completions.filter(c => {
-    const matchesSearch = c.date.includes(searchTerm) || c.dayOfWeek.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesMonth = filterMonth === "" || c.month === parseInt(filterMonth);
-    const matchesYear = filterYear === "" || c.year === parseInt(filterYear);
-    return matchesSearch && matchesMonth && matchesYear && c.classId === activeTab;
-  });
 
   const currentClass = classes.find(c => c.id === activeTab);
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-700 pb-20">
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-700 pb-20">
       
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div className="space-y-1">
             <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-4">
                 <div className="bg-indigo-600 p-2 rounded-2xl shadow-lg shadow-indigo-100">
                     <History className="w-6 h-6 text-white" />
                 </div>
-                Session Ledger
+                Academic Ledgers
             </h2>
-            <p className="text-slate-500 font-medium text-sm">Review your finalized academic footprint per classification.</p>
+            <p className="text-slate-500 font-medium text-sm">Review your finalized academic cycles and payroll settlements.</p>
         </div>
         
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto">
-            <select 
-              value={filterYear}
-              onChange={(e) => setFilterYear(e.target.value)}
-              className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+        {/* Year Selector Dropdown */}
+        <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm self-start lg:self-center">
+            <div className="flex items-center gap-2 px-3 py-2 border-r border-slate-100">
+                <Calendar className="w-4 h-4 text-indigo-500" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Archive</span>
+            </div>
+            <select
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+                className="bg-transparent px-4 py-1.5 text-sm font-black text-slate-700 outline-none cursor-pointer hover:text-indigo-600 transition-colors"
             >
-                <option value="">All Years</option>
-                {[2024, 2025, 2026].map(y => <option key={y} value={y.toString()}>{y}</option>)}
-            </select>
-            <select 
-              value={filterMonth}
-              onChange={(e) => setFilterMonth(e.target.value)}
-              className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-black uppercase tracking-widest text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-            >
-                <option value="">All Months</option>
-                {Array.from({length: 12}, (_, i) => i + 1).map(m => (
-                    <option key={m} value={m.toString()}>{format(new Date(2000, m-1), "MMMM")}</option>
+                {[2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030].map(y => (
+                    <option key={y} value={y.toString()}>{y} Academic Year</option>
                 ))}
             </select>
-            <div className="relative w-full lg:w-48">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                <input 
-                  type="text" 
-                  placeholder="Date Search..." 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-[1.25rem] text-xs focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all font-bold shadow-sm"
-                />
-            </div>
         </div>
       </div>
 
-      {/* Class Tabs - Unified UI with Student List */}
+      {/* Class Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-hide no-scrollbar">
           {loading ? (
             [1, 2, 3].map(i => <Skeleton key={i} width="140px" height="42px" className="rounded-xl flex-shrink-0" />)
@@ -183,97 +180,155 @@ export default function SessionHistoryPage() {
           )}
       </div>
 
-      {/* Main Ledger Table */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden outline outline-1 outline-slate-50 min-h-[500px]">
-          {loading || completionsLoading ? (
-               <div className="space-y-4 p-8">
-                 {[1, 2, 3, 4, 5].map(j => <Skeleton key={j} width="100%" height="70px" className="rounded-2xl" />)}
-               </div>
-          ) : activeTab && currentClass ? (
-            <div className="overflow-x-auto animate-in fade-in zoom-in-95 duration-500">
-                <table className="w-full border-collapse">
-                    <thead>
-                        <tr className="bg-slate-50/50 border-b border-slate-50">
-                            <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Date Log</th>
-                            <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Schedule Time</th>
-                            <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Completion Marked Time</th>
-                            <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Salary Status</th>
-                            <th className="px-8 py-5 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Audit Status</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                        {filteredCompletions.length > 0 ? filteredCompletions.map((log) => (
-                            <tr key={log.id} className="hover:bg-indigo-50/10 transition-colors group">
-                                <td className="px-8 py-5">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-indigo-50 rounded-2xl flex flex-col items-center justify-center text-indigo-600 font-black group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300">
-                                            <span className="text-[9px] leading-none uppercase">{format(new Date(log.date), "MMM")}</span>
-                                            <span className="text-lg leading-none">{format(new Date(log.date), "dd")}</span>
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-black text-slate-800 tracking-tight capitalize">{log.dayOfWeek}</p>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{log.date}</p>
-                                        </div>
-                                    </div>
-                                </td>
-                                <td className="px-8 py-5">
-                                    <div className="flex items-center gap-2">
-                                        <Clock size={14} className="text-indigo-500" />
-                                        <span className="text-sm font-black text-slate-700">{formatTime(log.startTime)}</span>
-                                    </div>
-                                </td>
-                                <td className="px-8 py-5">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                        <span className="text-sm font-black text-slate-700">
-                                            {log.timestamp ? format(log.timestamp.toDate(), "hh:mm a") : "--:--"}
-                                        </span>
-                                    </div>
-                                </td>
-                                <td className="px-8 py-5">
-                                    {log.isPaid ? (
-                                        <div className="px-4 py-1.5 bg-indigo-50 text-indigo-700 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-indigo-100 w-fit">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" /> Settled
-                                        </div>
-                                    ) : (
-                                        <div className="px-4 py-1.5 bg-amber-50 text-amber-700 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-amber-100 w-fit">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" /> Pending Local
-                                        </div>
+      {/* Cycles Grid */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {[1, 2, 3].map(j => <Skeleton key={j} width="100%" height="220px" className="rounded-3xl" />)}
+        </div>
+      ) : activeTab && currentClass ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {salaries.length > 0 ? salaries.map(salary => (
+                <div key={salary.id} className="bg-white rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-500 group overflow-hidden flex flex-col">
+                    <div className="p-6 border-b border-slate-50 bg-slate-50/30 flex justify-between items-start">
+                        <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${salary.status === 'paid' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'} transition-colors`}>
+                                <Banknote className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-0.5">{formatMonthYear(salary.month)}</p>
+                                <p className="text-sm font-black text-slate-800">Cycle {salary.id.slice(-4).toUpperCase()}</p>
+                            </div>
+                        </div>
+                        <span className={`px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border ${salary.status === 'paid' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                            {salary.status === 'paid' ? 'Settled' : 'Pending'}
+                        </span>
+                    </div>
+                    <div className="p-6 flex-1 bg-white">
+                        <div className="grid grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Sessions</p>
+                                <p className="text-xl font-black text-slate-800">{salary.sessionsConducted} <span className="text-xs text-slate-400 font-bold">/ {salary.sessionsPerCycle}</span></p>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Settlement</p>
+                                <p className="text-xl font-black text-indigo-600">LKR {salary.netAmount?.toLocaleString()}</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                            <Calendar className="w-3.5 h-3.5" /> Logged on {formatDate(salary.createdAt)}
+                        </div>
+                    </div>
+                    <div className="p-2 bg-slate-50/50 border-t border-slate-50">
+                        <button 
+                            onClick={() => openCycleModal(salary)}
+                            className="w-full py-3 bg-white text-slate-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm flex items-center justify-center gap-2 border border-slate-200 group-hover:border-indigo-600"
+                        >
+                            View Breakdown <Navigation className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                        </button>
+                    </div>
+                </div>
+            )) : (
+                <div className="col-span-full flex flex-col items-center justify-center py-20 text-center bg-white rounded-[3rem] border border-slate-100 outline outline-1 outline-slate-50">
+                    <Layers className="w-16 h-16 text-slate-100 mb-4" />
+                    <h4 className="text-lg font-black text-slate-800">No Cycles Completed</h4>
+                    <p className="text-sm text-slate-400 max-w-sm mt-2">You haven't reached an 8-session milestone for this class yet. Keep teaching!</p>
+                </div>
+            )}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center h-[400px] text-center px-10 bg-white rounded-[3rem] border border-slate-100 outline outline-1 outline-slate-50">
+            <BookOpen className="w-20 h-20 text-slate-100 mb-6" />
+            <h4 className="text-xl font-black text-slate-700 mb-2 italic">Registry Standby</h4>
+            <p className="text-sm text-slate-400 max-w-xs font-medium">Select a class classification from the tabs above to inspect the cycle verification ledger.</p>
+        </div>
+      )}
+
+      {/* Cycle Modal */}
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={`Ledger Detailed Breakdown`}>
+        {selectedSalary && (
+            <div className="space-y-6">
+                <div className="flex items-center justify-between p-5 bg-indigo-50 border border-indigo-100 rounded-3xl">
+                    <div>
+                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-1">{selectedSalary.className}</p>
+                        <p className="text-2xl font-black text-indigo-900">{formatMonthYear(selectedSalary.month)}</p>
+                    </div>
+                    <div className="text-right">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-1">Audit Protocol</p>
+                        <span className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-widest border bg-white ${selectedSalary.status === 'paid' ? 'text-emerald-600 border-emerald-200' : 'text-amber-600 border-amber-200'} shadow-sm`}>
+                            {selectedSalary.status === 'paid' ? 'Settled' : 'Pending Review'}
+                        </span>
+                    </div>
+                </div>
+
+                <div className="space-y-3">
+                    <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-400 px-2 flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Logged Sessions ({cycleSessions.length}/{selectedSalary.sessionsPerCycle})
+                    </h4>
+                    
+                    {sessionsLoading ? (
+                        <div className="space-y-2">
+                            {[1,2,3,4].map(k => <Skeleton key={k} height="60px" width="100%" className="rounded-2xl" />)}
+                        </div>
+                    ) : (
+                        <div className="border border-slate-100 rounded-[2rem] overflow-hidden bg-white">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="bg-slate-50/50 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 border-b border-slate-100">
+                                        <th className="px-6 py-4">Sess.</th>
+                                        <th className="px-6 py-4">Logged Date</th>
+                                        <th className="px-6 py-4">Schedule Time</th>
+                                        <th className="px-6 py-4 text-right">Audit</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {cycleSessions.map((session, index) => (
+                                        <tr key={session.id} className="hover:bg-slate-50/30 transition-colors group/row">
+                                            <td className="px-6 py-4">
+                                                <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center text-[10px] font-black group-hover/row:bg-indigo-600 group-hover/row:text-white transition-all">
+                                                    {index + 1}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <p className="text-xs font-black text-slate-800 tracking-tight">{session.date}</p>
+                                                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mt-0.5">{session.dayOfWeek}</p>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-2">
+                                                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-100 rounded-lg">
+                                                        <Clock className="w-3 h-3 text-indigo-400" />
+                                                        <span className="text-[10px] font-black text-slate-600 tabular-nums">
+                                                            {formatTime(session.startTime)} - {session.endTime ? formatTime(session.endTime) : '--:--'}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                {session.timestamp && (
+                                                    <p className="text-[8px] font-bold text-slate-400 uppercase mt-1.5 ml-1">
+                                                        Logged {new Date(session.timestamp.seconds * 1000 + session.timestamp.nanoseconds / 1000000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                    </p>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-md border border-emerald-100 text-[9px] font-black uppercase tracking-widest whitespace-nowrap">
+                                                    <CheckCircle2 className="w-3 h-3" /> Verified Entry
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {cycleSessions.length === 0 && !sessionsLoading && (
+                                        <tr>
+                                            <td colSpan={4} className="px-6 py-8 text-center text-slate-400 text-xs italic font-bold">
+                                                No specific session logs found for this cycle.
+                                            </td>
+                                        </tr>
                                     )}
-                                </td>
-                                <td className="px-8 py-5 text-right flex items-center justify-end gap-3">
-                                    <button 
-                                        onClick={() => deleteSession(log)}
-                                        className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-all border border-slate-100 group/btn"
-                                        title="Revert Completion"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                    <div className="px-5 py-2.5 bg-emerald-50 text-emerald-700 rounded-2xl text-[10px] font-black uppercase tracking-widest flex items-center gap-2 border border-emerald-100">
-                                        <CheckCircle2 size={12} /> Logged
-                                    </div>
-                                </td>
-                            </tr>
-                        )) : (
-                            <tr>
-                                <td colSpan={4} className="px-8 py-32 text-center">
-                                    <History className="w-16 h-16 text-slate-100 mx-auto mb-6" />
-                                    <h4 className="text-lg font-black text-slate-400 italic">No entry logs for this class.</h4>
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-300 mt-2">Class Identity: {currentClass.name}</p>
-                                </td>
-                            </tr>
-                        )}
-                    </tbody>
-                </table>
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
             </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-[500px] text-center px-10">
-                <BookOpen className="w-20 h-20 text-slate-100 mb-6" />
-                <h4 className="text-xl font-black text-slate-700 mb-2 italic">Registry Standby</h4>
-                <p className="text-sm text-slate-400 max-w-xs font-medium">Select a class classification from the tabs above to inspect the session verification ledger.</p>
-            </div>
-          )}
-      </div>
+        )}
+      </Modal>
     </div>
   );
 }

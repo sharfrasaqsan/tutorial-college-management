@@ -16,7 +16,8 @@ export async function processTeacherPayroll(
     teacherId: string, 
     teacherName: string, 
     classes: Class[],
-    month: string = new Date().toISOString().substring(0, 7)
+    month: string = new Date().toISOString().substring(0, 7),
+    newSessionId?: string
 ): Promise<TeacherPayrollResult> {
     
     try {
@@ -41,8 +42,8 @@ export async function processTeacherPayroll(
             const perSessionRate = cycleValue > 0 ? totalMonthlyRevenue / cycleValue : 0;
             const finalPayout = Math.round(perSessionRate * sessionsConducted);
 
-            // Unique salary ID: teacher-class-month
-            const salaryId = `${teacherId}-${cls.id}-${month}`;
+            // Unique salary ID: teacher-class-month-timestamp
+            const salaryId = `${teacherId}-${cls.id}-${month}-${Date.now()}`;
             const salaryRef = doc(db, "salaries", salaryId);
             
             const salaryDoc = {
@@ -74,21 +75,30 @@ export async function processTeacherPayroll(
                 sessionsSinceLastPayment: increment(-sessionsConducted)
             });
 
-            // 3. Lock all unpaid session completions for this class
+            // 3. Tag only UNPAID session completions for this class with the salary ID
             const completionsQ = query(
                 collection(db, "session_completions"),
                 where("classId", "==", cls.id),
-                where("teacherId", "==", teacherId)
+                where("teacherId", "==", teacherId),
+                where("isPaid", "==", false)
             );
             const completionsSnap = await getDocs(completionsQ);
-            completionsSnap.docs.forEach(compDoc => {
-                const data = compDoc.data();
-                if (!data.isPaid) {
-                    batch.update(doc(db, "session_completions", compDoc.id), {
-                        isPaid: true,
-                        salaryId: salaryId
-                    });
+            
+            // Use a Set to avoid duplicate updates if newSessionId was already in the query result
+            const completionIds = new Set(completionsSnap.docs.map(doc => doc.id));
+            if (newSessionId) {
+                // Only add if it belongs to this class (to avoid tagging other classes in the multi-class loop)
+                // Logic: check the filename prefix or just trust that the UI only passes relevant ID
+                // Safer: just check if the newSessionId starts with this classId
+                if (newSessionId.startsWith(cls.id)) {
+                    completionIds.add(newSessionId);
                 }
+            }
+
+            completionIds.forEach(id => {
+                batch.update(doc(db, "session_completions", id), {
+                    salaryId: salaryId
+                });
             });
 
             await batch.commit();

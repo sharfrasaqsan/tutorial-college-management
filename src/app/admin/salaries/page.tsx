@@ -72,18 +72,16 @@ export default function SalariesPage() {
       batch.update(doc(db, "salaries", item.id), { status: newStatus });
       
       // 2. Lock or unlock session completions based on new status
-      if (item.classId) {
-        const completionsQ = query(
-          collection(db, "session_completions"),
-          where("salaryId", "==", item.id)
-        );
-        const completionsSnap = await getDocs(completionsQ);
-        completionsSnap.docs.forEach(compDoc => {
-          batch.update(doc(db, "session_completions", compDoc.id), {
-            isPaid: newStatus === 'paid'
-          });
+      const completionsQ = query(
+        collection(db, "session_completions"),
+        where("salaryId", "==", item.id)
+      );
+      const completionsSnap = await getDocs(completionsQ);
+      completionsSnap.docs.forEach(compDoc => {
+        batch.update(doc(db, "session_completions", compDoc.id), {
+          isPaid: newStatus === 'paid'
         });
-      }
+      });
       
       await batch.commit();
       toast.success(newStatus === 'paid' ? "Salary authorized — sessions locked." : "Salary reverted to pending — sessions unlocked.");

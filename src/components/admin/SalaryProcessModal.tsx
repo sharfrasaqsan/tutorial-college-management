@@ -124,8 +124,8 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
       const teacher = teachers.find(t => t.id === selectedTeacherId);
       const batch = writeBatch(db);
       
-      // Unique salary ID: teacherId-classId-month
-      const salaryId = `${selectedTeacherId}-${item.classId}-${selectedMonth}`;
+      // Unique salary ID: teacherId-classId-month-timestamp
+      const salaryId = `${selectedTeacherId}-${item.classId}-${selectedMonth}-${Date.now()}`;
       const salaryRef = doc(db, "salaries", salaryId);
       
       const salaryDoc = {
@@ -164,13 +164,10 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
       );
       const completionsSnap = await getDocs(completionsQ);
       completionsSnap.docs.forEach(compDoc => {
-        const data = compDoc.data();
-        if (!data.isPaid) {
           batch.update(doc(db, "session_completions", compDoc.id), {
-            isPaid: true,
+            isPaid: false,
             salaryId: salaryId
           });
-        }
       });
 
       await batch.commit();
@@ -288,7 +285,7 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
                    <p className="text-xs font-bold text-amber-700">Administrative Flexibility</p>
                    <p className="text-[10px] text-amber-600/80 leading-relaxed font-medium">
                       Sessions are automatically read from the class counter. You may adjust manually if needed.
-                      Once submitted, sessions will be locked and the teacher cannot revert them.
+                      Once authorized (marked as paid), sessions will be locked and the teacher cannot revert them.
                    </p>
                 </div>
              </div>

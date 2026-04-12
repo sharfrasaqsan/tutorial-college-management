@@ -20,6 +20,7 @@ export default function SalaryHistoryPage() {
   // Filters
   const [showFilters, setShowFilters] = useState(false);
   const [filterMonth, setFilterMonth] = useState("");
+  const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
   const [filterStatus, setFilterStatus] = useState("");
 
   useEffect(() => {
@@ -56,21 +57,19 @@ export default function SalaryHistoryPage() {
   const totalCycleBenchmark = classes.reduce((acc, curr) => acc + (curr.sessionsPerCycle || 8), 0) || 8;
 
   const filteredSalaries = salaries.filter(s => {
-    const matchesMonth = filterMonth === "" || s.month.toLowerCase().includes(filterMonth.toLowerCase());
+    // Salary.month is stored as "YYYY-MM"
+    const [sYear, sMonth] = s.month.split('-');
+    
+    const matchesMonth = filterMonth === "" || sMonth === filterMonth.padStart(2, '0');
+    const matchesYear = filterYear === "" || sYear === filterYear;
     const matchesStatus = filterStatus === "" || s.status === filterStatus;
     
-    if (filterMonth && filterMonth.includes('-')) {
-        const [y, m] = filterMonth.split('-');
-        const date = s.createdAt?.toDate?.() || new Date();
-        const matchesDate = date.getFullYear() === parseInt(y) && (date.getMonth() + 1) === parseInt(m);
-        return matchesDate && matchesStatus;
-    }
-
-    return matchesMonth && matchesStatus;
+    return matchesMonth && matchesYear && matchesStatus;
   });
 
   const clearFilters = () => {
     setFilterMonth("");
+    setFilterYear(new Date().getFullYear().toString());
     setFilterStatus("");
   };
 
@@ -213,15 +212,32 @@ export default function SalaryHistoryPage() {
 
         {/* Filter Panel */}
         {showFilters && (
-          <div className="p-6 border-b border-slate-100 bg-white grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-top-4 duration-300">
+          <div className="p-6 border-b border-slate-100 bg-white grid grid-cols-1 md:grid-cols-4 gap-4 animate-in slide-in-from-top-4 duration-300">
+             <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Fiscal Year</label>
+                <select 
+                  value={filterYear}
+                  onChange={(e) => setFilterYear(e.target.value)}
+                  className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500"
+                >
+                  <option value="">All Years</option>
+                  {Array.from({length: 3}, (_, i) => new Date().getFullYear() - 1 + i).map(y => (
+                    <option key={y} value={y.toString()}>{y}</option>
+                  ))}
+                </select>
+             </div>
              <div className="space-y-1.5">
                 <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Fiscal Month</label>
-                <input 
-                  type="month"
+                <select 
                   value={filterMonth}
                   onChange={(e) => setFilterMonth(e.target.value)}
                   className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500"
-                />
+                >
+                  <option value="">All Months</option>
+                  {Array.from({length: 12}, (_, i) => i + 1).map(m => (
+                    <option key={m} value={m.toString()}>{format(new Date(2000, m-1), "MMMM")}</option>
+                  ))}
+                </select>
              </div>
              <div className="space-y-1.5">
                 <label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Payment Status</label>
@@ -239,7 +255,7 @@ export default function SalaryHistoryPage() {
              <div className="flex items-end">
                 <button 
                   onClick={clearFilters}
-                  className="w-full sm:w-auto px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-xl text-xs font-black uppercase tracking-widest transition-all h-[42px] flex items-center justify-center gap-2"
+                  className="w-full px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-xl text-xs font-black uppercase tracking-widest transition-all h-[42px] flex items-center justify-center gap-2"
                 >
                   <X className="w-3.5 h-3.5" /> Clear All
                 </button>
