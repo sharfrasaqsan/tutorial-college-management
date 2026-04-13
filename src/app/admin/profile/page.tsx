@@ -83,13 +83,6 @@ export default function AdminProfilePage() {
     return format(date, "yyyy");
   };
 
-  const getLastUpdateText = () => {
-    if (!adminData?.updatedAt) return "Original Registry";
-    const raw = adminData.updatedAt as any;
-    const date = raw?.toDate ? raw.toDate() : new Date(raw);
-    return `Update: ${format(date, "MMM dd, hh:mm a")}`;
-  };
-
   if (loading || dashLoading) {
     return (
       <div className="space-y-6 animate-in fade-in duration-500">
@@ -105,12 +98,6 @@ export default function AdminProfilePage() {
     );
   }
 
-  const identityStats = [
-    { title: "Students", value: stats?.totalStudents || 0, icon: User, color: "text-emerald-600", bg: "bg-emerald-50" },
-    { title: "Teachers", value: stats?.totalTeachers || 0, icon: Briefcase, color: "text-indigo-600", bg: "bg-indigo-50" },
-    { title: "Member Since", value: getJoinYear(), icon: History, color: "text-orange-600", bg: "bg-orange-50" },
-    { title: "Identity Status", value: adminData?.phone ? "100%" : "80%", icon: ShieldCheck, color: "text-blue-600", bg: "bg-blue-50" },
-  ];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700 pb-20 max-w-[1400px] mx-auto">
@@ -296,13 +283,7 @@ export default function AdminProfilePage() {
                                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cloud Saved</p>
                             </div>
-                            <button 
-                                type="submit"
-                                disabled={saving}
-                                className="w-full sm:w-auto px-10 py-4 bg-slate-900 text-white rounded-[1.5rem] font-bold text-[11px] uppercase tracking-wider hover:bg-emerald-600 transition-all shadow-2xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
-                            >
-                                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Profile"}
-                            </button>
+                          
                         </div>
                     </form>
                 </div>
