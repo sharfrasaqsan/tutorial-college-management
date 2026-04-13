@@ -1,9 +1,10 @@
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
-import { Bell, Search, User as UserIcon } from "lucide-react";
+import { Search, User as UserIcon } from "lucide-react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import NotificationCenter from "./NotificationCenter";
 
 export default function AdminTopbar() {
   const { user } = useAuth();
@@ -29,11 +30,7 @@ export default function AdminTopbar() {
           />
         </div>
         
-        <button className="relative w-10 h-10 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors">
-          <Bell className="w-5 h-5 text-slate-600" />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-        </button>
-        
+        <NotificationCenter />        
         <div className="h-8 w-px bg-slate-200 mx-2"></div>
         
         <Link href="/admin/profile" className="flex items-center gap-3 hover:opacity-80 transition-all group">

@@ -13,6 +13,7 @@ import ConfirmModal from "@/components/ui/ConfirmModal";
 import Modal from "@/components/ui/Modal";
 import toast from "react-hot-toast";
 import { formatMonthYear, formatDate } from "@/lib/formatters";
+import { createNotification } from "@/hooks/useNotifications";
 
 export default function SalariesPage() {
   const [salaries, setSalaries] = useState<Salary[]>([]);
@@ -84,6 +85,17 @@ export default function SalariesPage() {
       });
       
       await batch.commit();
+      
+      if (newStatus === 'paid') {
+        await createNotification({
+          userId: item.teacherId,
+          title: "Salary Advice",
+          message: `Your payment for ${item.month ? formatMonthYear(item.month) : 'recent cycle'} has been authorized. Amount: Rs. ${(item.netAmount || 0).toLocaleString()}`,
+          type: "success",
+          link: "/teacher/salary"
+        });
+      }
+
       toast.success(newStatus === 'paid' ? "Salary authorized — sessions locked." : "Salary reverted to pending — sessions unlocked.");
       loadData();
     } catch {

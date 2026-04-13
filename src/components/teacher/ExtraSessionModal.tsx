@@ -21,6 +21,7 @@ import { useAuth } from "@/context/AuthContext";
 import toast from "react-hot-toast";
 import { format } from "date-fns";
 import { formatTime } from "@/lib/formatters";
+import { notifyAdmins } from "@/hooks/useNotifications";
 
 interface ExtraSessionModalProps {
   isOpen: boolean;
@@ -157,6 +158,14 @@ export default function ExtraSessionModal({ isOpen, onClose, onSuccess, classes,
         room,
         status: "scheduled",
         createdAt: serverTimestamp()
+      });
+
+      // Notify Admin
+      await notifyAdmins({
+        title: "Extra Session Logged",
+        message: `${user.displayName || 'A teacher'} has scheduled an extra session for ${selectedClass?.name} on ${sessionDate}.`,
+        type: "info",
+        link: "/admin/timetable"
       });
 
       toast.success("Extra class added!");

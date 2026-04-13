@@ -1,12 +1,13 @@
 "use client";
 
 import { useAuth } from "@/context/AuthContext";
-import { Bell, Search, User as UserIcon, Clock } from "lucide-react";
+import { Search, User as UserIcon, Clock } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Link from "next/link";
+import NotificationCenter from "./NotificationCenter";
 
 export default function TeacherTopbar() {
   const { user } = useAuth();
@@ -49,10 +50,7 @@ export default function TeacherTopbar() {
           />
         </div>
         
-        <button className="relative w-10 h-10 flex items-center justify-center rounded-xl hover:bg-slate-100 transition-colors border border-slate-200">
-          <Bell className="w-5 h-5 text-slate-600" />
-          <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
-        </button>
+        <NotificationCenter />
         
         <div className="h-8 w-px bg-slate-200 mx-1"></div>
         

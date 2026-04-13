@@ -11,6 +11,7 @@ import { Teacher, Grade, Subject, Class } from "@/types/models";
 import toast from "react-hot-toast";
 import Skeleton from "@/components/ui/Skeleton";
 import { formatTime } from "@/lib/formatters";
+import { createNotification } from "@/hooks/useNotifications";
 
 const scheduleSchema = z.object({
   dayOfWeek: z.string().min(1, "Day is required"),
@@ -270,12 +271,32 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
         }
         batch.update(doc(db, "classes", initialData.id), classData);
         await batch.commit();
+
+        // Notify Teacher
+        await createNotification({
+          userId: data.teacherId,
+          title: "Class Refactored",
+          message: `The schedule for ${data.name} (${selectedSubject?.name}) has been updated by administration.`,
+          type: "info",
+          link: "/teacher/classes"
+        });
+
         toast.success("Schedule refactored successfully.");
       } else {
         const classRef = doc(collection(db, "classes"));
         if (data.gradeId) batch.update(doc(db, "grades", data.gradeId), { classCount: increment(1) });
         batch.set(classRef, { ...classData, studentCount: 0, createdAt: serverTimestamp() });
         await batch.commit();
+
+        // Notify Teacher
+        await createNotification({
+          userId: data.teacherId,
+          title: "New Class Assigned",
+          message: `You have been assigned to a new ${selectedGrade?.name} ${selectedSubject?.name} class: ${data.name}.`,
+          type: "success",
+          link: "/teacher/classes"
+        });
+
         toast.success("Academic class authorized.");
       }
 

@@ -1,6 +1,7 @@
 import { collection, doc, writeBatch, serverTimestamp, query, where, getDocs, increment } from "firebase/firestore";
 import { db } from "./firebase";
 import { Class } from "@/types/models";
+import { notifyAdmins } from "@/hooks/useNotifications";
 
 export interface TeacherPayrollResult {
     success: boolean;
@@ -102,6 +103,14 @@ export async function processTeacherPayroll(
             });
 
             await batch.commit();
+
+            // Notify Admin
+            await notifyAdmins({
+                title: "Class Cycle Finalized",
+                message: `${teacherName} has completed the cycle for ${cls.name}. Payroll record for ${month} is pending authorization.`,
+                type: "success",
+                link: "/admin/salaries"
+            });
         }
 
         return { success: true };
