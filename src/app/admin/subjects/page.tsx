@@ -3,14 +3,17 @@
 import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy, doc, updateDoc, writeBatch, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, BookType, Hash, Search, Filter, BookOpen, Edit, Trash2, Ban, CheckCircle } from "lucide-react";
+import { Plus, BookType, Hash, Search, Filter, BookOpen, Edit, Trash2, Ban, CheckCircle, Users, CreditCard, Briefcase, ArrowRight, Projector, AlertTriangle, History } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
 import { Subject } from "@/types/models";
 import SubjectModal from "@/components/admin/SubjectModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
+import { useDashboard } from "@/hooks/useDashboard";
+import { format } from "date-fns";
 import toast from "react-hot-toast";
 
 export default function SubjectsPage() {
+  const { stats, isLoading: statsLoading } = useDashboard();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -98,8 +101,16 @@ export default function SubjectsPage() {
     s.subjectCode?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const statCards = [
+    { title: "Total Subjects", value: subjects.length, icon: BookOpen, color: "text-blue-500" },
+    { title: "Active Curriculum", value: subjects.filter(s => s.status === 'active').length, icon: CheckCircle, color: "text-emerald-500" },
+    { title: "Archived Subjects", value: subjects.filter(s => s.status === 'inactive').length, icon: Ban, color: "text-rose-500" },
+    { title: "Global Enrollment", value: stats?.totalStudents || 0, icon: Users, color: "text-indigo-500" },
+  ];
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+      
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Subject Repository</h1>
@@ -113,6 +124,33 @@ export default function SubjectsPage() {
         >
           <Plus className="w-3.5 h-3.5" /> Add New Subject
         </button>
+      </div>
+
+      {/* 🏛️ Specialized Stats Header */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 py-4">
+        {loading ? (
+            [1, 2, 3, 4].map(idx => (
+                <Skeleton key={idx} variant="rect" width="100%" height="80px" className="rounded-2xl" />
+            ))
+        ) : statCards.map((card, idx) => (
+          <div 
+            key={idx} 
+            className={`bg-white p-5 rounded-2xl border border-slate-200/60 transition-all duration-200 hover:border-primary/30 group shadow-sm`}
+          >
+            <div className="flex flex-col gap-3">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${card.color.replace('text-', 'bg-').split('-').slice(0, 2).join('-')}-50 ${card.color} transition-all shadow-sm`}>
+                <card.icon className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">{card.title}</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-base font-bold text-slate-900 tracking-tight group-hover:text-primary transition-colors">{card.value}</p>
+                  <ArrowRight className="w-2.5 h-2.5 text-primary opacity-0 group-hover:opacity-100 transition-all translate-x-[-4px] group-hover:translate-x-0" />
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       <SubjectModal 

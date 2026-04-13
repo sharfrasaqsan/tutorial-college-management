@@ -83,7 +83,7 @@ export default function SessionHistoryPage() {
       
       const q = query(
         collection(db, "salaries"),
-        where("teacherId", "==", user.uid),
+        where("teacherId", "==", user!.uid),
         where("classId", "==", activeTab),
         where("month", ">=", yearStart),
         where("month", "<=", yearEnd),

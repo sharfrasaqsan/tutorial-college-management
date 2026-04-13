@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy, doc, updateDoc, writeBatch, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle, X } from "lucide-react";
+import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle, X, Users, Layers, CreditCard, Briefcase, ArrowRight, Projector, AlertTriangle, History } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
 import { Student, Grade, Subject } from "@/types/models";
 import Link from "next/link";
@@ -11,9 +11,12 @@ import StudentModal from "@/components/admin/StudentModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import toast from "react-hot-toast";
 import { useStudentProfile } from "@/context/StudentProfileContext";
+import { useDashboard } from "@/hooks/useDashboard";
+import { format } from "date-fns";
 
 export default function StudentsPage() {
   const { openStudentProfile } = useStudentProfile();
+  const { stats, isLoading: statsLoading } = useDashboard();
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -140,6 +143,13 @@ export default function StudentsPage() {
     }
   };
 
+  const clearFilters = () => {
+    setFilterGrade("");
+    setFilterStatus("");
+    setFilterSubject("");
+    setSearchTerm("");
+  };
+
   const filteredStudents = students.filter(s => {
     const matchesSearch = 
       s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -152,15 +162,16 @@ export default function StudentsPage() {
     return matchesSearch && matchesGrade && matchesStatus && matchesSubject;
   });
 
-  const clearFilters = () => {
-    setFilterGrade("");
-    setFilterSubject("");
-    setFilterStatus("");
-    setSearchTerm("");
-  };
+  const statCards = [
+    { title: "Total Students", value: students.length, icon: Users, color: "text-blue-500" },
+    { title: "Active Enrollment", value: students.filter(s => s.status === 'active').length, icon: CheckCircle, color: "text-emerald-500" },
+    { title: "Suspended Accounts", value: students.filter(s => s.status === 'inactive').length, icon: Ban, color: "text-rose-500" },
+    { title: "Grade Diversity", value: grades.length, icon: Layers, color: "text-indigo-500" },
+  ];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+      
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Students Directory</h1>
@@ -174,6 +185,33 @@ export default function StudentsPage() {
         >
           <Plus className="w-3.5 h-3.5" /> Enroll Student
         </button>
+      </div>
+
+      {/* 🏛️ Specialized Stats Header */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 py-4">
+        {loading ? (
+            [1, 2, 3, 4].map(idx => (
+                <Skeleton key={idx} variant="rect" width="100%" height="80px" className="rounded-2xl" />
+            ))
+        ) : statCards.map((card, idx) => (
+          <div 
+            key={idx} 
+            className={`bg-white p-5 rounded-2xl border border-slate-200/60 transition-all duration-200 hover:border-primary/30 group shadow-sm`}
+          >
+            <div className="flex flex-col gap-3">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${card.color.replace('text-', 'bg-').split('-').slice(0, 2).join('-')}-50 ${card.color} transition-all shadow-sm`}>
+                <card.icon className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">{card.title}</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-base font-bold text-slate-900 tracking-tight group-hover:text-primary transition-colors">{card.value}</p>
+                  <ArrowRight className="w-2.5 h-2.5 text-primary opacity-0 group-hover:opacity-100 transition-all translate-x-[-4px] group-hover:translate-x-0" />
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       <StudentModal 
@@ -279,12 +317,12 @@ export default function StudentsPage() {
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
                 <tr>
-                   <th className="px-6 py-4">Student Name</th>
-                   <th className="px-6 py-4">Contact</th>
-                   <th className="px-6 py-4">Enrollments</th>
-                   <th className="px-6 py-4">School</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
+                   <th className="px-6 py-4"><Skeleton variant="text" width="80px" height="10px" /></th>
+                   <th className="px-6 py-4"><Skeleton variant="text" width="60px" height="10px" /></th>
+                   <th className="px-6 py-4"><Skeleton variant="text" width="70px" height="10px" /></th>
+                   <th className="px-6 py-4"><Skeleton variant="text" width="50px" height="10px" /></th>
+                  <th className="px-6 py-4"><Skeleton variant="text" width="40px" height="10px" /></th>
+                  <th className="px-6 py-4 text-right flex justify-end"><Skeleton variant="text" width="30px" height="10px" /></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -318,6 +356,7 @@ export default function StudentsPage() {
                     </td>
                     <td className="px-6 py-4">
                        <div className="flex justify-end gap-2">
+                          <Skeleton variant="rect" width="32px" height="32px" className="rounded-lg" />
                           <Skeleton variant="rect" width="32px" height="32px" className="rounded-lg" />
                           <Skeleton variant="rect" width="32px" height="32px" className="rounded-lg" />
                           <Skeleton variant="rect" width="32px" height="32px" className="rounded-lg" />
@@ -388,9 +427,13 @@ export default function StudentsPage() {
                         >
                           {student.status === 'active' ? <Ban className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                         </button>
-                        <Link href={`/admin/students/${student.id}`} className="p-2 text-slate-400 hover:text-primary transition-colors hover:bg-slate-100 rounded-lg">
+                        <button 
+                          onClick={() => openStudentProfile(student.id)}
+                          className="p-2 text-slate-400 hover:text-primary transition-colors hover:bg-slate-100 rounded-lg"
+                          title="View Full Profile"
+                        >
                           <Eye className="w-4 h-4" />
-                        </Link>
+                        </button>
                         <button 
                           onClick={() => handleEdit(student)}
                           className="p-2 text-slate-400 hover:text-blue-600 transition-colors hover:bg-blue-50 rounded-lg"

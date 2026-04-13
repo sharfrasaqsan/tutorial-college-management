@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy, doc, updateDoc, writeBatch, increment, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, BookOpen, Clock, Calendar, Edit, Trash2, Ban, CheckCircle, Filter, X, MapPin } from "lucide-react";
+import { Plus, BookOpen, Clock, Calendar, Edit, Trash2, Ban, CheckCircle, Filter, X, MapPin, Projector, History, ArrowRight } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
 import { Class, Teacher, Subject, Grade } from "@/types/models";
 import ClassModal from "@/components/admin/ClassModal";
@@ -155,6 +155,13 @@ export default function ClassesPage() {
     setSearchTerm("");
   };
 
+  const statCards = [
+    { title: "Total Classes", value: classes.length, icon: Projector, color: "text-blue-500" },
+    { title: "Active Sessions", value: classes.filter(c => c.status === 'active').length, icon: CheckCircle, color: "text-emerald-500" },
+    { title: "Suspended", value: classes.filter(c => c.status === 'inactive').length, icon: Ban, color: "text-rose-500" },
+    { title: "Total Delivered", value: classes.reduce((sum, c) => sum + (c.completedSessions || 0), 0), icon: History, color: "text-indigo-500" },
+  ];
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       {/* Header */}
@@ -173,36 +180,31 @@ export default function ClassesPage() {
         </button>
       </div>
 
-      {/* Live Operational Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white/70 backdrop-blur-xl p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-5 hover:shadow-xl hover:translate-y-[-4px] transition-all duration-500 group relative overflow-hidden">
-            <div className="w-14 h-14 rounded-3xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 group-hover:rotate-6 transition-all duration-700">
-                <BookOpen className="w-7 h-7" />
+      {/* 🏛️ Specialized Stats Header */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 py-4">
+        {loading ? (
+            [1, 2, 3, 4].map(idx => (
+                <Skeleton key={idx} variant="rect" width="100%" height="80px" className="rounded-2xl" />
+            ))
+        ) : statCards.map((card, idx) => (
+          <div 
+            key={idx} 
+            className={`bg-white p-5 rounded-2xl border border-slate-200/60 transition-all duration-200 hover:border-primary/30 group shadow-sm`}
+          >
+            <div className="flex flex-col gap-3">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${card.color.replace('text-', 'bg-').split('-').slice(0, 2).join('-')}-50 ${card.color} transition-all shadow-sm`}>
+                <card.icon className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">{card.title}</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-base font-bold text-slate-900 tracking-tight group-hover:text-primary transition-colors">{card.value}</p>
+                  <ArrowRight className="w-2.5 h-2.5 text-primary opacity-0 group-hover:opacity-100 transition-all translate-x-[-4px] group-hover:translate-x-0" />
+                </div>
+              </div>
             </div>
-            <div>
-                <p className="text-[9px] font-black tracking-[0.2em] uppercase text-slate-400 mb-0.5">Total Classes</p>
-                <p className="text-2xl font-black text-slate-900 tracking-tight leading-none">{classes.length}</p>
-            </div>
-        </div>
-        <div className="bg-white/70 backdrop-blur-xl p-6 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-5 hover:shadow-xl hover:translate-y-[-4px] transition-all duration-500 group relative overflow-hidden">
-            <div className="w-14 h-14 rounded-3xl bg-emerald-50 flex items-center justify-center text-emerald-600 group-hover:scale-110 group-hover:rotate-6 transition-all duration-700">
-                <CheckCircle className="w-7 h-7" />
-            </div>
-            <div>
-                <p className="text-[9px] font-black tracking-[0.2em] uppercase text-slate-400 mb-0.5">Total Completed</p>
-                <p className="text-2xl font-black text-slate-900 tracking-tight leading-none">{classes.reduce((sum, c) => sum + (c.completedSessions || 0), 0)}</p>
-            </div>
-        </div>
-        <div className="bg-slate-900 p-6 rounded-[2.5rem] border border-slate-800 shadow-xl flex items-center gap-5 hover:shadow-2xl hover:translate-y-[-4px] transition-all duration-500 group relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-20 h-20 bg-primary/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
-            <div className="w-14 h-14 rounded-3xl bg-white/10 flex items-center justify-center text-primary group-hover:scale-110 group-hover:rotate-6 transition-all duration-700">
-                <Clock className="w-7 h-7" />
-            </div>
-            <div>
-                <p className="text-[9px] font-black tracking-[0.2em] uppercase text-white/40 mb-0.5">Wait Pay Sessions</p>
-                <p className="text-2xl font-black text-white tracking-tight leading-none">{classes.reduce((sum, c) => sum + (c.sessionsSinceLastPayment || 0), 0)}</p>
-            </div>
-        </div>
+          </div>
+        ))}
       </div>
 
       <ClassModal 
@@ -320,22 +322,22 @@ export default function ClassesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {loading ? (
           [1, 2, 3, 4, 5, 6].map(i => (
-            <div key={i} className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4 shadow-sm">
+            <div key={i} className="bg-white rounded-2xl border border-slate-200/60 p-5 space-y-4 shadow-sm animate-pulse">
               <div className="flex justify-between items-start mb-4">
-                <Skeleton variant="rect" width="48px" height="48px" className="rounded-2xl" />
-                <Skeleton variant="rect" width="60px" height="24px" className="rounded-md" />
+                <Skeleton variant="rect" width="40px" height="40px" className="rounded-xl" />
+                <Skeleton variant="rect" width="60px" height="20px" className="rounded-md" />
               </div>
-              <Skeleton variant="text" width="80%" height="24px" />
-              <Skeleton variant="text" width="60%" height="16px" />
+              <Skeleton variant="text" width="80%" height="20px" />
+              <Skeleton variant="text" width="60%" height="14px" />
               <div className="space-y-3 mt-6 pt-4 border-t border-slate-50">
-                <Skeleton variant="text" width="40%" height="14px" />
-                <Skeleton variant="text" width="50%" height="14px" />
-                <Skeleton variant="text" width="45%" height="14px" />
+                <Skeleton variant="text" width="100%" height="12px" />
+                <Skeleton variant="text" width="100%" height="12px" />
+                <Skeleton variant="text" width="100%" height="12px" />
               </div>
               <div className="flex gap-2 mt-6">
-                <Skeleton variant="rect" width="100%" height="36px" className="rounded-xl" />
-                <Skeleton variant="rect" width="36px" height="36px" className="rounded-xl" />
-                <Skeleton variant="rect" width="36px" height="36px" className="rounded-xl" />
+                <Skeleton variant="rect" width="100%" height="32px" className="rounded-lg" />
+                <Skeleton variant="rect" width="32px" height="32px" className="rounded-lg" />
+                <Skeleton variant="rect" width="32px" height="32px" className="rounded-lg" />
               </div>
             </div>
           ))
@@ -352,108 +354,82 @@ export default function ClassesPage() {
           const progressPercent = Math.min((sessionsPending / sessionsGoal) * 100, 100);
 
           return (
-            <div key={item.id} className={`bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-100/30 hover:shadow-2xl hover:translate-y-[-4px] transition-all duration-500 flex flex-col group overflow-hidden ${isClassInactive ? 'grayscale-[0.5] opacity-80' : ''}`}>
+            <div key={item.id} className={`bg-white rounded-2xl border border-slate-200/60 transition-all duration-200 hover:border-primary/30 flex flex-col group relative overflow-hidden ${isClassInactive ? 'grayscale-[0.5] opacity-80' : ''}`}>
               
-              <div className="p-8 pb-4">
-                <div className="flex justify-between items-start mb-6">
+              <div className="p-5 flex flex-col gap-4">
+                <div className="flex justify-between items-start mb-1">
                     <div className="flex items-center gap-4">
-                        <div className={`w-14 h-14 rounded-3xl flex items-center justify-center shadow-inner group-hover:scale-110 group-hover:rotate-6 transition-all duration-700 ${isClassInactive ? 'bg-slate-100 text-slate-400' : 'bg-primary/10 text-primary'}`}>
-                            <BookOpen className="w-7 h-7" />
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all bg-slate-50 text-slate-400 group-hover:bg-primary/5 group-hover:text-primary`}>
+                            <BookOpen className="w-5 h-5" />
                         </div>
                         <div>
-                            <p className="text-[9px] font-black uppercase text-slate-400 tracking-[0.2em] mb-1">{item.subject || subject?.name || '---'}</p>
-                            <h3 className="font-black text-lg text-slate-800 tracking-tight leading-none group-hover:text-primary transition-colors">{item.name}</h3>
+                            <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">{item.subject || subject?.name || '---'}</p>
+                            <h3 className="text-sm font-bold text-slate-900 tracking-tight leading-none group-hover:text-primary transition-colors">{item.name}</h3>
                         </div>
                     </div>
-                    <div className="flex flex-col items-end gap-2">
-                        <span className={`px-4 py-1.5 rounded-full text-[9px] uppercase font-black tracking-widest border ${isClassInactive ? 'bg-slate-50 text-slate-400 border-slate-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100 shadow-sm'}`}>
-                          {isClassInactive ? 'Suspended' : 'Operational'}
-                        </span>
-                    </div>
+                    <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${isClassInactive ? 'bg-slate-50 text-slate-400' : 'bg-emerald-50 text-emerald-600'}`}>
+                      {isClassInactive ? 'Inactive' : 'Active'}
+                    </span>
                 </div>
 
-                {/* Session Intelligence Bar */}
-                <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100/50 space-y-3">
-                    <div className="flex justify-between items-end">
-                        <div className="space-y-1">
-                            <p className="text-[9px] font-black uppercase text-slate-400 tracking-[0.1em]">Ledger Status</p>
-                            <p className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                                <span className={sessionsPending >= 8 ? 'text-primary' : 'text-slate-600'}>{sessionsPending}</span> 
-                                <span className="text-slate-300 font-medium">/ 8 Sessions Pending</span>
-                            </p>
-                        </div>
-                        <p className="text-[10px] font-black text-slate-400 lowercase tracking-widest">{sessionsDone} total done</p>
+                {/* Ledger Insights */}
+                <div className="bg-slate-50/50 rounded-xl p-3 border border-slate-100 flex items-center justify-between">
+                    <div>
+                        <p className="text-[9px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">Ledger Progress</p>
+                        <p className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                            <span className={sessionsPending >= 8 ? 'text-primary' : 'text-slate-600'}>{sessionsPending}</span> 
+                            <span className="text-slate-300 font-medium">/ 8 Pending</span>
+                        </p>
                     </div>
-                    <div className="h-2 bg-white rounded-full overflow-hidden shadow-inner border border-slate-100">
+                    <div className="w-16 h-1.5 bg-white rounded-full overflow-hidden border border-slate-100">
                         <div 
-                            className={`h-full transition-all duration-1000 ease-out rounded-full ${sessionsPending >= 8 ? 'bg-primary' : 'bg-slate-300'}`} 
+                            className={`h-full transition-all duration-1000 ease-out ${sessionsPending >= 8 ? 'bg-primary' : 'bg-slate-300'}`} 
                             style={{ width: `${progressPercent}%` }}
                         ></div>
                     </div>
                 </div>
-              </div>
 
-              <div className="px-8 space-y-4">
-                <div className="flex items-center justify-between py-1">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400">
+                <div className="space-y-3.5">
+                   <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                         <div className="w-7 h-7 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-xs font-bold text-slate-400 group-hover:bg-primary/5 group-hover:text-primary transition-all">
                             {item.teacherName?.charAt(0)}
-                        </div>
-                        <p className="text-[11px] font-black text-slate-600 uppercase tracking-widest">Faculty: {item.teacherName || 'Not Assigned'}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                         <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse shadow-[0_0_8px_rgba(var(--primary-rgb),0.6)]"></div>
-                         <p className="text-[10px] font-black text-slate-800">{item.studentCount || 0} Students</p>
-                    </div>
-                </div>
-                
-                <div className="space-y-2 mt-2">
-                  <p className="text-[9px] font-black uppercase text-slate-300 tracking-[0.2em] ml-1">Operational Slots</p>
-                  {(item.schedules || [])
-                    .sort((a, b) => {
-                      const dayOrder: Record<string, number> = { 
-                        "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, 
-                        "friday": 4, "saturday": 5, "sunday": 6 
-                      };
-                      const dayCompare = dayOrder[a.dayOfWeek.toLowerCase()] - dayOrder[b.dayOfWeek.toLowerCase()];
-                      if (dayCompare !== 0) return dayCompare;
-                      return a.startTime.localeCompare(b.startTime);
-                    })
-                    .map((schedule, idx) => (
-                      <div key={idx} className="flex justify-between items-center px-4 py-3 rounded-2xl bg-slate-50 border border-slate-100/30 group-hover:bg-white transition-all duration-500">
-                          <div className="flex items-center gap-3">
-                            <Calendar className="w-3.5 h-3.5 text-primary" />
-                            <span className="text-[11px] font-black uppercase tracking-widest text-slate-700">{schedule.dayOfWeek}</span>
-                          </div>
-                          <div className="flex items-center gap-3 text-[10px] font-black text-slate-400">
-                             <MapPin className="w-3 h-3 text-emerald-400" /> {schedule.room}
-                             <div className="w-1 h-1 rounded-full bg-slate-200"></div>
-                             <Clock className="w-3 h-3" /> {formatTime(schedule.startTime)}
-                          </div>
+                         </div>
+                         <p className="text-xs font-semibold text-slate-500">{item.teacherName || 'No Faculty'}</p>
                       </div>
-                    ))}
+                      <p className="text-xs font-bold text-primary">{item.studentCount || 0} Students</p>
+                   </div>
+                   
+                   <div className="space-y-2 pt-1">
+                      {(item.schedules || []).map((schedule, idx) => (
+                        <div key={idx} className="flex justify-between items-center text-[11px] text-slate-500 group-hover:text-slate-700 transition-colors">
+                           <span className="font-black uppercase tracking-widest">{schedule.dayOfWeek}</span>
+                           <span className="font-medium">{formatTime(schedule.startTime)} - {formatTime(schedule.endTime)}</span>
+                        </div>
+                      ))}
+                   </div>
                 </div>
               </div>
 
-              <div className="mt-8 p-6 bg-slate-50/50 border-t border-slate-50 flex gap-3">
+              <div className="mt-auto p-4 bg-slate-50/30 border-t border-slate-100 flex gap-2">
                 <button 
                   onClick={() => toggleStatus(item)}
-                  className={`flex-1 flex items-center justify-center gap-2.5 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all shadow-sm ${isClassInactive ? 'bg-primary text-white shadow-primary/20 hover:scale-[1.02]' : 'bg-white border border-slate-100 text-slate-400 hover:text-amber-600 hover:border-amber-100 hover:bg-amber-50'}`}
+                  title={isClassInactive ? 'Restore session' : 'Suspend session'}
+                  className={`flex-1 flex items-center justify-center py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${isClassInactive ? 'bg-slate-900 text-white hover:bg-black' : 'bg-white border border-slate-200 text-slate-400 hover:text-amber-600 hover:border-amber-100 hover:bg-amber-50'}`}
                 >
-                   {isClassInactive ? <CheckCircle className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
-                   {isClassInactive ? 'Restore' : 'Suspend'}
+                   {isClassInactive ? <CheckCircle className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}
                 </button>
                 <button 
-                    onClick={() => handleEdit(item)}
-                    className="w-12 h-12 flex items-center justify-center bg-white border border-slate-100 text-slate-400 hover:text-primary hover:border-primary/20 rounded-2xl transition-all shadow-sm group/btn"
+                  onClick={() => handleEdit(item)}
+                  className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-400 hover:text-primary hover:border-primary/20 rounded-lg transition-all"
                 >
-                    <Edit className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
+                    <Edit className="w-3.5 h-3.5" />
                 </button>
                 <button 
-                    onClick={() => confirmDelete(item.id)}
-                    className="w-12 h-12 flex items-center justify-center bg-rose-50 text-rose-400 hover:text-rose-600 border border-rose-100/50 rounded-2xl transition-all shadow-sm group/btn"
+                  onClick={() => confirmDelete(item.id)}
+                  className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-100 hover:bg-rose-50 rounded-lg transition-all"
                 >
-                    <Trash2 className="w-4 h-4 group-hover/btn:rotate-12 transition-transform" />
+                    <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>

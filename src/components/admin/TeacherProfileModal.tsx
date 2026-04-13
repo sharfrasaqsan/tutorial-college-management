@@ -73,53 +73,52 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-8 overflow-hidden">
+    <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8 transition-all duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300 pointer-events-none"></div>
+      <div className={`fixed inset-0 bg-slate-900/40 transition-all duration-300 ${isOpen ? "backdrop-blur-sm" : ""}`} onClick={onClose}></div>
 
       <div className={`relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all duration-300 ease-out flex flex-col h-[85vh] ${isOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
         
-        {/* Header - Professional & Focused */}
-        <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white z-10">
+        {/* Header - Exact parity with StudentProfileModal */}
+        <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white z-10 shrink-0">
             <div className="flex items-center gap-5">
-                <div className="w-14 h-14 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center text-primary text-xl font-black">
-                    {loading ? <Loader2 className="w-6 h-6 animate-spin text-slate-300" /> : teacher?.name.charAt(0)}
+                <div className="w-14 h-14 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-primary text-xl font-bold">
+                    {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : teacher?.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                    <h2 className="text-xl font-bold text-slate-900 flex items-center gap-3 leading-none">
+                    <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-3 leading-none">
                         {loading ? <Skeleton variant="text" width="180px" height="24px" /> : teacher?.name}
                     </h2>
-                    <div className="flex items-center gap-3 mt-2">
-                         <div className="flex items-center gap-1.5 text-xs font-semibold text-primary/80 bg-primary/5 px-2.5 py-0.5 rounded-full border border-primary/10">
-                            <Briefcase className="w-3.5 h-3.5" />
-                            {loading ? "..." : (teacher?.subjects?.[0] || "COORDINATOR")}
-                         </div>
+                    <div className="flex items-center gap-3 mt-1.5">
+                         <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
+                            <Hash className="w-3.5 h-3.5" /> ID: {loading ? "..." : teacher?.teacherId || teacher?.id.substring(0,8).toUpperCase()}
+                         </span>
                          <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
-                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none pt-0.5">
-                           ID: {loading ? "..." : teacher?.id.substring(0,8).toUpperCase()}
+                         <span className={`text-[10px] font-bold uppercase tracking-wider ${teacher?.status === 'active' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                            {loading ? "..." : teacher?.status}
                          </span>
                     </div>
                 </div>
             </div>
             <button 
                 onClick={onClose}
-                className="p-2.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all"
+                className="p-2.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all group"
             >
                 <X className="w-5 h-5" />
             </button>
         </div>
 
-        {/* Professional Navigation Bar */}
-        <div className="px-8 bg-slate-50/50 border-b border-slate-100 flex items-center gap-1">
+        {/* Professional Navigation Bar - Exact parity with StudentProfileModal */}
+        <div className="px-8 bg-slate-50/50 border-b border-slate-100 flex items-center gap-1 shrink-0">
             {(['overview', 'classes', 'financials', 'administration'] as const).map((tab) => (
                 <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-5 py-4 text-sm font-semibold transition-all relative capitalize ${activeTab === tab ? 'text-primary' : 'text-slate-500 hover:text-slate-800'}`}
+                    className={`px-5 py-4 text-sm font-medium transition-all relative capitalize ${activeTab === tab ? 'text-primary' : 'text-slate-500 hover:text-slate-800'}`}
                 >
                     {tab}
                     {activeTab === tab && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full animate-in fade-in slide-in-from-bottom-1"></div>
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
                     )}
                 </button>
             ))}

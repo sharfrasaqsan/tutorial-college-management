@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy, where, doc, updateDoc, deleteDoc, writeBatch, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { DollarSign, Search, Filter, Download, CreditCard, AlertCircle, CheckCircle, Printer, Trash2, Eye, History as HistoryIcon, FileText, Send, MessageCircle } from "lucide-react";
+import { Plus, DollarSign, Search, Filter, Download, CreditCard, AlertCircle, CheckCircle, Printer, Trash2, Eye, History as HistoryIcon, FileText, Send, MessageCircle, ArrowRight, Clock, Users } from "lucide-react";
 import { generateSalaryPDF } from "@/lib/pdf-generator";
 import { Teacher } from "@/types/models";
 import Skeleton from "@/components/ui/Skeleton";
@@ -171,29 +171,58 @@ export default function SalariesPage() {
 
   const totalPayout = salaries.reduce((sum, s) => s.status === 'paid' ? sum + (s.netAmount || 0) : sum, 0);
   const pendingCount = salaries.filter(s => s.status === 'pending').length;
-  const availableYears = Array.from(new Set(salaries.map(s => s.month.split('-')[0]))).sort((a, b) => b.localeCompare(a));
+  const availableYears = Array.from(new Set([...salaries.map(s => s.month.split('-')[0]), "2024", "2025", "2026"])).sort((a, b) => b.localeCompare(a));
+
+  const statCards = [
+    { title: "Authorized Payout", value: `LKR ${totalPayout.toLocaleString()}`, icon: DollarSign, color: "text-indigo-500" },
+    { title: "Pending Claims", value: pendingCount, icon: Clock, color: "text-orange-500" },
+    { title: "Faculty Reach", value: activeTeachersCount, icon: Users, color: "text-blue-500" },
+    { title: "Settled Cycles", value: salaries.filter(s => s.status === 'paid').length, icon: CheckCircle, color: "text-emerald-500" },
+  ];
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-500 pb-20">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-4">
         <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Payroll Central</h1>
-            <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-widest">
-              Institutional fiscal management & settlement terminal
-            </p>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Financial Terminal</h1>
+          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-widest">
+            Audit and authorize faculty salary settlements
+          </p>
         </div>
-        <div className="flex items-center gap-2">
-            <button className="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-2">
-                <Download className="w-3.5 h-3.5 text-slate-400" /> Export Ledger
-            </button>
-            <button 
-                onClick={() => setIsModalOpen(true)}
-                className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-bold hover:bg-black transition-all flex items-center gap-2"
-            >
-                <CreditCard className="w-3.5 h-3.5" /> Start Payroll
-            </button>
-        </div>
+        <button 
+          onClick={() => setIsModalOpen(true)}
+          className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-bold hover:bg-black transition-all flex items-center gap-2 shadow-sm"
+        >
+          <CreditCard className="w-3.5 h-3.5" /> Start Payroll
+        </button>
+      </div>
+
+      {/* 🏛️ Specialized Stats Header */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 py-4">
+        {loading ? (
+            [1, 2, 3, 4].map(idx => (
+                <Skeleton key={idx} variant="rect" width="100%" height="80px" className="rounded-2xl" />
+            ))
+        ) : statCards.map((card, idx) => (
+          <div 
+            key={idx} 
+            className={`bg-white p-5 rounded-2xl border border-slate-200/60 transition-all duration-200 hover:border-primary/30 group shadow-sm`}
+          >
+            <div className="flex flex-col gap-3">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${card.color.replace('text-', 'bg-').split('-').slice(0, 2).join('-')}-50 ${card.color} transition-all shadow-sm`}>
+                <card.icon className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">{card.title}</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-base font-bold text-slate-900 tracking-tight group-hover:text-primary transition-colors">{card.value}</p>
+                  <ArrowRight className="w-2.5 h-2.5 text-primary opacity-0 group-hover:opacity-100 transition-all translate-x-[-4px] group-hover:translate-x-0" />
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       <SalaryProcessModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={loadData} />
@@ -259,23 +288,23 @@ export default function SalariesPage() {
         </div>
       </Modal>
 
-      {/* Performance HUD */}
+      {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {[
-          { icon: <DollarSign className="w-6 h-6" />, label: 'Total Disbursements', value: `LKR ${totalPayout.toLocaleString()}`, color: 'bg-primary/10 text-primary', sub: 'Calculated this month' },
-          { icon: <AlertCircle className="w-6 h-6" />, label: 'Floating Liabilities', value: `${pendingCount} Pending`, color: 'bg-amber-50 text-amber-600', sub: 'Awaiting authorization' },
-          { icon: <CheckCircle className="w-6 h-6" />, label: 'Authorized Faculty', value: `${activeTeachersCount} Teachers`, color: 'bg-emerald-50 text-emerald-600', sub: 'Active payroll profiles' },
+          { icon: DollarSign, label: 'Total Paid', value: `LKR ${totalPayout.toLocaleString()}`, sub: 'Paid this month' },
+          { icon: AlertCircle, label: 'To Pay', value: `${pendingCount} Pending`, sub: 'Awaiting payment' },
+          { icon: HistoryIcon, label: 'Total Teachers', value: `${activeTeachersCount} Active`, sub: 'Active staff members' },
         ].map((stat, i) => (
-          <div key={i} className="bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col justify-between hover:shadow-xl hover:-translate-y-1 transition-all duration-700 group">
-             <div className="flex justify-between items-start">
-                <div className={`w-14 h-14 ${stat.color} rounded-2xl flex items-center justify-center shadow-inner group-hover:scale-110 group-hover:rotate-3 transition-all duration-500`}>
-                    {stat.icon}
+          <div key={i} className="bg-white p-5 rounded-2xl border border-slate-200/60 transition-all duration-200 hover:border-primary/30 group cursor-default">
+             <div className="flex flex-col gap-3">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-50 text-slate-400 group-hover:bg-primary/5 group-hover:text-primary transition-all">
+                    <stat.icon className="w-4 h-4" />
                 </div>
-                <span className="text-[10px] font-black tracking-[0.2em] uppercase text-slate-300">{stat.label}</span>
-             </div>
-             <div className="mt-8">
-                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">{stat.sub}</p>
-                {loading ? <Skeleton variant="text" width="60%" height="32px" /> : <h3 className="text-3xl font-black text-slate-900 tracking-tight">{stat.value}</h3>}
+                <div>
+                  <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">{stat.label}</p>
+                  <p className="text-base font-bold text-slate-900 tracking-tight group-hover:text-primary leading-none transition-colors">{stat.value}</p>
+                </div>
+                <p className="text-[9px] font-medium text-slate-400 uppercase tracking-widest opacity-60">{stat.sub}</p>
              </div>
           </div>
         ))}
@@ -283,153 +312,132 @@ export default function SalariesPage() {
 
       {/* Main Workspace */}
       <div className="space-y-6">
-        {/* Horizontal Pipeline View */}
-        {salaries.length > 0 && (
-            <div className="flex items-center gap-6 py-2 overflow-x-auto no-scrollbar scroll-smooth">
-                <div className="flex items-center gap-3 px-4 py-2 opacity-60">
-                    <HistoryIcon className="w-4 h-4 text-slate-400" />
-                    <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest whitespace-nowrap">Recent Activity</span>
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center bg-slate-50/50">
+                <div className="flex items-center gap-4">
+                    <div className="w-1.5 h-8 bg-primary rounded-full"></div>
+                    <div>
+                        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">Salary List</h3>
+                        <p className="text-[10px] text-slate-400 font-medium uppercase tracking-widest leading-none mt-1">Manage teacher payments and history</p>
+                    </div>
                 </div>
-                {salaries.slice(0, 8).map(s => (
-                    <button 
-                        key={s.id} 
-                        onClick={() => { setSelectedSalary(s); setIsViewOpen(true); }}
-                        className="flex items-center gap-3 px-5 py-3 bg-white border border-slate-100 rounded-2xl hover:border-primary/40 hover:shadow-lg transition-all shadow-sm group whitespace-nowrap"
-                    >
-                        <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-[10px] font-black text-slate-400 group-hover:bg-primary group-hover:text-white transition-all">
-                            {s.teacherName?.charAt(0)}
-                        </div>
-                        <div className="text-left">
-                            <p className="text-[10px] font-black text-slate-700">{s.teacherName}</p>
-                            <p className="text-[9px] font-bold text-primary tabular-nums">LKR {s.netAmount?.toLocaleString()}</p>
-                        </div>
-                    </button>
-                ))}
-            </div>
-        )}
 
-        <div className="bg-white rounded-[3.5rem] border border-slate-100 shadow-2xl shadow-slate-100/30 overflow-hidden">
-            {/* Unified Control Bar */}
-            <div className="px-10 py-8 border-b border-slate-50 flex flex-col lg:flex-row lg:items-center justify-between bg-white gap-6">
-              <div className="relative flex-1 max-w-sm">
-                <Search className="absolute left-6 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
-                <input 
-                  type="text" 
-                  placeholder="Search faculty identity..." 
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-14 pr-8 py-4 bg-slate-50 border-none rounded-2xl text-[11px] font-bold uppercase tracking-[0.1em] focus:ring-4 focus:ring-primary/5 transition-all outline-none"
-                />
-              </div>
-              
-              <div className="flex flex-wrap items-center gap-3 bg-slate-50 p-1 rounded-2xl border border-slate-100 shadow-inner">
-                 <select 
-                    value={filterClass}
-                    onChange={(e) => setFilterClass(e.target.value)}
-                    className="bg-transparent px-5 py-2.5 text-[10px] font-black uppercase tracking-widest text-primary outline-none"
-                 >
-                    <option value="">All Academic Units</option>
-                    {classList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                 </select>
-                 <div className="w-px h-6 bg-slate-200"></div>
-                 <select 
-                    value={filterYear}
-                    onChange={(e) => setFilterYear(e.target.value)}
-                    className="bg-transparent px-5 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-600 outline-none"
-                 >
-                    <option value="">All Years</option>
-                    {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
-                 </select>
-                 <div className="w-px h-6 bg-slate-200"></div>
-                 <select 
-                    value={filterMonth}
-                    onChange={(e) => setFilterMonth(e.target.value)}
-                    className="bg-transparent px-5 py-2.5 text-[10px] font-black uppercase tracking-widest text-slate-600 outline-none"
-                 >
-                    <option value="">Month</option>
-                    {[
-                       { v: "01", n: "Jan" }, { v: "02", n: "Feb" }, { v: "03", n: "Mar" }, 
-                       { v: "04", n: "Apr" }, { v: "05", n: "May" }, { v: "06", n: "Jun" },
-                       { v: "07", n: "Jul" }, { v: "08", n: "Aug" }, { v: "09", n: "Sep" },
-                       { v: "10", n: "Oct" }, { v: "11", n: "Nov" }, { v: "12", n: "Dec" }
-                    ].map(m => <option key={m.v} value={m.v}>{m.n}</option>)}
-                 </select>
-                 <button 
-                    onClick={() => { setFilterYear(""); setFilterMonth(""); setFilterClass(""); setSearchTerm(""); }}
-                    className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-primary transition-all"
-                 >
-                    <Filter className="w-5 h-5" />
-                 </button>
-              </div>
+                <div className="flex flex-wrap items-center gap-3">
+                    <select 
+                        value={filterClass}
+                        onChange={(e) => setFilterClass(e.target.value)}
+                        className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                    >
+                        <option value="">All Classes</option>
+                        {classList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+
+                    <select 
+                        value={filterYear}
+                        onChange={(e) => setFilterYear(e.target.value)}
+                        className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                    >
+                        <option value="">Year</option>
+                        {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
+
+                    <select 
+                        value={filterMonth}
+                        onChange={(e) => setFilterMonth(e.target.value)}
+                        className="px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                    >
+                        <option value="">Month</option>
+                        {[
+                        { v: "01", n: "Jan" }, { v: "02", n: "Feb" }, { v: "03", n: "Mar" }, 
+                        { v: "04", n: "Apr" }, { v: "05", n: "May" }, { v: "06", n: "Jun" },
+                        { v: "07", n: "Jul" }, { v: "08", n: "Aug" }, { v: "09", n: "Sep" },
+                        { v: "10", n: "Oct" }, { v: "11", n: "Nov" }, { v: "12", n: "Dec" }
+                        ].map(m => <option key={m.v} value={m.v}>{m.n}</option>)}
+                    </select>
+
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                        <input 
+                            type="text" 
+                            placeholder="Search Name..." 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all w-48"
+                        />
+                    </div>
+                </div>
             </div>
 
             <div className="overflow-x-auto min-h-[500px]">
               <table className="w-full text-left border-collapse">
-                <thead className="bg-slate-50/50 text-slate-400 font-black uppercase tracking-[0.2em] text-[9px] border-b border-slate-50">
+                <thead className="bg-slate-50/50 text-slate-500 font-medium border-b border-slate-100 uppercase text-[10px] tracking-wider">
                   <tr>
-                    <th className="px-10 py-6">Faculty Identity</th>
-                    <th className="px-10 py-6">Ledger Cycle</th>
-                    <th className="px-10 py-6">Processed On</th>
-                    <th className="px-10 py-6 text-right">Net Settlement</th>
-                    <th className="px-10 py-6 text-center">Authorization</th>
-                    <th className="px-10 py-6 text-right">Administrative Actions</th>
+                    <th className="px-6 py-4">Teacher</th>
+                    <th className="px-6 py-4">Month</th>
+                    <th className="px-6 py-4">Paid Date</th>
+                    <th className="px-6 py-4 text-right">Amount</th>
+                    <th className="px-6 py-4 text-center">Status</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     [1, 2, 3, 4, 5].map((i) => (
-                      <tr key={i} className="animate-pulse px-10"><td colSpan={6} className="px-10 py-8"><div className="h-10 bg-slate-50 rounded-2xl w-full"></div></td></tr>
+                      <tr key={i} className="animate-pulse">
+                        <td colSpan={6} className="px-6 py-6">
+                           <div className="h-10 bg-slate-50 rounded-lg w-full"></div>
+                        </td>
+                      </tr>
                     ))
                   ) : (
                     filteredSalaries.length > 0 ? filteredSalaries.map((item) => (
-                      <tr key={item.id} className="hover:bg-slate-50/50 transition-all duration-500 group/row border-b border-slate-50 last:border-none">
-                        <td className="px-10 py-7">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center font-black group-hover/row:bg-primary group-hover/row:text-white transition-all shadow-inner text-sm">
+                      <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group/row">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-sm border border-slate-200 relative group-hover/row:border-primary/30 transition-all">
                               {item.teacherName?.charAt(0)}
                             </div>
                             <div>
-                                <p className="font-black text-slate-800 tracking-tight text-sm group-hover/row:text-primary transition-colors">{item.teacherName}</p>
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{item.className}</p>
+                                <p className="font-semibold text-slate-800 hover:text-primary transition-colors leading-none">{item.teacherName}</p>
+                                <p className="text-[10px] text-slate-500 mt-1">ID: {item.id.slice(-6).toUpperCase()}</p>
                             </div>
                           </div>
                         </td>
-                        <td className="px-10 py-7">
-                            <span className="px-4 py-2 bg-white border border-slate-100 rounded-xl text-[10px] font-black text-slate-600 uppercase tracking-widest">
+                        <td className="px-6 py-4">
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 uppercase tracking-widest">
                                 {formatMonthYear(item.month)}
                             </span>
                         </td>
-                        <td className="px-10 py-7 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        <td className="px-6 py-4 text-xs font-medium text-slate-500">
                             {formatDate(item.createdAt)}
                         </td>
-                        <td className="px-10 py-7 text-right">
-                            <p className="text-xl font-black text-slate-900 tracking-tighter tabular-nums">LKR {item.netAmount?.toLocaleString()}</p>
+                        <td className="px-6 py-4 text-right">
+                            <p className="font-bold text-slate-900 tabular-nums">LKR {item.netAmount?.toLocaleString()}</p>
                         </td>
-                        <td className="px-10 py-7">
-                          <div className="flex justify-center">
-                            <span className={`px-5 py-2 rounded-full text-[9px] font-black uppercase tracking-[0.15em] border ${item.status === 'paid' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>
-                                {item.status === 'paid' ? 'Authorized' : 'Pending'}
+                        <td className="px-6 py-4 text-center">
+                            <span className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider ${item.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                                {item.status === 'paid' ? 'Paid' : 'Pending'}
                             </span>
-                          </div>
                         </td>
-                        <td className="px-10 py-7 text-right">
+                        <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-2 text-slate-400">
-                            <button onClick={() => { setSelectedSalary(item); setIsViewOpen(true); }} className="w-10 h-10 flex items-center justify-center hover:bg-slate-100 hover:text-primary rounded-xl transition-all" title="View Breakdown"><Eye className="w-4 h-4" /></button>
-                            <button onClick={() => toggleStatus(item)} className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all ${item.status === 'paid' ? 'text-emerald-500 hover:bg-emerald-50' : 'hover:bg-slate-100'}`} title="Toggle Authorization"><CheckCircle className="w-4 h-4" /></button>
+                            <button onClick={() => { setSelectedSalary(item); setIsViewOpen(true); }} className="p-2 text-slate-400 hover:text-primary transition-colors hover:bg-slate-100 rounded-lg" title="View"><Eye className="w-4 h-4" /></button>
+                            <button onClick={() => toggleStatus(item)} className={`p-2 transition-colors rounded-lg ${item.status === 'paid' ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-amber-600 hover:text-green-600 hover:bg-green-50'}`} title="Change Status"><CheckCircle className="w-4 h-4" /></button>
                             
                             {item.status === 'paid' && (
                                 <>
-                                    <button onClick={async () => await generateSalaryPDF(item)} className="w-10 h-10 flex items-center justify-center hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-all" title="Download Invoice PDF"><FileText className="w-4 h-4" /></button>
-                                    <button onClick={() => handleWhatsAppShare(item)} className="w-10 h-10 flex items-center justify-center hover:bg-emerald-50 hover:text-emerald-600 rounded-xl transition-all" title="Share via WhatsApp"><MessageCircle className="w-4 h-4" /></button>
+                                    <button onClick={async () => await generateSalaryPDF(item)} className="p-2 text-slate-400 hover:text-blue-600 transition-colors hover:bg-blue-50 rounded-lg" title="Download PDF"><FileText className="w-4 h-4" /></button>
+                                    <button onClick={() => handleWhatsAppShare(item)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors hover:bg-emerald-50 rounded-lg" title="WhatsApp"><MessageCircle className="w-4 h-4" /></button>
                                 </>
                             )}
 
-                            <button onClick={() => { setSelectedSalary(item); setIsDeleteOpen(true); setSalaryToDelete(item.id); }} className="w-10 h-10 flex items-center justify-center hover:bg-rose-50 hover:text-rose-600 rounded-xl transition-all" title="Purge Record"><Trash2 className="w-4 h-4" /></button>
+                            <button onClick={() => { setSelectedSalary(item); setIsDeleteOpen(true); setSalaryToDelete(item.id); }} className="p-2 text-slate-400 hover:text-red-500 transition-colors hover:bg-red-50 rounded-lg" title="Delete"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan={6} className="px-10 py-32 text-center text-slate-400 font-bold uppercase tracking-widest text-[10px]">No payroll segments match this criteria.</td></tr>
+                      <tr><td colSpan={6} className="px-6 py-24 text-center text-slate-500 font-medium">No records found.</td></tr>
                     )
                   )}
                 </tbody>

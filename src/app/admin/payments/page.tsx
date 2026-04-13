@@ -171,12 +171,12 @@ export default function PaymentsPage() {
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
                 <tr>
-                  <th className="px-6 py-4">Transaction ID</th>
-                  <th className="px-6 py-4">Student</th>
-                  <th className="px-6 py-4">Date</th>
-                  <th className="px-6 py-4">Amount</th>
-                  <th className="px-6 py-4">Method</th>
-                  <th className="px-6 py-4 text-right">Status</th>
+                  <th className="px-6 py-4"><Skeleton variant="text" width="80px" height="10px" /></th>
+                  <th className="px-6 py-4"><Skeleton variant="text" width="60px" height="10px" /></th>
+                  <th className="px-6 py-4"><Skeleton variant="text" width="50px" height="10px" /></th>
+                  <th className="px-6 py-4"><Skeleton variant="text" width="70px" height="10px" /></th>
+                  <th className="px-6 py-4"><Skeleton variant="text" width="55px" height="10px" /></th>
+                  <th className="px-6 py-4 text-right flex justify-end"><Skeleton variant="text" width="40px" height="10px" /></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">

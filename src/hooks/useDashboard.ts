@@ -63,7 +63,7 @@ export function useDashboard() {
         setStats(prev => ({
             ...(prev || {} as DashboardStats),
             totalTeachers: snapshot.size,
-            teacherList: teacherDocs.map(d => ({
+            teacherList: teacherDocs.map((d: any) => ({
                 id: d.id,
                 name: d.name,
                 teacherId: d.teacherId,

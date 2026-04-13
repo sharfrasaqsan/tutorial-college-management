@@ -12,7 +12,10 @@ import {
   Activity,
   Briefcase,
   History,
-  CheckCircle2
+  CheckCircle2,
+  CheckCircle,
+  User,
+  X
 } from "lucide-react";
 import { DashboardStudent, DashboardTimetableSlot } from "@/types/dashboard";
 import Skeleton from "@/components/ui/Skeleton";
@@ -28,14 +31,16 @@ export default function AdminDashboard() {
   const { openStudentProfile } = useStudentProfile();
   const { stats, isLoading, isError } = useDashboard();
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [mounted, setMounted] = useState(false);
   const [isBreakdownOpen, setIsBreakdownOpen] = useState(false);
   const [isClassesModalOpen, setIsClassesModalOpen] = useState(false);
   const [isTeachersModalOpen, setIsTeachersModalOpen] = useState(false);
-  const [isRevenueModalOpen, setIsRevenueModalOpen] = useState(false);
+  const [isPaymentsModalOpen, setIsPaymentsModalOpen] = useState(false);
   const [isUnpaidModalOpen, setIsUnpaidModalOpen] = useState(false);
   const [isSalariesModalOpen, setIsSalariesModalOpen] = useState(false);
-
+  
   useEffect(() => {
+    setMounted(true);
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
     return () => clearInterval(timer);
   }, []);
@@ -52,21 +57,28 @@ export default function AdminDashboard() {
     );
   }
 
-  const isOngoing = (startTime: string) => {
+  const isOngoing = (startTime: string, endTime: string) => {
     const now = new Date();
-    const [hours, minutes] = startTime.split(':').map(Number);
-    const sessionDate = new Date();
-    sessionDate.setHours(hours, minutes, 0);
+    const [h, m] = startTime.split(':').map(Number);
+    const start = new Date();
+    start.setHours(h, m, 0);
     
-    const sessionEnd = new Date(sessionDate.getTime() + 120 * 60000); // Assume 2 hour session
-    return now >= sessionDate && now <= sessionEnd;
+    let end = new Date();
+    if (endTime && endTime.includes(':')) {
+        const [eh, em] = endTime.split(':').map(Number);
+        end.setHours(eh, em + 15, 0); // 15 min buffer
+    } else {
+        end = new Date(start.getTime() + 120 * 60000); // fallback
+    }
+    
+    return now >= start && now <= end;
   };
 
   const statCards = [
     { title: "Students", value: stats?.totalStudents || 0, icon: Users, color: "text-blue-500", action: () => setIsBreakdownOpen(true), clickable: true },
     { title: "Teachers", value: stats?.totalTeachers || 0, icon: Briefcase, color: "text-violet-500", action: () => setIsTeachersModalOpen(true), clickable: true },
     { title: "Active Classes", value: stats?.activeClassesCount || 0, icon: Projector, color: "text-emerald-500", action: () => setIsClassesModalOpen(true), clickable: true },
-    { title: `${format(new Date(), "MMMM")} Payments`, value: `LKR ${(stats?.feesCollected || 0).toLocaleString()}`, icon: CreditCard, color: "text-indigo-500", action: () => setIsRevenueModalOpen(true), clickable: true },
+    { title: `${format(new Date(), "MMMM")} Payments`, value: `LKR ${(stats?.feesCollected || 0).toLocaleString()}`, icon: CreditCard, color: "text-indigo-500", action: () => setIsPaymentsModalOpen(true), clickable: true },
     { title: `${format(new Date(), "MMMM")} Unpaid`, value: stats?.unpaidFeesCount || 0, icon: AlertTriangle, color: "text-orange-500", action: () => setIsUnpaidModalOpen(true), clickable: true },
     { title: `${format(new Date(), "MMMM")} Salaries`, value: stats?.pendingSalariesCount || 0, icon: History, color: "text-rose-500", action: () => setIsSalariesModalOpen(true), clickable: true },
   ];
@@ -79,7 +91,11 @@ export default function AdminDashboard() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Dashboard Overview</h1>
           <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-widest">
-            {format(currentTime, "EEEE, dd MMMM")} • {format(currentTime, "hh:mm a")}
+            {mounted ? (
+              <>{format(currentTime, "EEEE, dd MMMM")} • {format(currentTime, "hh:mm a")}</>
+            ) : (
+              <span className="opacity-0">Loading...</span>
+            )}
           </p>
         </div>
 
@@ -105,7 +121,7 @@ export default function AdminDashboard() {
             className={`bg-white p-5 rounded-2xl border border-slate-200/60 transition-all duration-200 hover:border-primary/30 group ${card.clickable ? 'cursor-pointer active:scale-[0.98]' : ''}`}
           >
             <div className="flex flex-col gap-3">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-slate-50 text-slate-400 group-hover:bg-primary/5 group-hover:text-primary transition-all`}>
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${card.color.replace('text-', 'bg-').split('-').slice(0, 2).join('-')}-50 ${card.color} transition-all shadow-sm`}>
                 <card.icon className="w-4 h-4" />
               </div>
               <div>
@@ -215,7 +231,7 @@ export default function AdminDashboard() {
                     </div>
                   ))
               ) : (stats?.timetable?.length || 0) > 0 ? stats!.timetable.map((slot: DashboardTimetableSlot, idx: number) => {
-                const active = isOngoing(slot.startTime);
+                const active = isOngoing(slot.startTime, slot.endTime);
                 return (
                   <div key={slot.id} className="relative group flex gap-5">
                     {/* Vertical Line Connector */}
@@ -307,7 +323,7 @@ export default function AdminDashboard() {
                   </div>
                </h4>
                <p className="text-[10px] font-medium text-white/30 mt-3 uppercase tracking-widest leading-none">
-                  Verified Data Integrity • Last Audit: {format(currentTime, "HH:mm:ss")}
+                  Verified Data Integrity • Last Audit: {mounted ? format(currentTime, "hh:mm:ss a") : "--:--:-- --"}
                </p>
             </div>
          </div>
@@ -334,253 +350,401 @@ export default function AdminDashboard() {
          </div>
       </div>
 
-      {/* 🚀 Student Census Breakdown Modal */}
-      <Modal 
-        isOpen={isBreakdownOpen} 
-        onClose={() => setIsBreakdownOpen(false)} 
-        title="Grade Enrollment Census"
-      >
-        <div className="space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-               <p className="text-sm font-semibold text-slate-500">Global Institutional Total</p>
-               <p className="text-2xl font-bold text-slate-900">{stats?.totalStudents || 0}</p>
+      {/* 🏛️ Student Census Breakdown Modal - Premium Layout */}
+      <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8 transition-all duration-300 ${isBreakdownOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+        <div className={`fixed inset-0 bg-slate-900/40 transition-all duration-300 ${isBreakdownOpen ? "backdrop-blur-sm" : ""}`} onClick={() => setIsBreakdownOpen(false)}></div>
+        <div className={`relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all duration-300 ease-out flex flex-col h-[75vh] ${isBreakdownOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
+            <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white z-10 shrink-0">
+                <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600">
+                        <Users className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900 leading-none">Grade Enrollment Census</h2>
+                        <div className="flex items-center gap-3 mt-2">
+                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">Global Registry Audit</span>
+                             <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                             <span className="text-xs font-black text-blue-600">{stats?.totalStudents || 0} Registered Students</span>
+                        </div>
+                    </div>
+                </div>
+                <button onClick={() => setIsBreakdownOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all">
+                    <X className="w-5 h-5" />
+                </button>
             </div>
 
-            <div className="bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-slate-100 overflow-hidden">
-                {Array.from(new Set(stats?.studentBreakdown?.map(c => c.grade) || [])).sort((a, b) => a.localeCompare(b)).map(grade => {
-                    const gradeClasses = stats?.studentBreakdown?.filter(c => c.grade === grade) || [];
-                    const gradeTotal = gradeClasses.reduce((acc, curr) => acc + curr.studentCount, 0);
+            <div className="flex-1 overflow-y-auto p-8 bg-white scrollbar-hide">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {Array.from(new Set(stats?.studentBreakdown?.map(c => c.grade) || [])).sort((a, b) => a.localeCompare(b)).map(grade => {
+                        const gradeClasses = stats?.studentBreakdown?.filter(c => c.grade === grade) || [];
+                        const gradeTotal = gradeClasses.reduce((acc, curr) => acc + curr.studentCount, 0);
 
-                    return (
-                        <div key={grade} className="p-5 flex items-center justify-between hover:bg-white transition-colors">
-                            <div>
-                                <p className="text-base font-bold text-slate-800 tracking-tight">{grade}</p>
-                                <p className="text-xs text-slate-500 mt-0.5">{gradeClasses.length} Active Classes</p>
+                        return (
+                            <div key={grade} className="p-6 rounded-2xl border border-slate-100 flex items-center justify-between hover:bg-slate-50 border-transparent hover:border-slate-200 transition-all group">
+                                <div>
+                                    <p className="text-base font-black text-slate-800 tracking-tight">{grade}</p>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">{gradeClasses.length} Authorized Classes</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-xl font-black text-blue-600">{gradeTotal}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Enrolled</p>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+                {(!stats?.studentBreakdown || stats.studentBreakdown.length === 0) && (
+                    <div className="py-20 text-center space-y-3">
+                        <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-200">
+                             <Users className="w-8 h-8" />
+                        </div>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest italic">No census data available for this cycle.</p>
+                    </div>
+                )}
+            </div>
+
+            <div className="px-8 py-5 border-t border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Institutional Enrollment Data • Verified</p>
+                <button onClick={() => setIsBreakdownOpen(false)} className="px-8 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-black transition-all shadow-lg shadow-slate-200">Close Census</button>
+            </div>
+        </div>
+      </div>
+
+      {/* 🏛️ Active Classes Detail Modal - Premium Layout */}
+      <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8 transition-all duration-300 ${isClassesModalOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+        <div className={`fixed inset-0 bg-slate-900/40 transition-all duration-300 ${isClassesModalOpen ? "backdrop-blur-sm" : ""}`} onClick={() => setIsClassesModalOpen(false)}></div>
+        <div className={`relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all duration-300 ease-out flex flex-col h-[75vh] ${isClassesModalOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
+            <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white z-10 shrink-0">
+                <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600">
+                        <Projector className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900 leading-none">Active Academic Registry</h2>
+                        <div className="flex items-center gap-3 mt-2">
+                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">Live Session Architecture</span>
+                             <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                             <span className="text-xs font-black text-emerald-600">{stats?.activeClassesCount || 0} Operational Units</span>
+                        </div>
+                    </div>
+                </div>
+                <button onClick={() => setIsClassesModalOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all">
+                    <X className="w-5 h-5" />
+                </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-8 bg-white scrollbar-hide">
+                <div className="space-y-4">
+                    {stats?.studentBreakdown?.map((item) => (
+                        <div key={item.id} className="p-5 rounded-2xl border border-slate-100 flex items-center justify-between hover:bg-slate-50 border-transparent hover:border-slate-200 transition-all group">
+                            <div className="flex items-center gap-5">
+                                <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center border border-slate-100 text-slate-400 group-hover:text-emerald-600 transition-colors shadow-sm">
+                                    <Projector className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-bold text-slate-800">{item.name}</p>
+                                    <div className="flex items-center gap-2 mt-1">
+                                       <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase tracking-wider">{item.grade}</span>
+                                       <span className="text-[11px] text-slate-400 font-bold uppercase tracking-widest">{item.teacherName}</span>
+                                    </div>
+                                </div>
                             </div>
                             <div className="text-right">
-                                <p className="text-lg font-bold text-primary">{gradeTotal} <span className="text-[10px] text-slate-400 ml-1 uppercase tracking-widest">Students</span></p>
+                                <p className="text-base font-black text-slate-900">{item.studentCount}</p>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Students Enrolled</p>
                             </div>
                         </div>
-                    );
-                })}
-                {(!stats?.studentBreakdown || stats.studentBreakdown.length === 0) && (
-                    <div className="py-12 text-center text-slate-400 text-sm italic">
-                       No census data available for this cycle.
-                    </div>
-                )}
+                    ))}
+                    {(!stats?.studentBreakdown || stats.studentBreakdown.length === 0) && (
+                        <div className="py-20 text-center space-y-3">
+                            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-200">
+                                 <Projector className="w-8 h-8" />
+                            </div>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest italic">No active classes registered in the system.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <div className="px-8 py-5 border-t border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">System Classroom Telemetry • Real-time</p>
+                <div className="flex items-center gap-3">
+                    <button onClick={() => setIsClassesModalOpen(false)} className="px-6 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition-all">Dismiss</button>
+                    <Link href="/admin/classes" className="px-8 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-black transition-all shadow-lg shadow-slate-200">Manage Registry</Link>
+                </div>
             </div>
         </div>
-      </Modal>
+      </div>
 
-      {/* 🚀 Active Classes Detail Modal */}
-      <Modal 
-        isOpen={isClassesModalOpen} 
-        onClose={() => setIsClassesModalOpen(false)} 
-        title="Active Academic Registry"
-      >
-        <div className="space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-               <p className="text-sm font-semibold text-slate-500">Currently Active Classes</p>
-               <p className="text-2xl font-bold text-emerald-600">{stats?.activeClassesCount || 0}</p>
+      {/* 🏛️ Faculty Directory Modal - Premium Layout */}
+      <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8 transition-all duration-300 ${isTeachersModalOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+        <div className={`fixed inset-0 bg-slate-900/40 transition-all duration-300 ${isTeachersModalOpen ? "backdrop-blur-sm" : ""}`} onClick={() => setIsTeachersModalOpen(false)}></div>
+        <div className={`relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all duration-300 ease-out flex flex-col h-[75vh] ${isTeachersModalOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
+            <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white z-10 shrink-0">
+                <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 rounded-2xl bg-violet-50 border border-violet-100 flex items-center justify-center text-violet-600">
+                        <Briefcase className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900 leading-none">Institutional Faculty Directory</h2>
+                        <div className="flex items-center gap-3 mt-2">
+                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">Academic Human Capital</span>
+                             <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                             <span className="text-xs font-black text-violet-600">{stats?.totalTeachers || 0} Registered Staff</span>
+                        </div>
+                    </div>
+                </div>
+                <button onClick={() => setIsTeachersModalOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all">
+                    <X className="w-5 h-5" />
+                </button>
             </div>
 
-            <div className="bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-slate-100 overflow-hidden">
-                {stats?.studentBreakdown?.map((item) => (
-                    <div key={item.id} className="p-4 flex items-center justify-between hover:bg-white transition-colors group">
-                        <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-slate-100 text-slate-400 group-hover:text-emerald-600 transition-colors shadow-sm">
-                                <Projector className="w-5 h-5" />
+            <div className="flex-1 overflow-y-auto p-8 bg-white scrollbar-hide">
+                <div className="space-y-4">
+                    {stats?.teacherList?.map((teacher) => (
+                        <div key={teacher.id} className="p-5 rounded-2xl border border-slate-100 flex items-center justify-between hover:bg-slate-50 border-transparent hover:border-slate-200 transition-all group">
+                            <div className="flex items-center gap-5">
+                                <div className="w-14 h-14 rounded-xl bg-white flex items-center justify-center border border-slate-100 text-slate-400 group-hover:text-violet-600 transition-colors shadow-sm overflow-hidden relative">
+                                    {teacher.photoURL ? (
+                                        <img src={teacher.photoURL} alt={teacher.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <span className="text-lg font-black text-slate-400 group-hover:text-violet-600 transition-colors">{teacher.name.charAt(0)}</span>
+                                    )}
+                                </div>
+                                <div>
+                                    <p className="text-base font-black text-slate-800 tracking-tight">{teacher.name}</p>
+                                    <div className="flex flex-wrap items-center gap-2 mt-1">
+                                       {teacher.subjects.slice(0, 3).map(sub => (
+                                           <span key={sub} className="text-[9px] font-black text-violet-600 bg-violet-50 px-2 py-0.5 rounded uppercase tracking-wider">{sub}</span>
+                                       ))}
+                                       {teacher.subjects.length > 3 && <span className="text-[10px] text-slate-400 font-bold">+{teacher.subjects.length - 3}</span>}
+                                    </div>
+                                </div>
                             </div>
-                            <div>
-                                <p className="text-sm font-bold text-slate-800">{item.name}</p>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                   <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase">{item.grade}</span>
-                                   <span className="text-[11px] text-slate-500 font-medium">{item.teacherName}</span>
+                            <div className="text-right">
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Direct line</p>
+                                <p className="text-sm font-black text-slate-700 tabular-nums">{teacher.phone}</p>
+                            </div>
+                        </div>
+                    ))}
+                    {(!stats?.teacherList || stats.teacherList.length === 0) && (
+                        <div className="py-20 text-center space-y-3">
+                            <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-200">
+                                 <Briefcase className="w-8 h-8" />
+                            </div>
+                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest italic">No faculty records registered.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <div className="px-8 py-5 border-t border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Faculty Administrative Audit • Verified Registry</p>
+                <div className="flex items-center gap-3">
+                    <button onClick={() => setIsTeachersModalOpen(false)} className="px-6 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition-all">Dismiss</button>
+                    <Link href="/admin/teachers" className="px-8 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-black transition-all shadow-lg shadow-slate-200">Review Board</Link>
+                </div>
+            </div>
+        </div>
+      </div>
+
+      {/* 🏛️ Revenue Detail Modal - Premium Layout */}
+      <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8 transition-all duration-300 ${isPaymentsModalOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+        <div className={`fixed inset-0 bg-slate-900/40 transition-all duration-300 ${isPaymentsModalOpen ? "backdrop-blur-sm" : ""}`} onClick={() => setIsPaymentsModalOpen(false)}></div>
+        <div className={`relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all duration-300 ease-out flex flex-col h-[75vh] ${isPaymentsModalOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
+            
+            <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white z-10 shrink-0">
+                <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+                        <CreditCard className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900 leading-none">Institutional Revenue Ledger</h2>
+                        <div className="flex items-center gap-3 mt-2">
+                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">Month Cycle: {format(new Date(), "MMMM yyyy")}</span>
+                             <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                             <span className="text-xs font-black text-indigo-600">LKR {(stats?.feesCollected || 0).toLocaleString()}</span>
+                        </div>
+                    </div>
+                </div>
+                <button onClick={() => setIsPaymentsModalOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all">
+                    <X className="w-5 h-5" />
+                </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-8 bg-white scrollbar-hide">
+                <div className="space-y-4">
+                    {stats?.monthlyPayments?.map((payment) => (
+                        <div key={payment.id} className="p-5 rounded-2xl border border-slate-100 flex items-center justify-between hover:bg-slate-50 border-transparent hover:border-slate-200 transition-all group">
+                            <div className="flex items-center gap-5">
+                                <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center border border-slate-100 text-slate-400 group-hover:text-indigo-600 transition-colors shadow-sm">
+                                    <User className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-bold text-slate-800">{payment.studentName}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Transaction ID: {payment.id?.substring(0, 8).toUpperCase()}</p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <p className="text-base font-black text-slate-900">LKR {payment.amount.toLocaleString()}</p>
+                                <div className="flex items-center gap-1.5 justify-end mt-1">
+                                    <div className={`w-1.5 h-1.5 rounded-full ${payment.status === 'paid' ? 'bg-emerald-500' : 'bg-amber-500'}`}></div>
+                                    <span className={`text-[10px] font-black uppercase tracking-wider ${payment.status === 'paid' ? 'text-emerald-600' : 'text-amber-600'}`}>{payment.status}</span>
                                 </div>
                             </div>
                         </div>
-                        <div className="text-right">
-                            <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Capacity</div>
-                            <p className="text-sm font-bold text-slate-900">{item.studentCount} <span className="text-[10px] text-slate-400 font-normal">STDS</span></p>
+                    ))}
+                    {(!stats?.monthlyPayments || stats.monthlyPayments.length === 0) && (
+                        <div className="py-20 text-center space-y-3">
+                           <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-200">
+                                <History className="w-8 h-8" />
+                           </div>
+                           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest italic">No financial movements logged in this cycle.</p>
                         </div>
-                    </div>
-                ))}
-                {(!stats?.studentBreakdown || stats.studentBreakdown.length === 0) && (
-                    <div className="py-12 text-center text-slate-400 text-sm italic">
-                       No active classes registered in the system.
-                    </div>
-                )}
+                    )}
+                </div>
+            </div>
+
+            <div className="px-8 py-5 border-t border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">System Revenue Audit • Live Sync</p>
+                <button onClick={() => setIsPaymentsModalOpen(false)} className="px-8 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-black transition-all shadow-lg shadow-slate-200">Close Ledger</button>
             </div>
         </div>
-      </Modal>
+      </div>
 
-      {/* 🚀 Faculty Directory Modal */}
-      <Modal 
-        isOpen={isTeachersModalOpen} 
-        onClose={() => setIsTeachersModalOpen(false)} 
-        title="Faculty Directory"
-      >
-        <div className="space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-               <p className="text-sm font-semibold text-slate-500">Board of Staff</p>
-               <p className="text-2xl font-bold text-violet-600">{stats?.totalTeachers || 0}</p>
+      {/* 🚀 Unpaid Records Detail Modal - Premium Layout */}
+      <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8 transition-all duration-300 ${isUnpaidModalOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+        <div className={`fixed inset-0 bg-slate-900/40 transition-all duration-300 ${isUnpaidModalOpen ? "backdrop-blur-sm" : ""}`} onClick={() => setIsUnpaidModalOpen(false)}></div>
+        <div className={`relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all duration-300 ease-out flex flex-col h-[75vh] ${isUnpaidModalOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
+            
+            <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white z-10 shrink-0">
+                <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600">
+                        <AlertTriangle className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900 leading-none">Outstanding Dues Registry</h2>
+                        <div className="flex items-center gap-3 mt-2">
+                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">Registry Audit: {format(new Date(), "yyyy 'Cycle'")}</span>
+                             <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                             <span className="text-xs font-black text-rose-600">{stats?.unpaidFeesCount || 0} Pending Accounts</span>
+                        </div>
+                    </div>
+                </div>
+                <button onClick={() => setIsUnpaidModalOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all">
+                    <X className="w-5 h-5" />
+                </button>
             </div>
 
-            <div className="bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-slate-100 overflow-hidden">
-                {stats?.teacherList?.map((teacher) => (
-                    <div key={teacher.id} className="p-4 flex items-center justify-between hover:bg-white transition-colors group">
-                        <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center border border-slate-100 text-slate-400 group-hover:text-violet-600 transition-colors shadow-sm overflow-hidden relative">
-                                {teacher.photoURL ? (
-                                    <img src={teacher.photoURL} alt={teacher.name} className="w-full h-full object-cover" />
-                                ) : (
-                                    <span className="font-bold text-slate-500">{teacher.name.charAt(0)}</span>
-                                )}
+            <div className="flex-1 overflow-y-auto p-8 bg-white scrollbar-hide">
+                <div className="space-y-4">
+                    {stats?.unpaidList?.map((item) => (
+                        <div key={item.id} className="p-5 rounded-2xl border border-slate-100 flex items-center justify-between hover:bg-slate-50 border-transparent hover:border-slate-200 transition-all group">
+                            <div className="flex items-center gap-5">
+                                <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center border border-slate-100 text-slate-400 group-hover:text-rose-600 transition-colors shadow-sm">
+                                    <User className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-bold text-slate-800">{item.studentName}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Billing Month: {item.month}</p>
+                                </div>
                             </div>
-                            <div>
-                                <p className="text-sm font-bold text-slate-800">{teacher.name}</p>
-                                <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                                   {teacher.subjects.slice(0, 2).map(sub => (
-                                       <span key={sub} className="text-[9px] font-bold text-violet-600 bg-violet-50 px-1 py-0.5 rounded uppercase tracking-wider">{sub}</span>
-                                   ))}
-                                   {teacher.subjects.length > 2 && <span className="text-[9px] text-slate-400">+{teacher.subjects.length - 2}</span>}
+                            <div className="text-right">
+                                <p className="text-base font-black text-rose-600">LKR {item.amount.toLocaleString()}</p>
+                                <div className="flex items-center gap-1.5 justify-end mt-1">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500"></div>
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-rose-600">Arrears</span>
                                 </div>
                             </div>
                         </div>
-                        <div className="text-right">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none mb-1">Contact</p>
-                            <p className="text-[11px] font-bold text-slate-700">{teacher.phone}</p>
+                    ))}
+                    {(!stats?.unpaidList || stats.unpaidList.length === 0) && (
+                        <div className="py-20 text-center space-y-3">
+                           <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-200">
+                                <CheckCircle className="w-8 h-8" />
+                           </div>
+                           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest italic">All institutional accounts are clear.</p>
                         </div>
-                    </div>
-                ))}
-                {(!stats?.teacherList || stats.teacherList.length === 0) && (
-                    <div className="py-12 text-center text-slate-400 text-sm italic">
-                       No faculty records registered.
-                    </div>
-                )}
+                    )}
+                </div>
+            </div>
+
+            <div className="px-8 py-5 border-t border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Account Registry Audit • Active Monitoring</p>
+                <div className="flex items-center gap-3">
+                    <button onClick={() => setIsUnpaidModalOpen(false)} className="px-6 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition-all">Dismiss</button>
+                    <Link href="/admin/students" className="px-8 py-2.5 bg-rose-600 text-white rounded-xl text-xs font-bold hover:bg-rose-700 transition-all shadow-lg shadow-rose-100">Review Students</Link>
+                </div>
             </div>
         </div>
-      </Modal>
+      </div>
 
-      {/* 🚀 Monthly Revenue Detail Modal */}
-      <Modal 
-        isOpen={isRevenueModalOpen} 
-        onClose={() => setIsRevenueModalOpen(false)} 
-        title="Revenue Intelligence"
-      >
-        <div className="space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-               <div>
-                  <p className="text-sm font-semibold text-slate-500">Current Month Total</p>
-                  <p className="text-[10px] font-black uppercase text-slate-400 mt-1 tracking-widest">{format(new Date(), "MMMM yyyy")}</p>
-               </div>
-               <p className="text-2xl font-bold text-indigo-600">LKR {(stats?.feesCollected || 0).toLocaleString()}</p>
+      {/* 🚀 Salary Ledger Detail Modal - Premium Layout */}
+      <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8 transition-all duration-300 ${isSalariesModalOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+        <div className={`fixed inset-0 bg-slate-900/40 transition-all duration-300 ${isSalariesModalOpen ? "backdrop-blur-sm" : ""}`} onClick={() => setIsSalariesModalOpen(false)}></div>
+        <div className={`relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all duration-300 ease-out flex flex-col h-[75vh] ${isSalariesModalOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
+            
+            <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white z-10 shrink-0">
+                <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600">
+                        <History className="w-6 h-6" />
+                    </div>
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900 leading-none">Faculty Settlement Ledger</h2>
+                        <div className="flex items-center gap-3 mt-2">
+                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">Payroll Cycle: {format(new Date(), "MMMM yyyy")}</span>
+                             <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                             <span className="text-xs font-black text-amber-600">{stats?.pendingSalariesCount || 0} Awaiting Approval</span>
+                        </div>
+                    </div>
+                </div>
+                <button onClick={() => setIsSalariesModalOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all">
+                    <X className="w-5 h-5" />
+                </button>
             </div>
 
-            <div className="bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-slate-100 overflow-hidden">
-                {stats?.monthlyPayments?.map((payment) => (
-                    <div key={payment.id} className="p-4 flex items-center justify-between hover:bg-white transition-colors group">
-                        <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-slate-100 text-slate-400 group-hover:text-indigo-600 transition-colors shadow-sm">
-                                <CreditCard className="w-5 h-5" />
+            <div className="flex-1 overflow-y-auto p-8 bg-white scrollbar-hide">
+                <div className="space-y-4">
+                    {stats?.salaryList?.map((item) => (
+                        <div key={item.id} className="p-5 rounded-2xl border border-slate-100 flex items-center justify-between hover:bg-slate-50 border-transparent hover:border-slate-200 transition-all group">
+                            <div className="flex items-center gap-5">
+                                <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center border border-slate-100 text-slate-400 group-hover:text-amber-600 transition-colors shadow-sm">
+                                    <Briefcase className="w-5 h-5" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-bold text-slate-800">{item.teacherName}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Requested: {item.requestDate ? format(new Date(item.requestDate), "dd MMM, yyyy") : 'Unknown'}</p>
+                                </div>
                             </div>
-                            <div>
-                                <p className="text-sm font-bold text-slate-800">{payment.studentName}</p>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{payment.date ? format(new Date(payment.date), "dd MMM, hh:mm a") : 'Processing'}</p>
+                            <div className="text-right">
+                                <p className="text-base font-black text-slate-900">LKR {item.amount.toLocaleString()}</p>
+                                <div className="flex items-center gap-1.5 justify-end mt-1">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500/50"></div>
+                                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-600">Audit in Progress</span>
+                                </div>
                             </div>
                         </div>
-                        <div className="text-right">
-                            <p className="text-sm font-bold text-emerald-600">LKR {payment.amount.toLocaleString()}</p>
-                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${payment.status === 'paid' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>{payment.status}</span>
+                    ))}
+                    {(!stats?.salaryList || stats.salaryList.length === 0) && (
+                        <div className="py-20 text-center space-y-3">
+                           <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto text-slate-200">
+                                <Activity className="w-8 h-8" />
+                           </div>
+                           <p className="text-xs font-bold text-slate-400 uppercase tracking-widest italic">No pending settlements found.</p>
                         </div>
-                    </div>
-                ))}
-                {(!stats?.monthlyPayments || stats.monthlyPayments.length === 0) && (
-                    <div className="py-12 text-center text-slate-400 text-sm italic">
-                       No financial transactions logged for this cycle.
-                    </div>
-                )}
-            </div>
-        </div>
-      </Modal>
-
-      {/* 🚀 Unpaid Records Detail Modal */}
-      <Modal 
-        isOpen={isUnpaidModalOpen} 
-        onClose={() => setIsUnpaidModalOpen(false)} 
-        title="Unpaid Fee Registry"
-      >
-        <div className="space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-               <p className="text-sm font-semibold text-slate-500">Total Unpaid Records</p>
-               <p className="text-2xl font-bold text-orange-600">{stats?.unpaidFeesCount || 0}</p>
+                    )}
+                </div>
             </div>
 
-            <div className="bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-slate-100 overflow-hidden">
-                {stats?.unpaidList?.map((item) => (
-                    <div key={item.id} className="p-4 flex items-center justify-between hover:bg-white transition-colors group">
-                        <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-slate-100 text-slate-400 group-hover:text-orange-600 transition-colors shadow-sm">
-                                <AlertTriangle className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-bold text-slate-800">{item.studentName}</p>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Billing Cycle: {item.month}</p>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-sm font-bold text-rose-600">LKR {item.amount.toLocaleString()}</p>
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase bg-rose-50 text-rose-600">Pending</span>
-                        </div>
-                    </div>
-                ))}
-                {(!stats?.unpaidList || stats.unpaidList.length === 0) && (
-                    <div className="py-12 text-center text-slate-400 text-sm italic">
-                       No outstanding dues for this cycle.
-                    </div>
-                )}
+            <div className="px-8 py-5 border-t border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Institutional Payroll Terminal • Audit Logs</p>
+                <div className="flex items-center gap-3">
+                    <button onClick={() => setIsSalariesModalOpen(false)} className="px-6 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 transition-all">Dismiss</button>
+                    <Link href="/admin/salaries" className="px-8 py-2.5 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-black transition-all shadow-lg shadow-slate-200">Manage Payroll</Link>
+                </div>
             </div>
         </div>
-      </Modal>
-
-      {/* 🚀 Salary Ledger Detail Modal */}
-      <Modal 
-        isOpen={isSalariesModalOpen} 
-        onClose={() => setIsSalariesModalOpen(false)} 
-        title="Faculty Salary Ledger"
-      >
-        <div className="space-y-6">
-            <div className="flex items-center justify-between pb-4 border-b border-slate-100">
-               <p className="text-sm font-semibold text-slate-500">Pending Salary Approvals</p>
-               <p className="text-2xl font-bold text-rose-600">{stats?.pendingSalariesCount || 0}</p>
-            </div>
-
-            <div className="bg-slate-50 rounded-2xl border border-slate-100 divide-y divide-slate-100 overflow-hidden">
-                {stats?.salaryList?.map((item) => (
-                    <div key={item.id} className="p-4 flex items-center justify-between hover:bg-white transition-colors group">
-                        <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center border border-slate-100 text-slate-400 group-hover:text-rose-600 transition-colors shadow-sm">
-                                <History className="w-5 h-5" />
-                            </div>
-                            <div>
-                                <p className="text-sm font-bold text-slate-800">{item.teacherName}</p>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Requested: {item.requestDate ? format(new Date(item.requestDate), "dd MMM, yyyy") : 'Unknown'}</p>
-                            </div>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-sm font-bold text-slate-900">LKR {item.amount.toLocaleString()}</p>
-                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded uppercase bg-rose-50 text-rose-600">Review Required</span>
-                        </div>
-                    </div>
-                ))}
-                {(!stats?.salaryList || stats.salaryList.length === 0) && (
-                    <div className="py-12 text-center text-slate-400 text-sm italic">
-                       No pending salary requests found.
-                    </div>
-                )}
-            </div>
-        </div>
-      </Modal>
+      </div>
     </div>
   );
 }

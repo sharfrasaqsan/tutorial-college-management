@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy, doc, updateDoc, writeBatch, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle, X } from "lucide-react";
+import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle, X, Users, CreditCard, Briefcase, ArrowRight, Projector, AlertTriangle, History } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
 import { Teacher, Subject } from "@/types/models";
 import Link from "next/link";
@@ -12,9 +12,12 @@ import ConfirmModal from "@/components/ui/ConfirmModal";
 import NextImage from "next/image";
 import toast from "react-hot-toast";
 import { useTeacherProfile } from "@/context/TeacherProfileContext";
+import { useDashboard } from "@/hooks/useDashboard";
+import { format } from "date-fns";
 
 export default function TeachersPage() {
   const { openTeacherProfile } = useTeacherProfile();
+  const { stats, isLoading: statsLoading } = useDashboard();
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -115,6 +118,12 @@ export default function TeachersPage() {
     }
   };
 
+  const clearFilters = () => {
+    setFilterStatus("");
+    setFilterSubject("");
+    setSearchTerm("");
+  };
+
   const filteredTeachers = teachers.filter(t => {
     const matchesSearch = 
       t.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -128,14 +137,16 @@ export default function TeachersPage() {
     return matchesSearch && matchesSubject && matchesStatus;
   });
 
-  const clearFilters = () => {
-    setFilterSubject("");
-    setFilterStatus("");
-    setSearchTerm("");
-  };
+  const statCards = [
+    { title: "Total Faculty", value: teachers.length, icon: Briefcase, color: "text-blue-500" },
+    { title: "Active Instructors", value: teachers.filter(t => t.status === 'active').length, icon: CheckCircle, color: "text-emerald-500" },
+    { title: "Suspended Faculty", value: teachers.filter(t => t.status === 'inactive').length, icon: Ban, color: "text-rose-500" },
+    { title: "Pending Settlements", value: stats?.pendingSalariesCount || 0, icon: History, color: "text-indigo-500" },
+  ];
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+      
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Teachers Directory</h1>
@@ -149,6 +160,33 @@ export default function TeachersPage() {
         >
           <Plus className="w-3.5 h-3.5" /> Add Teacher
         </button>
+      </div>
+
+      {/* 🏛️ Specialized Stats Header */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 py-4">
+        {loading ? (
+            [1, 2, 3, 4].map(idx => (
+                <Skeleton key={idx} variant="rect" width="100%" height="80px" className="rounded-2xl" />
+            ))
+        ) : statCards.map((card, idx) => (
+          <div 
+            key={idx} 
+            className={`bg-white p-5 rounded-2xl border border-slate-200/60 transition-all duration-200 hover:border-primary/30 group shadow-sm`}
+          >
+            <div className="flex flex-col gap-3">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${card.color.replace('text-', 'bg-').split('-').slice(0, 2).join('-')}-50 ${card.color} transition-all shadow-sm`}>
+                <card.icon className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">{card.title}</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-base font-bold text-slate-900 tracking-tight group-hover:text-primary transition-colors">{card.value}</p>
+                  <ArrowRight className="w-2.5 h-2.5 text-primary opacity-0 group-hover:opacity-100 transition-all translate-x-[-4px] group-hover:translate-x-0" />
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       <TeacherModal 
@@ -242,11 +280,11 @@ export default function TeachersPage() {
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100 uppercase text-[10px] tracking-wider">
                 <tr>
-                  <th className="px-6 py-4">Faculty Member</th>
-                  <th className="px-6 py-4">Specialization</th>
-                  <th className="px-6 py-4">Contact</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-right">Utility</th>
+                  <th className="px-6 py-4"><Skeleton variant="text" width="80px" height="10px" /></th>
+                  <th className="px-6 py-4"><Skeleton variant="text" width="60px" height="10px" /></th>
+                  <th className="px-6 py-4"><Skeleton variant="text" width="70px" height="10px" /></th>
+                  <th className="px-6 py-4"><Skeleton variant="text" width="50px" height="10px" /></th>
+                  <th className="px-6 py-4 text-right flex justify-end"><Skeleton variant="text" width="40px" height="10px" /></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -254,7 +292,7 @@ export default function TeachersPage() {
                   <tr key={i} className="animate-pulse">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <Skeleton variant="rect" width="40px" height="40px" className="rounded-xl" />
+                        <Skeleton variant="rect" width="40px" height="40px" className="rounded-full" />
                         <div className="space-y-2">
                            <Skeleton variant="text" width="120px" height="14px" />
                            <Skeleton variant="text" width="80px" height="10px" />
@@ -269,12 +307,17 @@ export default function TeachersPage() {
                     </td>
                     <td className="px-6 py-4 space-y-2">
                        <Skeleton variant="text" width="100px" height="14px" />
+                       <Skeleton variant="text" width="60px" height="10px" />
                     </td>
                     <td className="px-6 py-4">
-                       <Skeleton variant="rect" width="70px" height="24px" className="rounded-md" />
+                       <div className="flex gap-1">
+                          <Skeleton variant="rect" width="40px" height="20px" className="rounded-md" />
+                          <Skeleton variant="rect" width="40px" height="20px" className="rounded-md" />
+                       </div>
                     </td>
                     <td className="px-6 py-4">
                        <div className="flex justify-end gap-2">
+                          <Skeleton variant="rect" width="32px" height="32px" className="rounded-lg" />
                           <Skeleton variant="rect" width="32px" height="32px" className="rounded-lg" />
                           <Skeleton variant="rect" width="32px" height="32px" className="rounded-lg" />
                           <Skeleton variant="rect" width="32px" height="32px" className="rounded-lg" />
@@ -358,9 +401,13 @@ export default function TeachersPage() {
                         >
                           {teacher.status === 'active' ? <Ban className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                         </button>
-                        <Link href={`/admin/teachers/${teacher.id}`} className="p-2 text-slate-400 hover:text-primary transition-colors hover:bg-slate-100 rounded-lg">
+                        <button 
+                          onClick={() => openTeacherProfile(teacher.id)}
+                          className="p-2 text-slate-400 hover:text-primary transition-colors hover:bg-slate-100 rounded-lg"
+                          title="View Faculty Profile"
+                        >
                           <Eye className="w-4 h-4" />
-                        </Link>
+                        </button>
                         <button 
                           onClick={() => handleEdit(teacher)}
                           className="p-2 text-slate-400 hover:text-blue-600 transition-colors hover:bg-blue-50 rounded-lg"
