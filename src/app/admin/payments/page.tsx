@@ -54,9 +54,9 @@ export default function PaymentsPage() {
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Financial Records</h1>
-          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-widest">
-            Track all student fee payments and transactions
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Student Payments</h1>
+          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider">
+            View and manage all student payments
           </p>
         </div>
         <div className="flex gap-2">

@@ -174,8 +174,8 @@ export default function StudentsPage() {
       
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Students Directory</h1>
-          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-widest">
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Student List</h1>
+          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider">
             Manage all student enrollments and records
           </p>
         </div>

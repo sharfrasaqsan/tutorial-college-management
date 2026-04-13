@@ -89,8 +89,8 @@ export default function AdminDashboard() {
       {/* 🏛️ Simple Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 py-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Dashboard Overview</h1>
-          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-widest">
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Admin Dashboard</h1>
+          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider">
             {mounted ? (
               <>{format(currentTime, "EEEE, dd MMMM")} • {format(currentTime, "hh:mm a")}</>
             ) : (
@@ -140,10 +140,10 @@ export default function AdminDashboard() {
         <div className="lg:col-span-7 bg-white rounded-[4rem] border border-slate-100 shadow-2xl shadow-slate-100/50 overflow-hidden flex flex-col group/table hover:border-primary/10 transition-all duration-700">
           <div className="px-10 py-10 border-b border-slate-50 flex items-center justify-between bg-white relative">
             <div className="flex items-center gap-5">
-               <div className="w-1.5 h-10 bg-primary rounded-full group-hover/table:scale-y-110 transition-transform"></div>
+               <div className="w-1.5 h-10 bg-primary rounded-full group-hover/table:scale-y-110 transition-transform shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)]"></div>
                <div>
-                  <h3 className="font-black text-slate-800 tracking-[0.2em] uppercase text-xs">Student Audit</h3>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mt-1.5 opacity-80">Recent registry modifications</p>
+                  <h3 className="font-black text-slate-800 tracking-wider uppercase text-xs">Recent Students</h3>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mt-1.5 opacity-80">Newest registrations</p>
                </div>
             </div>
             <Link href="/admin/students" className="w-12 h-12 rounded-[1.25rem] bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-400 hover:bg-primary hover:text-white transition-all shadow-sm group/link">
@@ -152,9 +152,9 @@ export default function AdminDashboard() {
           </div>
           <div className="p-0 flex-1 overflow-x-auto">
             <table className="w-full text-xs text-left whitespace-nowrap border-collapse">
-              <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 border-b border-slate-100">
+              <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100">
                 <tr>
-                  <th className="px-8 py-5">Identity</th>
+                  <th className="px-8 py-5">Student</th>
                   <th className="px-8 py-5">Grade</th>
                   <th className="px-8 py-5">Contact</th>
                   <th className="px-8 py-5 text-right">Joined</th>
@@ -206,12 +206,12 @@ export default function AdminDashboard() {
         </div>
 
         <div className="lg:col-span-5 bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col hover:border-primary/5 transition-all duration-500">
-          <div className="px-8 py-6 border-b border-slate-50 bg-white flex items-center justify-between relative">
-            <div className="flex items-center gap-4">
-               <div className="w-1 h-6 bg-primary rounded-full"></div>
+          <div className="px-8 py-8 border-b border-slate-50 bg-white flex items-center justify-between relative group/timeline">
+            <div className="flex items-center gap-5">
+               <div className="w-1.5 h-10 bg-primary rounded-full group-hover/timeline:scale-y-110 transition-transform shadow-[0_0_10px_rgba(var(--primary-rgb),0.5)]"></div>
                <div>
-                  <h3 className="font-bold text-slate-800 text-sm">Today&apos;s Schedule</h3>
-                  <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">Live Session Feed</p>
+                  <h3 className="text-xs font-black uppercase text-slate-800 tracking-wider">Schedule Today</h3>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mt-1.5 opacity-80">Active Classes</p>
                </div>
             </div>
             <div className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${(stats?.timetable?.length || 0) > 0 ? 'bg-primary/5 text-primary border-primary/10' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
@@ -256,11 +256,11 @@ export default function AdminDashboard() {
 
                     <div className={`flex-1 p-4 rounded-2xl border transition-all ${slot.isCompleted ? 'bg-slate-50/80 border-slate-100 opacity-50 grayscale-[0.5]' : active ? 'bg-white border-primary shadow-xl shadow-primary/5' : 'bg-white border-slate-100 hover:border-slate-200'}`}>
                         <div className="flex items-center justify-between mb-1.5">
-                            <h4 className="font-bold text-slate-900 text-sm group-hover:text-primary transition-colors">{slot.className}</h4>
+                            <h4 className="font-bold text-slate-900 text-sm group-hover:text-primary transition-colors tracking-tight">{slot.className}</h4>
                             {slot.isCompleted ? (
-                                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500 text-white text-[9px] font-black uppercase tracking-tighter shadow-lg shadow-emerald-500/20">
+                                <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500 text-white text-[9px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/20">
                                     <CheckCircle2 className="w-3.5 h-3.5" />
-                                    <span>Session Completed</span>
+                                    <span>Class done</span>
                                 </div>
                             ) : active && (
                                 <div className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-500 uppercase animate-pulse">
@@ -297,7 +297,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* 🔮 Institutional Intelligence Radar */}
+      {/* 🔮 Status Radar */}
       <div className="bg-slate-900 rounded-[3.5rem] p-10 text-white flex flex-col md:flex-row items-center justify-between gap-10 relative overflow-hidden shadow-2xl group/hud">
          <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-primary/20 rounded-full blur-[120px] -mr-80 -mt-80 group-hover/hud:scale-110 transition-transform duration-[2000ms]"></div>
          <div className="flex flex-col sm:flex-row items-center gap-10 relative z-10 text-center sm:text-left">
@@ -305,7 +305,7 @@ export default function AdminDashboard() {
                 <Activity className="w-10 h-10 animate-pulse" />
             </div>
             <div>
-               <p className="text-[11px] font-black text-white/40 uppercase tracking-[0.4em] mb-3">Operational Vitality</p>
+               <p className="text-[11px] font-black text-white/40 uppercase tracking-wider mb-3">System Status</p>
                <h4 className="text-2xl font-black flex flex-wrap items-center justify-center sm:justify-start gap-4">
                   Cloud Sync: <span className="text-emerald-400">ACTIVE</span>
                   <div className="flex gap-1.5 h-6">
@@ -329,8 +329,8 @@ export default function AdminDashboard() {
          </div>
          <div className="flex flex-wrap items-center justify-center gap-12 relative z-10 border-t md:border-t-0 md:border-l border-white/10 pt-10 md:pt-0 md:pl-12">
             <div className="text-center group-hover/hud:translate-y-[-4px] transition-transform duration-500">
-               <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.3em] mb-2 leading-none">Academic Index</p>
-               <p className="text-3xl font-black tracking-tighter tabular-nums leading-none">
+               <p className="text-[9px] font-black text-white/40 uppercase tracking-wider mb-2 leading-none">Academic Status</p>
+               <p className="text-3xl font-black tracking-tight tabular-nums leading-none">
                   {stats?.academicIndex ?? 100}<span className="text-sm ml-0.5 opacity-40">%</span>
                </p>
                <p className="text-[8px] font-bold text-emerald-400 mt-2.5 uppercase tracking-widest opacity-80 flex items-center justify-center gap-1.5">
@@ -360,11 +360,11 @@ export default function AdminDashboard() {
                         <Users className="w-6 h-6" />
                     </div>
                     <div>
-                        <h2 className="text-xl font-bold text-slate-900 leading-none">Grade Enrollment Census</h2>
+                        <h2 className="text-xl font-bold text-slate-900 leading-none tracking-tight">Students by Grade</h2>
                         <div className="flex items-center gap-3 mt-2">
-                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em]">Global Registry Audit</span>
+                             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Student Breakdown</span>
                              <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
-                             <span className="text-xs font-black text-blue-600">{stats?.totalStudents || 0} Registered Students</span>
+                             <span className="text-xs font-black text-blue-600">{stats?.totalStudents || 0} Registered</span>
                         </div>
                     </div>
                 </div>

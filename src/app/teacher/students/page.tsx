@@ -95,43 +95,49 @@ export default function MyStudentsPage() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
-      <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
-        <div className="space-y-1">
-            <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-                <Users className="w-7 h-7 text-indigo-600" /> Enrollment Hub
-            </h2>
-            <p className="text-slate-500 text-sm font-bold tracking-tight">Manage and monitor students across your assigned classifications.</p>
+      {/* 🏛️ Page Header - Dashboard Style Parity */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 py-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            My Students
+          </h1>
+          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider leading-none">
+            List of your students
+          </p>
         </div>
         
         <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+          {/* Class Selection Dropdown */}
+          <div className="flex items-center gap-2 bg-white border border-slate-200 p-1 rounded-xl shadow-sm min-w-[200px]">
+            <div className="flex items-center gap-2 px-3 py-1.5 border-r border-slate-100">
+                <BookOpen className="w-4 h-4 text-indigo-500" />
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Class</span>
+            </div>
+            <select
+                value={activeTab || ""}
+                onChange={(e) => setActiveTab(e.target.value)}
+                className="bg-transparent flex-1 px-4 py-1.5 text-sm font-black text-slate-700 outline-none cursor-pointer hover:text-indigo-600 transition-colors uppercase tracking-tight"
+            >
+                {[...classes]
+                  .sort((a, b) => (a.grade || "").localeCompare(b.grade || "", undefined, { numeric: true }))
+                  .map(cls => (
+                    <option key={cls.id} value={cls.id}>{cls.name}</option>
+                ))}
+                {classes.length === 0 && <option value="">No Classes Assigned</option>}
+            </select>
+          </div>
+
           <div className="relative w-full md:w-80">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input 
               type="text" 
-              placeholder="Filter list by name or ID..." 
+              placeholder="Search by name or ID..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-12 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium shadow-sm"
+              className="w-full pl-12 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-[11px] font-black uppercase tracking-wider focus:outline-none focus:ring-4 focus:ring-indigo-500/5 focus:border-indigo-500 transition-all shadow-sm"
             />
           </div>
         </div>
-      </div>
-
-      {/* Class Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-hide no-scrollbar">
-          {loading ? (
-            [1, 2, 3].map(i => <Skeleton key={i} width="140px" height="42px" className="rounded-xl flex-shrink-0" />)
-          ) : classes.length > 0 ? classes.map((cls) => (
-            <button
-                key={cls.id}
-                onClick={() => setActiveTab(cls.id)}
-                className={`flex-shrink-0 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${activeTab === cls.id ? 'bg-slate-900 border-slate-900 text-white shadow-lg shadow-indigo-100' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}
-            >
-                {cls.name}
-            </button>
-          )) : (
-            <p className="text-xs text-slate-400 italic font-medium">No assigned classes found reaching your credentials.</p>
-          )}
       </div>
 
       <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden outline outline-1 outline-slate-50 min-h-[450px]">
@@ -144,10 +150,10 @@ export default function MyStudentsPage() {
                 <table className="w-full border-collapse">
                     <thead>
                         <tr className="bg-slate-50/50 border-b border-slate-100">
-                            <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Identity Details</th>
-                            <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Student ID</th>
-                            <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-widest text-slate-400">Academic State</th>
-                            <th className="px-8 py-5 text-right text-[10px] font-black uppercase tracking-widest text-slate-400">Interactive</th>
+                            <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">Student</th>
+                            <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">ID</th>
+                            <th className="px-8 py-5 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">Grade & Status</th>
+                            <th className="px-8 py-5 text-right text-[10px] font-black uppercase tracking-wider text-slate-400">Actions</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -172,7 +178,7 @@ export default function MyStudentsPage() {
                                 </td>
                                 <td className="px-8 py-5">
                                     <div className="flex flex-col gap-1">
-                                        <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500">{s.grade}</span>
+                                        <span className="text-[9px] font-black uppercase tracking-wider text-indigo-500">{s.grade}</span>
                                         <div className="flex items-center gap-1.5">
                                             <span className={`w-1.5 h-1.5 rounded-full ${s.status === 'active' ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
                                             <span className="text-[10px] font-bold text-slate-500 capitalize">{s.status}</span>
@@ -189,9 +195,9 @@ export default function MyStudentsPage() {
                                     </button>
                                     <button 
                                         onClick={() => openStudentDetails(s, 'view')}
-                                        className="px-5 py-2.5 bg-slate-900 text-white rounded-[0.9rem] text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 transition-all shadow-md shadow-indigo-100/50"
+                                        className="px-5 py-2.5 bg-slate-900 text-white rounded-[0.9rem] text-[10px] font-black uppercase tracking-wider hover:bg-indigo-600 transition-all shadow-md shadow-indigo-100/50"
                                     >
-                                        Full Profile
+                                        View Profile
                                     </button>
                                 </td>
                             </tr>
@@ -199,8 +205,8 @@ export default function MyStudentsPage() {
                             <tr>
                                 <td colSpan={4} className="px-8 py-20 text-center flex flex-col items-center justify-center">
                                     <Users className="w-12 h-12 text-slate-100 mb-4" />
-                                    <p className="text-slate-500 font-bold tracking-tight">No matching records in this classification.</p>
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Class: {currentClass.name}</p>
+                                    <p className="text-slate-500 font-bold tracking-tight">No students found.</p>
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Class: {currentClass.name}</p>
                                 </td>
                             </tr>
                         )}
@@ -210,8 +216,8 @@ export default function MyStudentsPage() {
           ) : (
             <div className="flex flex-col items-center justify-center h-[450px] text-center px-10">
                 <BookOpen className="w-20 h-20 text-slate-100 mb-6" />
-                <h4 className="text-lg font-black text-slate-700 mb-2">No Sessions Active</h4>
-                <p className="text-sm text-slate-400 max-w-xs font-medium">You don&apos;t have any assigned class sessions in the registry at this time.</p>
+                <h4 className="text-lg font-black text-slate-700 mb-2">No Classes</h4>
+                <p className="text-sm text-slate-400 max-w-xs font-medium">You don&apos;t have any assigned classes at this time.</p>
             </div>
           )}
       </div>

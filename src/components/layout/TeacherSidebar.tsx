@@ -17,18 +17,18 @@ import { useAuth } from "@/context/AuthContext";
 const navItems = [
   { label: "Main", items: [
     { name: "Dashboard", href: "/teacher/dashboard", icon: LayoutDashboard },
-    { name: "Session Ledger", href: "/teacher/ledger", icon: History },
+    { name: "Class History", href: "/teacher/ledger", icon: History },
     { name: "My Classes", href: "/teacher/classes", icon: Layers },
   ]},
-  { label: "Academic", items: [
-    { name: "Students List", href: "/teacher/students", icon: Users },
-    { name: "Timetable", href: "/teacher/timetable", icon: CalendarDays },
+  { label: "Classes", items: [
+    { name: "Students", href: "/teacher/students", icon: Users },
+    { name: "Schedule", href: "/teacher/timetable", icon: CalendarDays },
   ]},
-  { label: "Earnings", items: [
-    { name: "Salary History", href: "/teacher/salary", icon: Banknote },
+  { label: "Salary", items: [
+    { name: "My Salary", href: "/teacher/salary", icon: Banknote },
   ]},
   { label: "Account", items: [
-    { name: "My Profile", href: "/teacher/profile", icon: Settings },
+    { name: "Profile", href: "/teacher/profile", icon: Settings },
   ]},
 ];
 

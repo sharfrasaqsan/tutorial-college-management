@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, where, orderBy, getDocs, doc, deleteDoc, updateDoc, increment, writeBatch, deleteField } from "firebase/firestore";
+import { collection, query, where, orderBy, getDocs, getDoc, doc, deleteDoc, updateDoc, increment, writeBatch, deleteField } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { 
   CheckCircle2, 
@@ -18,7 +18,7 @@ import Modal from "@/components/ui/Modal";
 import { useAuth } from "@/context/AuthContext";
 import { format } from "date-fns";
 import toast from "react-hot-toast";
-import { Class, Salary } from "@/types/models";
+import { Class, Salary, Teacher } from "@/types/models";
 import { formatTime, formatMonthYear, formatDate } from "@/lib/formatters";
 
 interface SessionCompletion {
@@ -42,9 +42,23 @@ export default function SessionHistoryPage() {
   const { user } = useAuth();
   const [classes, setClasses] = useState<Class[]>([]);
   const [salaries, setSalaries] = useState<Salary[]>([]);
+  const [teacherData, setTeacherData] = useState<Teacher | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 17) return "Good Afternoon";
+    return "Good Evening";
+  };
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,15 +66,20 @@ export default function SessionHistoryPage() {
   const [cycleSessions, setCycleSessions] = useState<SessionCompletion[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
 
-  // 1. Initial Load: Fetch Teacher's Classes
+  // 1. Initial Load: Fetch Teacher's Classes & Profie
   useEffect(() => {
-    async function loadClasses() {
+    async function loadData() {
       if (!user?.uid) return;
       try {
-        const q = query(collection(db, "classes"), where("teacherId", "==", user.uid));
-        const snap = await getDocs(q);
-        const fetchedClasses = snap.docs.map(d => ({ ...d.data(), id: d.id } as Class));
+        const [classesSnap, teacherSnap] = await Promise.all([
+          getDocs(query(collection(db, "classes"), where("teacherId", "==", user.uid))),
+          getDoc(doc(db, "teachers", user.uid))
+        ]);
+
+        const fetchedClasses = classesSnap.docs.map(d => ({ ...d.data(), id: d.id } as Class));
         setClasses(fetchedClasses);
+        if (teacherSnap.exists()) setTeacherData(teacherSnap.data() as Teacher);
+        
         if (fetchedClasses.length > 0) {
           setActiveTab(fetchedClasses[0].id);
         }
@@ -70,7 +89,7 @@ export default function SessionHistoryPage() {
         setLoading(false);
       }
     }
-    loadClasses();
+    loadData();
   }, [user]);
 
   // 2. Fetch Salaries for Active Class & Year
@@ -133,51 +152,56 @@ export default function SessionHistoryPage() {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-700 pb-20">
       
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-        <div className="space-y-1">
-            <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-4">
-                <div className="bg-indigo-600 p-2 rounded-2xl shadow-lg shadow-indigo-100">
-                    <History className="w-6 h-6 text-white" />
-                </div>
-                Academic Ledgers
-            </h2>
-            <p className="text-slate-500 font-medium text-sm">Review your finalized academic cycles and payroll settlements.</p>
+      {/* 🏛️ Page Header - Dashboard Style Parity */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 py-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            Class History
+          </h1>
+          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider leading-none">
+            Your previous classes and payments
+          </p>
         </div>
-        
-        {/* Year Selector Dropdown */}
-        <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm self-start lg:self-center">
-            <div className="flex items-center gap-2 px-3 py-2 border-r border-slate-100">
+        <div className="flex items-center gap-3">
+          {/* Class Selection Dropdown */}
+          <div className="flex items-center gap-2 bg-white border border-slate-200 p-1 rounded-xl shadow-sm min-w-[200px]">
+            <div className="flex items-center gap-2 px-3 py-1.5 border-r border-slate-100">
+                <BookOpen className="w-4 h-4 text-indigo-500" />
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Class</span>
+            </div>
+            <select
+                value={activeTab || ""}
+                onChange={(e) => setActiveTab(e.target.value)}
+                className="bg-transparent flex-1 px-4 py-1.5 text-sm font-black text-slate-700 outline-none cursor-pointer hover:text-indigo-600 transition-colors uppercase tracking-tight"
+            >
+                {[...classes]
+                  .sort((a, b) => (a.grade || "").localeCompare(b.grade || "", undefined, { numeric: true }))
+                  .map(cls => (
+                    <option key={cls.id} value={cls.id}>{cls.name}</option>
+                ))}
+            </select>
+          </div>
+
+          {/* Year Selector Dropdown - Styled as Action */}
+          <div className="flex items-center gap-2 bg-white border border-slate-200 p-1 rounded-xl shadow-sm">
+            <div className="flex items-center gap-2 px-3 py-1.5 border-r border-slate-100">
                 <Calendar className="w-4 h-4 text-indigo-500" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Archive</span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Year</span>
             </div>
             <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
                 className="bg-transparent px-4 py-1.5 text-sm font-black text-slate-700 outline-none cursor-pointer hover:text-indigo-600 transition-colors"
             >
-                {[2023, 2024, 2025, 2026, 2027, 2028, 2029, 2030].map(y => (
+                {Array.from(new Set([
+                    new Date().getFullYear().toString(),
+                    ...salaries.map(s => s.month.split('-')[0])
+                ])).sort((a, b) => b.localeCompare(a)).map(y => (
                     <option key={y} value={y.toString()}>{y} Academic Year</option>
                 ))}
             </select>
+          </div>
         </div>
-      </div>
-
-      {/* Class Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-hide no-scrollbar">
-          {loading ? (
-            [1, 2, 3].map(i => <Skeleton key={i} width="140px" height="42px" className="rounded-xl flex-shrink-0" />)
-          ) : classes.length > 0 ? classes.map((cls) => (
-            <button
-                key={cls.id}
-                onClick={() => setActiveTab(cls.id)}
-                className={`flex-shrink-0 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${activeTab === cls.id ? 'bg-slate-900 border-slate-900 text-white shadow-xl shadow-slate-100' : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'}`}
-            >
-                {cls.grade} - {cls.name}
-            </button>
-          )) : (
-            <p className="text-xs text-slate-400 italic">No classes found.</p>
-          )}
       </div>
 
       {/* Cycles Grid */}
@@ -196,21 +220,21 @@ export default function SessionHistoryPage() {
                             </div>
                             <div>
                                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-0.5">{formatMonthYear(salary.month)}</p>
-                                <p className="text-sm font-black text-slate-800">Cycle {salary.id.slice(-4).toUpperCase()}</p>
+                                <p className="text-sm font-black text-slate-800">Payment {salary.id.slice(-4).toUpperCase()}</p>
                             </div>
                         </div>
-                        <span className={`px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border ${salary.status === 'paid' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
-                            {salary.status === 'paid' ? 'Settled' : 'Pending'}
+                        <span className={`px-3 py-1 rounded-md text-[9px] font-black uppercase tracking-wider border ${salary.status === 'paid' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-amber-50 text-amber-600 border-amber-100'}`}>
+                            {salary.status === 'paid' ? 'Paid' : 'Pending'}
                         </span>
                     </div>
                     <div className="p-6 flex-1 bg-white">
                         <div className="grid grid-cols-2 gap-4 mb-6">
                             <div>
-                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Sessions</p>
+                                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Classes Done</p>
                                 <p className="text-xl font-black text-slate-800">{salary.sessionsConducted} <span className="text-xs text-slate-400 font-bold">/ {salary.sessionsPerCycle}</span></p>
                             </div>
                             <div className="text-right">
-                                <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Settlement</p>
+                                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Amount</p>
                                 <p className="text-xl font-black text-indigo-600">LKR {salary.netAmount?.toLocaleString()}</p>
                             </div>
                         </div>
@@ -221,30 +245,30 @@ export default function SessionHistoryPage() {
                     <div className="p-2 bg-slate-50/50 border-t border-slate-50">
                         <button 
                             onClick={() => openCycleModal(salary)}
-                            className="w-full py-3 bg-white text-slate-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all shadow-sm flex items-center justify-center gap-2 border border-slate-200 group-hover:border-indigo-600"
+                            className="w-full py-3 bg-white text-slate-600 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-indigo-600 hover:text-white transition-all shadow-sm flex items-center justify-center gap-2 border border-slate-200 group-hover:border-indigo-600"
                         >
-                            View Breakdown <Navigation className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                            View Classes <Navigation className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                         </button>
                     </div>
                 </div>
             )) : (
                 <div className="col-span-full flex flex-col items-center justify-center py-20 text-center bg-white rounded-[3rem] border border-slate-100 outline outline-1 outline-slate-50">
                     <Layers className="w-16 h-16 text-slate-100 mb-4" />
-                    <h4 className="text-lg font-black text-slate-800">No Cycles Completed</h4>
-                    <p className="text-sm text-slate-400 max-w-sm mt-2">You haven't reached an 8-session milestone for this class yet. Keep teaching!</p>
+                    <h4 className="text-lg font-black text-slate-800">No classes yet</h4>
+                    <p className="text-sm text-slate-400 max-w-sm mt-2">You haven't reached 8 classes for this payment yet. Keep teaching!</p>
                 </div>
             )}
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center h-[400px] text-center px-10 bg-white rounded-[3rem] border border-slate-100 outline outline-1 outline-slate-50">
             <BookOpen className="w-20 h-20 text-slate-100 mb-6" />
-            <h4 className="text-xl font-black text-slate-700 mb-2 italic">Registry Standby</h4>
-            <p className="text-sm text-slate-400 max-w-xs font-medium">Select a class classification from the tabs above to inspect the cycle verification ledger.</p>
+            <h4 className="text-xl font-black text-slate-700 mb-2 italic">Select a Class</h4>
+            <p className="text-sm text-slate-400 max-w-xs font-medium">Pick a class from the list above to see your previous classes and payments.</p>
         </div>
       )}
 
       {/* Cycle Modal */}
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={`Ledger Detailed Breakdown`}>
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={`Detailed Breakdown`}>
         {selectedSalary && (
             <div className="space-y-6">
                 <div className="flex items-center justify-between p-5 bg-indigo-50 border border-indigo-100 rounded-3xl">
@@ -253,16 +277,16 @@ export default function SessionHistoryPage() {
                         <p className="text-2xl font-black text-indigo-900">{formatMonthYear(selectedSalary.month)}</p>
                     </div>
                     <div className="text-right">
-                        <p className="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-1">Audit Protocol</p>
-                        <span className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-widest border bg-white ${selectedSalary.status === 'paid' ? 'text-emerald-600 border-emerald-200' : 'text-amber-600 border-amber-200'} shadow-sm`}>
-                            {selectedSalary.status === 'paid' ? 'Settled' : 'Pending Review'}
+                        <p className="text-[10px] font-black uppercase tracking-wider text-indigo-400 mb-1">Status</p>
+                        <span className={`px-3 py-1 rounded-md text-[10px] font-black uppercase tracking-wider border bg-white ${selectedSalary.status === 'paid' ? 'text-emerald-600 border-emerald-200' : 'text-amber-600 border-amber-200'} shadow-sm`}>
+                            {selectedSalary.status === 'paid' ? 'Paid' : 'Pending'}
                         </span>
                     </div>
                 </div>
 
                 <div className="space-y-3">
-                    <h4 className="text-[11px] font-black uppercase tracking-widest text-slate-400 px-2 flex items-center gap-2">
-                        <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Logged Sessions ({cycleSessions.length}/{selectedSalary.sessionsPerCycle})
+                    <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-400 px-2 flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500" /> Recorded Classes ({cycleSessions.length}/{selectedSalary.sessionsPerCycle})
                     </h4>
                     
                     {sessionsLoading ? (
@@ -274,10 +298,10 @@ export default function SessionHistoryPage() {
                             <table className="w-full text-left">
                                 <thead>
                                     <tr className="bg-slate-50/50 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 border-b border-slate-100">
-                                        <th className="px-6 py-4">Sess.</th>
-                                        <th className="px-6 py-4">Logged Date</th>
-                                        <th className="px-6 py-4">Schedule Time</th>
-                                        <th className="px-6 py-4 text-right">Audit</th>
+                                        <th className="px-6 py-4">#</th>
+                                        <th className="px-6 py-4">Date</th>
+                                        <th className="px-6 py-4">Time</th>
+                                        <th className="px-6 py-4 text-right">Status</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
@@ -308,8 +332,8 @@ export default function SessionHistoryPage() {
                                                 )}
                                             </td>
                                             <td className="px-6 py-4 text-right">
-                                                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-md border border-emerald-100 text-[9px] font-black uppercase tracking-widest whitespace-nowrap">
-                                                    <CheckCircle2 className="w-3 h-3" /> Verified Entry
+                                                <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-md border border-emerald-100 text-[9px] font-black uppercase tracking-wider whitespace-nowrap">
+                                                    <CheckCircle2 className="w-3 h-3" /> Recorded
                                                 </div>
                                             </td>
                                         </tr>

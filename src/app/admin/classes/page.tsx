@@ -167,9 +167,9 @@ export default function ClassesPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-4">
         <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Campus Schedule</h1>
-            <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-widest">
-              Manage academic sessions and room assignments
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Class List</h1>
+            <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider">
+              View and manage all classes
             </p>
         </div>
         <button 

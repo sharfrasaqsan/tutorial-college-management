@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { collection, query, where, getDocs, doc, updateDoc, writeBatch, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { BookOpen, Users, Calendar, Clock, MapPin, Activity, Plus, Edit, Trash2, Ban, CheckCircle, Filter, X, Search, History as HistoryIcon } from "lucide-react";
+import { BookOpen, Users, Calendar, Clock, MapPin, Activity, Plus, Edit, Trash2, Ban, CheckCircle, Filter, X, Search, History as HistoryIcon, Projector, ArrowRight } from "lucide-react";
 import { Class, Grade, Subject } from "@/types/models";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
@@ -149,23 +149,61 @@ export default function MyClassesPage() {
     setSearchTerm("");
   };
 
+  const statCards = [
+    { title: "My Total Classes", value: classes.length, icon: Projector, color: "text-blue-500" },
+    { title: "Active Sessions", value: classes.filter(c => c.status === 'active').length, icon: CheckCircle, color: "text-emerald-500" },
+    { title: "Suspended", value: classes.filter(c => c.status === 'inactive').length, icon: Ban, color: "text-rose-500" },
+    { title: "Total Delivered", value: classes.reduce((sum, c) => sum + (c.completedSessions || 0), 0), icon: HistoryIcon, color: "text-indigo-500" },
+  ];
+
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="space-y-1">
-            <h2 className="text-2xl font-black text-slate-800 tracking-tight flex items-center gap-3">
-                <BookOpen className="w-7 h-7 text-indigo-600" /> Academic Portfolio
-            </h2>
-            <p className="text-slate-500 text-sm font-bold tracking-tight">Manage your scheduled sessions and monitor batch progress.</p>
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+      {/* 🏛️ Page Header - Dashboard Style Parity */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 py-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            My Classes
+          </h1>
+          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-widest leading-none">
+            Faculty Curricular Registry
+          </p>
         </div>
+
         <div className="flex flex-col sm:flex-row items-center gap-3">
-            <button 
-                onClick={handleAdd}
-                className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
-            >
-                <Plus className="w-4 h-4" /> Schedule Class
-            </button>
+          <button 
+            onClick={handleAdd}
+            className="w-full sm:w-auto px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-bold hover:bg-black transition-all flex items-center gap-2 shadow-sm"
+          >
+            <Plus className="w-3.5 h-3.5" /> Schedule Class
+          </button>
         </div>
+      </div>
+
+      {/* 🏛️ Specialized Stats Header */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 py-4">
+        {loading ? (
+            [1, 2, 3, 4].map(idx => (
+                <Skeleton key={idx} variant="rect" width="100%" height="80px" className="rounded-2xl" />
+            ))
+        ) : statCards.map((card, idx) => (
+          <div 
+            key={idx} 
+            className={`bg-white p-5 rounded-2xl border border-slate-200/60 transition-all duration-200 hover:border-indigo-300 group shadow-sm`}
+          >
+            <div className="flex flex-col gap-3">
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${card.color.replace('text-', 'bg-').split('-').slice(0, 2).join('-')}-50 ${card.color} transition-all shadow-sm`}>
+                <card.icon className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">{card.title}</p>
+                <div className="flex items-center gap-1">
+                  <p className="text-base font-bold text-slate-900 tracking-tight group-hover:text-indigo-600 transition-colors">{card.value}</p>
+                  <ArrowRight className="w-2.5 h-2.5 text-indigo-600 opacity-0 group-hover:opacity-100 transition-all translate-x-[-4px] group-hover:translate-x-0" />
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
 
       <ClassModal 
@@ -192,54 +230,51 @@ export default function MyClassesPage() {
       />
 
       {/* Control Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center shadow-sm">
-        <div className="relative w-full sm:max-w-xs">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-4 w-4 text-slate-400" />
+      <div className="bg-white/70 backdrop-blur-xl p-6 rounded-[2.5rem] border border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center shadow-xl shadow-slate-100/30">
+        <div className="relative w-full sm:max-w-md group">
+          <div className="absolute inset-y-0 left-6 flex items-center pointer-events-none">
+            <Search className="h-4 w-4 text-slate-400 group-hover:text-indigo-600 transition-colors" />
           </div>
           <input 
             type="text" 
             placeholder="Search your classes..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all font-medium"
+            className="w-full pl-14 pr-4 py-4 bg-white border border-slate-100 rounded-[1.5rem] text-[11px] font-black uppercase tracking-[0.1em] focus:ring-4 focus:ring-indigo-600/5 transition-all shadow-inner placeholder:text-slate-300 outline-none"
           />
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex gap-2">
            <button 
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex-1 sm:flex-none px-4 py-2 border rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${showFilters ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+            className={`w-12 h-12 flex items-center justify-center border rounded-2xl transition-all ${showFilters ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200' : 'bg-white border-slate-100 text-slate-400 hover:bg-slate-50 hover:text-indigo-600 shadow-sm'}`}
            >
-            <Filter className="w-4 h-4" /> Filters
-            {(filterGrade || filterSubject || filterDay || filterStatus) && (
-              <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></span>
-            )}
+            <Filter className="w-5 h-5" />
            </button>
         </div>
       </div>
 
-      {/* Filter Panel */}
+      {/* Enhanced Filter Panel */}
       {showFilters && (
-        <div className="p-5 rounded-2xl border border-slate-100 bg-white shadow-xl shadow-indigo-50/20 grid grid-cols-1 sm:grid-cols-5 gap-4 animate-in slide-in-from-top duration-300">
-           <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Grade</label>
+        <div className="p-8 rounded-[2.5rem] border border-slate-100 bg-white shadow-xl shadow-slate-100/20 grid grid-cols-1 sm:grid-cols-5 gap-6 animate-in slide-in-from-top-4 duration-500">
+           <div className="space-y-2">
+              <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Grade</label>
               <select 
                 value={filterGrade}
                 onChange={(e) => setFilterGrade(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-black uppercase tracking-wider focus:ring-4 focus:ring-indigo-600/5 transition-all outline-none"
               >
-                <option value="">All Grades</option>
+                <option value="">All Levels</option>
                 {Object.values(grades).map(g => (
                   <option key={g.id} value={g.id}>{g.name}</option>
                 ))}
               </select>
            </div>
-           <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Subject</label>
+           <div className="space-y-2">
+              <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Subject</label>
               <select 
                 value={filterSubject}
                 onChange={(e) => setFilterSubject(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-black uppercase tracking-wider focus:ring-4 focus:ring-indigo-600/5 transition-all outline-none"
               >
                 <option value="">All Subjects</option>
                 {Object.values(subjects).map(sub => (
@@ -247,12 +282,12 @@ export default function MyClassesPage() {
                 ))}
               </select>
            </div>
-           <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Day</label>
+           <div className="space-y-2">
+              <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Session Day</label>
               <select 
                 value={filterDay}
                 onChange={(e) => setFilterDay(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-black uppercase tracking-wider focus:ring-4 focus:ring-indigo-600/5 transition-all outline-none"
               >
                 <option value="">All Days</option>
                 {["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map(d => (
@@ -260,168 +295,136 @@ export default function MyClassesPage() {
                 ))}
               </select>
            </div>
-           <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Status</label>
+           <div className="space-y-2">
+              <label className="text-[9px] font-black uppercase text-slate-400 ml-1 tracking-widest">Status</label>
               <select 
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-[11px] font-black uppercase tracking-wider focus:ring-4 focus:ring-indigo-600/5 transition-all outline-none"
               >
-                <option value="">All Status</option>
-                <option value="active">Active</option>
+                <option value="">All States</option>
+                <option value="active">Operational</option>
                 <option value="inactive">Suspended</option>
               </select>
            </div>
            <div className="flex items-end">
               <button 
                 onClick={clearFilters}
-                className="w-full h-[38px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+                className="w-full h-[46px] px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 group"
               >
-                <X className="w-4 h-4" /> Reset
+                <X className="w-4 h-4 group-hover:rotate-90 transition-transform" /> Clear
               </button>
            </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {loading ? (
-          [1, 2, 3, 4].map(i => (
-            <div key={i} className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4 shadow-sm">
+          [1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="bg-white rounded-2xl border border-slate-200/60 p-5 space-y-4 shadow-sm animate-pulse">
               <div className="flex justify-between items-start mb-4">
-                <Skeleton variant="rect" width="48px" height="48px" className="rounded-2xl" />
-                <Skeleton variant="rect" width="60px" height="24px" className="rounded-md" />
+                <Skeleton variant="rect" width="40px" height="40px" className="rounded-xl" />
+                <Skeleton variant="rect" width="60px" height="20px" className="rounded-md" />
               </div>
-              <Skeleton variant="text" width="80%" height="24px" />
+              <Skeleton variant="text" width="80%" height="20px" />
               <div className="space-y-3 mt-6 pt-4 border-t border-slate-50">
-                <Skeleton variant="text" width="100%" height="40px" className="rounded-xl" />
+                <Skeleton variant="text" width="100%" height="12px" />
+                <Skeleton variant="text" width="100%" height="12px" />
               </div>
             </div>
           ))
         ) : filteredClasses.length > 0 ? filteredClasses.map((item) => {
           const isClassInactive = item.status === 'inactive';
+          const sessionsGoal = item.sessionsPerCycle || 8;
+          const sessionsPending = item.sessionsSinceLastPayment || 0;
+          const progressPercent = Math.min((sessionsPending / sessionsGoal) * 100, 100);
+
           return (
-            <div key={item.id} className={`bg-white rounded-3xl border border-slate-100 shadow-sm hover:shadow-xl hover:shadow-indigo-50/30 transition-all group overflow-hidden ${isClassInactive ? 'opacity-70 grayscale-[0.2]' : ''}`}>
-                <div className="p-6">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-colors duration-500 ${isClassInactive ? 'bg-slate-100 text-slate-400' : 'bg-indigo-50 text-indigo-600'}`}>
-                            <BookOpen className="w-6 h-6" />
-                        </div>
-                        <div className="flex flex-col items-end gap-2">
-                            <span className={`px-2.5 py-1 rounded-md text-[9px] font-black uppercase tracking-widest border ${isClassInactive ? 'bg-slate-100 text-slate-500 border-slate-200' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
-                                {isClassInactive ? 'Suspended' : 'Active'}
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="mb-6">
-                        <h3 className={`text-lg font-black mb-1 transition-colors ${isClassInactive ? 'text-slate-500' : 'text-slate-800'}`}>{item.name}</h3>
-                        <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                            <span>{item.subject}</span>
-                            <span className="w-1.5 h-1.5 bg-slate-200 rounded-full"></span>
-                            <span className="text-indigo-500">{item.grade} Batch</span>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 mb-6">
-                      <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50/50 border border-slate-100">
-                          <Users className="w-4 h-4 text-slate-400" />
-                          <div>
-                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Students</p>
-                              <p className="text-xs font-bold text-slate-700">{item.studentCount || 0}</p>
-                          </div>
-                      </div>
-                      <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-50/50 border border-slate-100">
-                          <Activity className="w-4 h-4 text-emerald-500" />
-                          <div>
-                              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Status</p>
-                              <p className="text-xs font-bold text-slate-700">Live</p>
-                          </div>
-                      </div>
-                    </div>
-
-                    <div className="mb-6">
-                        <div className="flex items-center justify-between mb-3">
-                           <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1 flex items-center gap-1.5">
-                              <Calendar className="w-3 h-3" /> Weekly Schedule
-                           </p>
-                        </div>
-                        <div className="space-y-2">
-                        {(item.schedules || [])
-                            .sort((a, b) => {
-                                const dayOrder: Record<string, number> = { 
-                                    "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3, 
-                                    "friday": 4, "saturday": 5, "sunday": 6 
-                                };
-                                const dayCompare = dayOrder[a.dayOfWeek.toLowerCase()] - dayOrder[b.dayOfWeek.toLowerCase()];
-                                if (dayCompare !== 0) return dayCompare;
-                                return a.startTime.localeCompare(b.startTime);
-                            })
-                            .map((schedule, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/30 border border-slate-100/50">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div>
-                                    <span className="text-[11px] font-bold text-slate-700 capitalize">{schedule.dayOfWeek}</span>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-500">
-                                        <Clock className="w-3.5 h-3.5 text-indigo-400" />
-                                        {formatTime(schedule.startTime)} - {formatTime(schedule.endTime)}
-                                    </div>
-                                    <div className="flex items-center gap-1 text-[10px] font-bold text-amber-500">
-                                        <MapPin className="w-3 h-3 child" />
-                                        {schedule.room || 'Hall'}
-                                    </div>
-                                </div>
+            <div key={item.id} className={`bg-white rounded-2xl border border-slate-200/60 transition-all duration-200 hover:border-indigo-300 flex flex-col group relative overflow-hidden ${isClassInactive ? 'grayscale-[0.5] opacity-80' : ''}`}>
+              
+                <div className="p-5 flex flex-col gap-4">
+                    <div className="flex justify-between items-start mb-1">
+                        <div className="flex items-center gap-4">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600`}>
+                                <BookOpen className="w-5 h-5" />
                             </div>
-                        ))}
+                            <div>
+                                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">{item.subject || '---'}</p>
+                                <h3 className="text-sm font-bold text-slate-900 tracking-tight leading-none group-hover:text-indigo-600 transition-colors">{item.name}</h3>
+                            </div>
+                        </div>
+                        <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${isClassInactive ? 'bg-slate-50 text-slate-400' : 'bg-emerald-50 text-emerald-600'}`}>
+                            {isClassInactive ? 'Suspended' : 'Active'}
+                        </span>
+                    </div>
+
+                    {/* Ledger Insights */}
+                    <div className="bg-slate-50/50 rounded-xl p-3 border border-slate-100 flex items-center justify-between">
+                        <div>
+                            <p className="text-[9px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">Cycle Milestone</p>
+                            <p className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                                <span className={sessionsPending >= sessionsGoal ? 'text-indigo-600' : 'text-slate-600'}>{sessionsPending}</span> 
+                                <span className="text-slate-300 font-medium">/ {sessionsGoal} Pending</span>
+                            </p>
+                        </div>
+                        <div className="w-16 h-1.5 bg-white rounded-full overflow-hidden border border-slate-100">
+                            <div 
+                                className={`h-full transition-all duration-1000 ease-out ${sessionsPending >= sessionsGoal ? 'bg-indigo-600' : 'bg-slate-300'}`} 
+                                style={{ width: `${progressPercent}%` }}
+                            ></div>
                         </div>
                     </div>
 
-                    <div className="flex gap-2 pt-6 border-t border-slate-50">
-                        {!isClassInactive && (
-                            <Link 
-                                href="/teacher/attendance"
-                                className="flex-1 bg-slate-900 text-white rounded-xl py-3 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-md shadow-indigo-100/50"
-                            >
-                                <HistoryIcon className="w-3.5 h-3.5" /> View Ledger
-                            </Link>
-                        )}
-                        <button 
-                            onClick={() => toggleStatus(item)}
-                            title={isClassInactive ? "Restore Session" : "Suspend Session"}
-                            className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all ${isClassInactive ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-slate-50 text-slate-400 hover:text-amber-600 hover:bg-amber-50'}`}
-                        >
-                            {isClassInactive ? <CheckCircle className="w-4 h-4" /> : <Ban className="w-4 h-4" />}
-                        </button>
-                        <button 
-                            onClick={() => handleEdit(item)}
-                            className="w-11 h-11 border border-slate-100 rounded-xl flex items-center justify-center text-slate-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                        >
-                            <Edit className="w-4 h-4" />
-                        </button>
-                        <button 
-                            onClick={() => confirmDelete(item.id)}
-                            className="w-11 h-11 border border-slate-100 rounded-xl flex items-center justify-center text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </button>
+                    <div className="space-y-3.5">
+                       <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                             <div className="w-7 h-7 rounded-lg bg-slate-50 border border-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition-all uppercase">
+                                {item.grade?.charAt(0)}
+                             </div>
+                             <p className="text-xs font-semibold text-slate-500 uppercase tracking-widest">{item.grade} Batch</p>
+                          </div>
+                          <p className="text-xs font-bold text-indigo-600">{item.studentCount || 0} Students</p>
+                       </div>
+                       
+                       <div className="space-y-2 pt-1">
+                          {(item.schedules || []).map((schedule, idx) => (
+                            <div key={idx} className="flex justify-between items-center text-[11px] text-slate-500 group-hover:text-slate-700 transition-colors">
+                               <span className="font-black uppercase tracking-widest">{schedule.dayOfWeek}</span>
+                               <span className="font-medium">{formatTime(schedule.startTime)} - {formatTime(schedule.endTime)}</span>
+                            </div>
+                          ))}
+                       </div>
                     </div>
+                </div>
+
+                <div className="mt-auto p-4 bg-slate-50/30 border-t border-slate-100 flex gap-2">
+                    <button 
+                        onClick={() => toggleStatus(item)}
+                        title={isClassInactive ? 'Restore session' : 'Suspend session'}
+                        className={`flex-1 flex items-center justify-center py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${isClassInactive ? 'bg-slate-900 text-white hover:bg-black' : 'bg-white border border-slate-200 text-slate-400 hover:text-amber-600 hover:border-amber-100 hover:bg-amber-50'}`}
+                    >
+                        {isClassInactive ? <CheckCircle className="w-3.5 h-3.5" /> : <Ban className="w-3.5 h-3.5" />}
+                    </button>
+                    <button 
+                        onClick={() => handleEdit(item)}
+                        className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 rounded-lg transition-all"
+                    >
+                        <Edit className="w-3.5 h-3.5" />
+                    </button>
+                    <button 
+                        onClick={() => confirmDelete(item.id)}
+                        className="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-400 hover:text-rose-600 hover:border-rose-100 hover:bg-rose-50 rounded-lg transition-all"
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                    </button>
                 </div>
             </div>
           );
         }) : (
-          <div className="col-span-full py-20 text-center bg-white rounded-3xl border-2 border-dashed border-slate-100">
-            <BookOpen className="w-12 h-12 text-slate-100 mx-auto mb-4" />
-            <p className="text-slate-500 font-bold tracking-tight mb-2">No matching classes found.</p>
-            {(searchTerm || filterGrade || filterSubject || filterDay || filterStatus) ? (
-              <button onClick={clearFilters} className="text-xs font-black uppercase tracking-widest text-indigo-600 hover:underline">Clear all filters</button>
-            ) : (
-              <button 
-                  onClick={handleAdd}
-                  className="mt-4 inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
-              >
-                  <Plus className="w-3 h-3" /> Schedule First Class
-              </button>
+          <div className="col-span-full py-20 text-center bg-white rounded-2xl border border-dashed border-slate-200">
+            <p className="text-slate-500 font-medium">No classes found matching your criteria.</p>
+            {(searchTerm || filterGrade || filterSubject || filterDay || filterStatus) && (
+              <button onClick={clearFilters} className="mt-4 text-sm font-black uppercase tracking-widest text-indigo-600 hover:underline">Clear all filters</button>
             )}
           </div>
         )}

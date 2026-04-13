@@ -296,10 +296,11 @@ export default function TimetablePage() {
       <div className="relative z-[60]">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 py-4">
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">My Timetable</h1>
-            <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
-              {format(currentTime, "EEEE, dd MMMM")} • {format(currentTime, "hh:mm a")}
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+              Weekly Timetable
+            </h1>
+            <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider leading-none">
+              {format(new Date(), "MMMM yyyy")} • <span className="text-indigo-600 font-bold">{teacherData?.name || "Verified Faculty"}</span>
             </p>
           </div>
 
@@ -308,7 +309,7 @@ export default function TimetablePage() {
               <button onClick={handlePrevMonth} className="p-2 hover:bg-slate-50 rounded-lg transition-all text-slate-400 hover:text-indigo-600"><ChevronLeft className="w-4 h-4" /></button>
               <button 
                 onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
-                className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-700 hover:text-indigo-600 transition-all flex items-center gap-2"
+                className="px-4 py-2 text-[10px] font-black uppercase tracking-wider text-slate-700 hover:text-indigo-600 transition-all flex items-center gap-2"
               >
                 {format(selectedDate, "MMMM yyyy")}
                 {isCalendarExpanded ? <ChevronUp className="w-3.5 h-3.5 text-indigo-600" /> : <ChevronDown className="w-3.5 h-3.5 text-indigo-600" />}
@@ -324,12 +325,6 @@ export default function TimetablePage() {
                   Sync Today
                 </button>
               )}
-              <button 
-                  onClick={() => setIsExtraModalOpen(true)}
-                  className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all shadow-xl shadow-indigo-100 flex items-center gap-2"
-              >
-                  <Zap className="w-3.5 h-3.5" /> Extra Class
-              </button>
             </div>
           </div>
         </div>
@@ -338,7 +333,7 @@ export default function TimetablePage() {
         {isCalendarExpanded && (
           <div className="absolute right-0 top-full mt-2 bg-white/90 backdrop-blur-xl p-6 rounded-[2rem] border border-slate-100 shadow-[0_32px_128px_-10px_rgba(79,70,229,0.3)] animate-in slide-in-from-top-4 duration-500 max-w-sm w-[calc(100vw-32px)] sm:w-80 overflow-hidden border-t-4 border-t-indigo-600 z-[100]">
           <div className="flex items-center justify-between gap-4 mb-6">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">Select Date</h4>
+            <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">Select Date</h4>
             <div className="flex items-center gap-1.5 font-bold">
               <div className="relative">
                 <button 
@@ -387,7 +382,7 @@ export default function TimetablePage() {
 
           <div className="grid grid-cols-7 gap-1">
             {["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"].map(day => (
-              <div key={day} className="h-8 flex items-center justify-center text-[9px] font-black uppercase tracking-widest text-slate-300">
+              <div key={day} className="h-8 flex items-center justify-center text-[9px] font-black uppercase tracking-wider text-slate-300">
                 {day}
               </div>
             ))}
@@ -412,7 +407,7 @@ export default function TimetablePage() {
 
           <button 
             onClick={() => setIsCalendarExpanded(false)}
-            className="w-full mt-4 py-2 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-rose-500 transition-colors border-t border-slate-50 pt-4"
+            className="w-full mt-4 py-2 text-[9px] font-black uppercase tracking-wider text-slate-400 hover:text-rose-500 transition-colors border-t border-slate-50 pt-4"
           >
             Close Calendar
           </button>
@@ -420,61 +415,31 @@ export default function TimetablePage() {
       )}
       </div>
 
-      {/* 🚀 High-Density Accomplishment HUD */}
-      <div className="bg-white/60 border border-slate-100 rounded-[2.5rem] p-6 flex flex-col md:flex-row items-center gap-8 group hover:bg-white hover:shadow-2xl hover:shadow-indigo-100/40 transition-all duration-700">
-          <div className="relative w-16 h-16 flex items-center justify-center bg-indigo-50 rounded-[1.5rem] shrink-0">
-            <Activity className="w-7 h-7 text-indigo-600" />
-            <svg className="absolute -inset-2 w-20 h-20" viewBox="0 0 100 100">
-                <circle className="text-slate-100 stroke-current" strokeWidth="6" fill="transparent" r="42" cx="50" cy="50" />
-                <circle 
-                    className="text-indigo-600 stroke-current transition-all duration-1000 ease-out" 
-                    strokeWidth="6" 
-                    strokeDasharray={263.8} 
-                    strokeDashoffset={263.8 - (263.8 * progressPercent) / 100} 
-                    strokeLinecap="round" 
-                    fill="transparent" 
-                    r="42" cx="50" cy="50" 
-                />
-            </svg>
-          </div>
-          <div className="flex-1 space-y-4 w-full">
-            <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest leading-none">Class Progress</h3>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-2">{completedCount} of {allSlots.length} Classes Completed</p>
-                </div>
-                <div className="text-right">
-                  <span className="text-2xl font-black text-indigo-600 italic">{Math.round(progressPercent)}%</span>
-                </div>
-            </div>
-            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden shadow-inner">
-                <div className="h-full bg-indigo-600 transition-all duration-1000 shadow-[0_0_15px_rgba(79,70,229,0.4)]" style={{ width: `${progressPercent}%` }}></div>
-            </div>
-          </div>
-      </div>
-
       {/* Selected Day Context Feed */}
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row items-center justify-between px-4 py-4 gap-4">
-            <div className="flex items-center gap-4">
-                <div className="w-1.5 h-8 bg-indigo-600 rounded-full shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
-                <div>
-                    <h3 className="text-2xl font-black text-slate-800 tracking-tight">
-                        {format(selectedDate, "EEEE, do MMMM")}
-                    </h3>
-                    <p className="text-[10px] font-black text-indigo-500/60 uppercase tracking-widest mt-0.5">Class Schedule</p>
-                </div>
+        <div className="flex flex-col sm:flex-row items-center justify-between px-2 py-4 gap-4">
+            <div className="flex items-center gap-3">
+                <div className="w-1 h-6 bg-indigo-600 rounded-full"></div>
+                <h3 className="text-xl font-bold text-slate-800 tracking-tight">
+                    {format(selectedDate, "EEEE, do MMMM")}
+                </h3>
             </div>
             <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white px-5 py-2.5 rounded-2xl border border-slate-100 shadow-sm">
-                    {allSlots.length} Total Sessions
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-4 py-2 rounded-xl border border-slate-100">
+                    {allSlots.length} Active Modules
                 </span>
+                <button 
+                    onClick={() => setIsExtraModalOpen(true)}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-bold hover:bg-indigo-700 transition-all shadow-lg flex items-center gap-2"
+                >
+                    <Zap className="w-3 h-3" /> Extra Class
+                </button>
             </div>
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           {loading ? (
-             [1, 2, 3].map(i => <div key={i} className="bg-white rounded-3xl border border-slate-100 h-24 animate-pulse" />)
+             [1, 2, 3, 4, 5].map(i => <div key={i} className="bg-white rounded-2xl border border-slate-100 h-20 animate-pulse" />)
           ) : allSlots.length > 0 ? (
             allSlots.map((slot) => {
               const active = isSlotLive(slot.startTime, slot.endTime);
@@ -486,32 +451,32 @@ export default function TimetablePage() {
               return (
                 <div 
                     key={slot.id} 
-                    className={`bg-white rounded-3xl border transition-all duration-500 px-8 py-5 flex flex-col lg:flex-row items-center justify-between gap-6 group/row ${slot.isCompleted ? 'bg-slate-50/40 border-slate-100 opacity-60' : active ? 'border-indigo-400 ring-4 ring-indigo-50 shadow-xl shadow-indigo-100/40' : 'border-slate-100 hover:border-indigo-200 hover:shadow-xl'}`}
+                    className={`bg-white rounded-2xl border transition-all duration-300 px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-4 group/row ${slot.isCompleted ? 'bg-slate-50/50 border-slate-100 opacity-60' : active ? 'border-indigo-600 ring-1 ring-indigo-600/10 shadow-lg shadow-indigo-600/5' : 'border-slate-100 hover:border-slate-200 hover:shadow-sm'}`}
                 >
-                  <div className="flex flex-1 items-center gap-8 w-full">
+                  <div className="flex flex-1 items-center gap-6 w-full">
                     {/* Time Module */}
-                    <div className="flex items-center gap-4 min-w-[160px]">
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xs transition-all ${active ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 rotate-3' : 'bg-slate-50 text-slate-500 group-hover/row:bg-indigo-50 group-hover/row:text-indigo-600'}`}>
+                    <div className="flex items-center gap-3 min-w-[140px]">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-[11px] ${active ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
                            {formatTime(slot.startTime).split(' ')[0]}
                         </div>
                         <div className="flex flex-col">
-                           <span className="text-[9px] font-black text-slate-300 uppercase tracking-widest leading-none mb-1.5">{formatTime(slot.startTime).split(' ')[1]}</span>
-                           <span className="text-sm font-black text-slate-800 tracking-tight tabular-nums">{formatTime(slot.startTime)} — {formatTime(slot.endTime)}</span>
+                           <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider leading-none mb-1">{formatTime(slot.startTime).split(' ')[1]}</span>
+                           <span className="text-[10px] font-bold text-slate-800 tracking-tight tabular-nums">{formatTime(slot.startTime)} — {formatTime(slot.endTime)}</span>
                         </div>
                     </div>
 
                     {/* Class Info Module */}
-                    <div className="flex flex-col gap-1.5 flex-1">
-                        <div className="flex items-center gap-3">
-                           <h4 className={`text-lg font-black tracking-tight transition-colors ${slot.isCompleted ? 'text-slate-400' : 'text-slate-900 group-hover/row:text-indigo-600'}`}>{slot.className}</h4>
-                           {slot.isExtra && <span className="px-2 py-0.5 bg-indigo-600 text-white text-[8px] font-black uppercase rounded-lg shadow-lg shadow-indigo-200 tracking-widest">Extra</span>}
+                    <div className="flex flex-col gap-1 flex-1">
+                        <div className="flex items-center gap-2">
+                           <h4 className={`text-base font-bold text-slate-900 tracking-tight transition-colors ${slot.isCompleted ? 'text-slate-400' : 'group-hover/row:text-indigo-600'}`}>{slot.className}</h4>
+                           {slot.isExtra && <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-500 text-[7px] font-black uppercase rounded border border-indigo-100 tracking-tighter">Extra Class</span>}
                         </div>
-                        <div className="flex flex-wrap items-center gap-5">
-                           <div className="flex items-center gap-2 text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                               <MapPin className="w-3.5 h-3.5 text-rose-400" /> {slot.room}
+                        <div className="flex items-center gap-4">
+                           <div className="flex items-center gap-1.5 text-[10px] font-medium text-slate-400">
+                               <MapPin className="w-3 h-3 text-rose-400" /> {slot.room}
                            </div>
-                           <div className="px-3 py-1 bg-slate-50 text-slate-400 text-[9px] font-black uppercase tracking-widest rounded-xl border border-slate-100 group-hover/row:border-indigo-100 group-hover/row:text-indigo-600 transition-all">{slot.subject}</div>
-                           <div className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[9px] font-black uppercase tracking-widest rounded-xl border border-indigo-100">{slot.grade}</div>
+                           <div className="px-2 py-0.5 bg-slate-50 text-slate-400 text-[8px] font-black uppercase tracking-wider rounded-md border border-slate-100">{slot.subject}</div>
+                           <div className="px-2 py-0.5 bg-indigo-50 text-indigo-600 text-[8px] font-black uppercase tracking-wider rounded-md border border-indigo-100">{slot.grade}</div>
                         </div>
                     </div>
                   </div>
@@ -520,51 +485,51 @@ export default function TimetablePage() {
                   <div className="flex items-center gap-8 w-full lg:w-auto justify-between lg:justify-end">
                     {slot.isPaid ? (
                         <div className="flex items-center gap-2 text-amber-500 bg-amber-50 px-4 py-2 rounded-2xl border border-amber-100">
-                           <Lock className="w-4 h-4" />
-                           <span className="text-[10px] font-black uppercase tracking-widest">Settled</span>
+                           <Lock className="w-3.5 h-3.5" />
+                           <span className="text-[9px] font-black uppercase tracking-wider">Paid</span>
                         </div>
                     ) : slot.isCompleted ? (
-                        <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-2xl border border-emerald-100">
-                           <CheckCircle2 className="w-4 h-4" />
-                           <span className="text-[10px] font-black uppercase tracking-widest">Completed</span>
+                        <div className="flex items-center gap-1.5 text-emerald-600">
+                           <CheckCircle2 className="w-3.5 h-3.5" />
+                           <span className="text-[9px] font-black uppercase tracking-wider">Done</span>
                         </div>
                     ) : active ? (
-                        <div className="flex items-center gap-2 px-4 py-2 bg-rose-500 text-white rounded-full text-[9px] font-black uppercase tracking-[0.1em] shadow-lg shadow-rose-200 animate-pulse">
-                           <div className="w-1.5 h-1.5 rounded-full bg-white"></div> LIVE NOW
+                        <div className="flex items-center gap-1.5 px-3 py-1 bg-rose-500 text-white rounded-full text-[8px] font-black uppercase tracking-[0.1em] animate-pulse">
+                           <span className="w-1 h-1 rounded-full bg-white"></span> LIVE
                         </div>
                     ) : isFuture ? (
-                        <div className="px-4 py-2 bg-slate-50 text-slate-400 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-slate-100">Scheduled</div>
+                        <div className="px-2 py-1 bg-slate-50 text-slate-400 rounded-lg text-[9px] font-black uppercase tracking-wider">Upcoming</div>
                     ) : (
-                        <div className="px-4 py-2 bg-indigo-50 text-indigo-500 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-indigo-100 shadow-sm">Mark Completed</div>
+                        <div className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[9px] font-black uppercase tracking-widest animate-shimmer">Mark Done</div>
                     )}
 
-                    <button 
+                    <div className="flex items-center gap-2">
+                       <button 
                         onClick={() => toggleClassCompletion(slot)}
                         disabled={slot.isPaid || (isFuture && !slot.isCompleted)}
-                        className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all shadow-xl group/btn ${
-                            slot.isPaid 
-                            ? 'bg-amber-50 text-amber-300 opacity-30 cursor-not-allowed' 
-                            : slot.isCompleted 
-                            ? 'bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 hover:border-rose-200' 
-                            : isFuture 
-                            ? 'bg-slate-50 text-slate-200 border-none cursor-not-allowed' 
-                            : 'bg-slate-900 text-white hover:bg-indigo-600 hover:shadow-indigo-200 active:scale-95'
+                        className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all border ${
+                            slot.isPaid ? 'bg-slate-50 text-slate-200 border-slate-100' :
+                            slot.isCompleted ? 'bg-white border-slate-200 text-rose-500 hover:bg-rose-50' :
+                            isFuture ? 'bg-slate-50 text-slate-100 border-none opacity-20' :
+                            'bg-slate-900 border-slate-900 text-white hover:bg-indigo-600'
                         }`}
-                    >
-                        {slot.isCompleted ? <RotateCcw className="w-6 h-6 group-hover/btn:rotate-[-120deg] transition-transform" /> : <CheckCircle2 className="w-7 h-7" />}
-                    </button>
+                       >
+                           {slot.isCompleted ? <RotateCcw className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                       </button>
+                    </div>
                   </div>
                 </div>
               );
             })
           ) : (
-            <div className="col-span-full py-40 text-center bg-slate-50/50 rounded-[4rem] border-4 border-dotted border-slate-100 mt-10">
-                <div className="w-24 h-24 bg-white rounded-[2.5rem] flex items-center justify-center shadow-2xl shadow-slate-200 mx-auto mb-10 border border-slate-50">
-                    <Clock className="w-12 h-12 text-slate-200" />
+            <div className="col-span-full py-32 text-center bg-slate-50/50 rounded-[4rem] border-4 border-dotted border-slate-100 shadow-inner">
+                <div className="w-24 h-24 bg-white rounded-[2.5rem] flex items-center justify-center shadow-2xl shadow-slate-200 mx-auto mb-8 border border-slate-50">
+                    <Clock className="w-10 h-10 text-slate-200 animate-spin-slow" />
                 </div>
-                <h4 className="text-2xl font-black text-slate-800 uppercase tracking-tight">No classes scheduled</h4>
-                <p className="text-[10px] font-black text-slate-400 mt-6 uppercase tracking-[0.3em] leading-loose max-w-sm mx-auto opacity-70">
-                    No classroom activity detected for the selected date.
+                <h4 className="text-2xl font-black text-slate-900 uppercase tracking-tight">No Classes</h4>
+                <p className="text-[10px] font-black text-slate-400 mt-4 uppercase tracking-[0.3em] leading-loose max-w-md mx-auto">
+                    No classes found for this date.<br/>
+                    Pick a different day using the <button onClick={() => setIsCalendarExpanded(true)} className="text-indigo-600 hover:underline font-bold">Calendar</button>.
                 </p>
             </div>
           )}

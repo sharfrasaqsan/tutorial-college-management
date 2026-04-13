@@ -149,9 +149,9 @@ export default function TeachersPage() {
       
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 py-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Teachers Directory</h1>
-          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-widest">
-            Manage faculty members and their assignments
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Teacher List</h1>
+          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider">
+            View and manage all teachers
           </p>
         </div>
         <button 

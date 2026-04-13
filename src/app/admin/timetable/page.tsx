@@ -157,8 +157,8 @@ export default function TimetablePage() {
       <div className="relative z-[60]">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 py-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Academic Timeline</h1>
-            <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-widest">
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Timetable</h1>
+            <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider">
               {format(currentTime, "EEEE, dd MMMM")} • {format(currentTime, "hh:mm a")}
             </p>
           </div>
@@ -168,7 +168,7 @@ export default function TimetablePage() {
               <button onClick={handlePrevMonth} className="p-2 hover:bg-slate-50 rounded-lg transition-all text-slate-400 hover:text-primary"><ChevronLeft className="w-4 h-4" /></button>
               <button 
                 onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
-                className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-slate-700 hover:text-primary transition-all flex items-center gap-2"
+                className="px-4 py-2 text-[10px] font-black uppercase tracking-wider text-slate-700 hover:text-primary transition-all flex items-center gap-2"
               >
                 {format(selectedDate, "MMMM yyyy")}
                 {isCalendarExpanded ? <ChevronUp className="w-3.5 h-3.5 text-primary" /> : <ChevronDown className="w-3.5 h-3.5 text-primary" />}
@@ -180,7 +180,7 @@ export default function TimetablePage() {
                 onClick={handleJumpToToday} 
                 className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-bold hover:bg-black transition-all flex items-center gap-2 shadow-sm"
               >
-                Sync Today
+                Today
               </button>
             )}
           </div>

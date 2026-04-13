@@ -328,7 +328,7 @@ export default function TeacherDashboard() {
     if (!user?.uid) return;
 
     if (classItem.isPaid) {
-      toast.error("Audit Locked: Session settled.");
+      toast.error("Already paid.");
       return;
     }
 
@@ -394,7 +394,7 @@ export default function TeacherDashboard() {
           sessionsSinceLastPayment: increment(pendingDelta),
         });
         await batch.commit();
-        toast.success(`Session reverted.`);
+        toast.success(`Class undone.`);
       } else {
         await setDoc(completionRef, {
           classId: classItem.id,
@@ -418,7 +418,7 @@ export default function TeacherDashboard() {
           completedSessions: increment(1),
           sessionsSinceLastPayment: increment(1),
         });
-        toast.success(`Session completed!`);
+        toast.success(`Class done!`);
 
         try {
           const classQ = query(
@@ -443,7 +443,7 @@ export default function TeacherDashboard() {
               completionId,
             );
             if (pr.success)
-              toast.success("Cycle milestone reached!", { icon: "💰" });
+              toast.success("Payment ready!", { icon: "💰" });
           }
         } catch (e) {}
       }
@@ -507,35 +507,35 @@ export default function TeacherDashboard() {
       bg: "bg-blue-50",
     },
     {
-      title: "Active Classes",
+      title: "Classes",
       value: stats.activeClasses,
       icon: Projector,
       color: "text-violet-500",
       bg: "bg-violet-50",
     },
     {
-      title: "Today's Work",
+      title: "Done Today",
       value: stats.completedToday,
       icon: Clock,
       color: "text-emerald-500",
       bg: "bg-emerald-50",
     },
     {
-      title: "Pending Logs",
+      title: "Classes to Log",
       value: stats.pendingSessions,
       icon: History,
       color: "text-orange-500",
       bg: "bg-orange-50",
     },
     {
-      title: "Settlements",
+      title: "Paid Months",
       value: stats.cyclesCompletedYear,
       icon: Wallet,
       color: "text-indigo-500",
       bg: "bg-indigo-50",
     },
     {
-      title: "Faculty Tenure",
+      title: "Joined",
       value: stats.tenureLabel,
       icon: Briefcase,
       color: "text-rose-500",
@@ -551,7 +551,7 @@ export default function TeacherDashboard() {
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
             My Dashboard
           </h1>
-          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-widest leading-none">
+          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider leading-none">
             {getGreeting()},{" "}
             <span className="text-indigo-600 font-black">
               {teacherData?.name?.split(" ")[0]}
@@ -607,13 +607,13 @@ export default function TeacherDashboard() {
         <div className="lg:col-span-7 bg-white rounded-[4rem] border border-slate-100 shadow-2xl shadow-slate-100/50 overflow-hidden flex flex-col group/table hover:border-indigo-100 transition-all duration-700">
           <div className="px-10 py-10 border-b border-slate-50 flex items-center justify-between bg-white relative">
             <div className="flex items-center gap-5">
-              <div className="w-1.5 h-10 bg-indigo-600 rounded-full group-hover/table:scale-y-110 transition-transform"></div>
+              <div className="w-1.5 h-10 bg-indigo-600 rounded-full group-hover/table:scale-y-110 transition-transform shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
               <div>
-                <h3 className="font-black text-slate-800 tracking-[0.2em] uppercase text-xs">
+                <h3 className="font-black text-slate-800 tracking-wider uppercase text-xs">
                   My Classes
                 </h3>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mt-1.5 opacity-80">
-                  Class cycle progress
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mt-1.5 opacity-80">
+                  Class progress
                 </p>
               </div>
             </div>
@@ -627,7 +627,7 @@ export default function TeacherDashboard() {
 
           <div className="p-0 flex-1 overflow-x-auto">
             <table className="w-full text-xs text-left whitespace-nowrap border-collapse">
-              <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 border-b border-slate-100">
+              <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100">
                 <tr>
                   <th className="px-8 py-5">Class Name</th>
                   <th className="px-8 py-5">Class Progress</th>
@@ -699,15 +699,15 @@ export default function TeacherDashboard() {
 
         {/* 📟 Today's Timeline (Right - 5 cols) */}
         <div className="lg:col-span-5 bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col hover:border-indigo-100/5 transition-all duration-500">
-          <div className="px-8 py-6 border-b border-slate-50 bg-white flex items-center justify-between relative">
-            <div className="flex items-center gap-4">
-              <div className="w-1 h-6 bg-indigo-600 rounded-full"></div>
+          <div className="px-8 py-8 border-b border-slate-50 bg-white flex items-center justify-between relative group/timeline">
+            <div className="flex items-center gap-5">
+              <div className="w-1.5 h-10 bg-indigo-600 rounded-full group-hover/timeline:scale-y-110 transition-transform shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
               <div>
-                <h3 className="font-bold text-slate-800 text-sm">
-                  Today&apos;s Schedule
+                <h3 className="text-xs font-black uppercase text-slate-800 tracking-wider">
+                  Schedule
                 </h3>
-                <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">
-                  Class Timeline
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider mt-1.5 opacity-80">
+                  Today
                 </p>
               </div>
             </div>

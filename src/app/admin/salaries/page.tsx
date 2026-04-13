@@ -171,7 +171,11 @@ export default function SalariesPage() {
 
   const totalPayout = salaries.reduce((sum, s) => s.status === 'paid' ? sum + (s.netAmount || 0) : sum, 0);
   const pendingCount = salaries.filter(s => s.status === 'pending').length;
-  const availableYears = Array.from(new Set([...salaries.map(s => s.month.split('-')[0]), "2024", "2025", "2026"])).sort((a, b) => b.localeCompare(a));
+  const currentYear = new Date().getFullYear().toString();
+  const availableYears = Array.from(new Set([
+    currentYear,
+    ...salaries.map(s => s.month.split('-')[0])
+  ])).sort((a, b) => b.localeCompare(a));
 
   const statCards = [
     { title: "Authorized Payout", value: `LKR ${totalPayout.toLocaleString()}`, icon: DollarSign, color: "text-indigo-500" },
@@ -185,9 +189,9 @@ export default function SalariesPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Financial Terminal</h1>
-          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-widest">
-            Audit and authorize faculty salary settlements
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Teacher Salaries</h1>
+          <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider">
+            Review and pay teacher salaries
           </p>
         </div>
         <button 
