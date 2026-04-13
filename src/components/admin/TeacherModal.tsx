@@ -70,9 +70,10 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
     reset,
     setValue,
     watch,
-    formState: { errors },
+    formState: { errors, isValid },
   } = useForm<TeacherForm>({
     resolver: zodResolver(teacherSchema),
+    mode: "onChange",
     defaultValues: {
       status: "active",
       gender: "male",
@@ -417,7 +418,12 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
             <button type="button" onClick={onClose} className="px-6 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-800 transition-all">
               Discard
             </button>
-            <button form="teacher-form" type="submit" disabled={loading} className="flex-1 sm:flex-none px-10 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-black transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-50">
+            <button 
+                form="teacher-form" 
+                type="submit" 
+                disabled={loading || !isValid} 
+                className="flex-1 sm:flex-none px-10 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-black transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Refactor Profile" : "Authorize Faculty")}
             </button>
           </div>

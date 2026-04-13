@@ -46,10 +46,10 @@ export default function SubjectsPage() {
     try {
         const newStatus = item.status === 'active' ? 'inactive' : 'active';
         await updateDoc(doc(db, "subjects", item.id), { status: newStatus });
-        toast.success(newStatus === 'active' ? "Subject restored." : "Subject suspended.");
+        toast.success(newStatus === 'active' ? "Subject Reactivated: Curriculum definition is now active." : "Subject Suspended: Curriculum definition has been successfully archived.");
         loadSubjects();
     } catch {
-        toast.error("Failed to update subject status.");
+        toast.error("System Error: Failed to synchronize subject status updates.");
     }
   };
 
@@ -84,13 +84,13 @@ export default function SubjectsPage() {
         batch.delete(doc(db, "subjects", subjectToDelete));
         
         await batch.commit();
-        toast.success("Subject definition purged. Associated classes suspended.");
+        toast.success("Purge Successful: Subject definition removed and related instructional classes suspended.");
         setIsDeleteOpen(false);
         setSubjectToDelete(null);
         loadSubjects();
     } catch (error) {
         console.error("Error deleting subject:", error);
-        toast.error("Process failed.");
+        toast.error("Process Aborted: Failed to purge subject record from the registry.");
     } finally {
         setDeleting(false);
     }

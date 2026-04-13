@@ -3,10 +3,12 @@
 import { useState, useRef, useEffect } from "react";
 import { Bell, CheckCheck, Info, CheckCircle, AlertTriangle, XCircle, Clock, ExternalLink, X } from "lucide-react";
 import { useNotifications, Notification } from "@/hooks/useNotifications";
+import { useAuth } from "@/context/AuthContext";
 import { formatDistanceToNow } from "date-fns";
 import Link from "next/link";
 
 export default function NotificationCenter() {
+  const { role } = useAuth();
   const { notifications, unreadCount, markAsRead, markAllAsRead, loading } = useNotifications();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -134,9 +136,13 @@ export default function NotificationCenter() {
 
           {/* Footer */}
           <div className="px-6 py-4 border-t border-slate-50 text-center">
-            <button className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-primary transition-colors">
+            <Link 
+                href={`/${role}/notifications`}
+                onClick={() => setIsOpen(false)}
+                className="text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-primary transition-colors inline-block"
+            >
                 View all activity logs
-            </button>
+            </Link>
           </div>
         </div>
       )}

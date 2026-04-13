@@ -96,10 +96,10 @@ export default function SalariesPage() {
         });
       }
 
-      toast.success(newStatus === 'paid' ? "Salary authorized — sessions locked." : "Salary reverted to pending — sessions unlocked.");
+      toast.success(newStatus === 'paid' ? "Fiscal Authorization Successful: Salary record locked and sessions marked as settled." : "Transaction Reverted: Salary status set to pending and sessions unlocked for editing.");
       loadData();
     } catch {
-      toast.error("Failed to update status.");
+      toast.error("Process Error: Failed to synchronize salary status with the institutional ledger.");
     }
   };
 
@@ -133,13 +133,13 @@ export default function SalariesPage() {
 
       await batch.commit();
       
-      toast.success("Payroll record purged and sessions restored for re-processing.");
+      toast.success("Hard Reset Successful: Payroll record purged and associated sessions restored for re-processing.");
       setIsDeleteOpen(false);
       setSelectedSalary(null);
       loadData();
     } catch (error) {
       console.error("Deletion error:", error);
-      toast.error("Critical: Fiscal rollback failed.");
+      toast.error("Critical Integrity Failure: Fiscal rollback process failed. Please contact system architect.");
     } finally {
       setActionLoading(false);
     }

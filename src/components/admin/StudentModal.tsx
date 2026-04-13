@@ -211,7 +211,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
         });
         
         await batch.commit();
-        toast.success("Profile updated successfully.");
+        toast.success("Profile Synchronization Successful: Student records updated and verified.");
       } else {
         const studentRef = doc(collection(db, "students"));
         const studentId = await generateId("student");
@@ -226,13 +226,13 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
         });
 
         await batch.commit();
-        toast.success("Student registered.");
+        toast.success("Admission Authorized: New student successfully registered to the institution registry.");
       }
       onSuccess();
       onClose();
     } catch (error) {
       console.error("Error saving student:", error);
-      toast.error(`System error during data persistence.`);
+      toast.error("Data Persistence Failure: System could not finalize the registry entry.");
     } finally {
       setLoading(false);
     }
@@ -485,7 +485,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
               form="student-form"
               type="submit"
               disabled={loading || !isValid}
-              className={`flex-1 sm:flex-none px-10 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-0 disabled:pointer-events-none ${activeTab === 'logistics' || initialData ? '' : 'hidden'}`}
+              className="flex-1 sm:flex-none px-10 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Refactor Profile" : "Complete Admission")}
             </button>

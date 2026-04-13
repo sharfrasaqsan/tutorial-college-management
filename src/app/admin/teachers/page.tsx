@@ -77,10 +77,10 @@ export default function TeachersPage() {
       const newStatus = teacher.status === 'active' ? 'inactive' : 'active';
       await updateDoc(doc(db, "teachers", teacher.id), { status: newStatus });
       await updateDoc(doc(db, "users", teacher.id), { status: newStatus });
-      toast.success(newStatus === 'active' ? "Faculty member active." : "Faculty member suspended.");
+      toast.success(newStatus === 'active' ? "Operational Status: Faculty credentials reactivated." : "Operational Status: Faculty credentials suspended and archived.");
       loadTeachers();
     } catch {
-      toast.error("Failed to update status.");
+      toast.error("System Error: Failed to synchronize faculty status updates.");
     }
   };
 
@@ -106,13 +106,13 @@ export default function TeachersPage() {
         batch.delete(doc(db, "users", teacherToDelete));
         
         await batch.commit();
-        toast.success("Faculty records purged. Linked classes suspended.");
+        toast.success("Archive Purge Successful: Faculty credentials removed and associated instructional classes suspended.");
         setIsDeleteOpen(false);
         setTeacherToDelete(null);
         loadTeachers();
     } catch (error) {
         console.error("Error deleting teacher:", error);
-        toast.error("Process failed.");
+        toast.error("Process Aborted: Failed to purge faculty record from the registry.");
     } finally {
         setDeleting(false);
     }

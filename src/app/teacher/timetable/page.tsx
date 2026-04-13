@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { Class, ClassSchedule } from "@/types/models";
+import { Class, ClassSchedule, Teacher } from "@/types/models";
 import { format, addMonths, subMonths, isSameDay, isToday, startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, setYear, setMonth, isAfter } from "date-fns";
 import { formatTime } from "@/lib/formatters";
 import toast from "react-hot-toast";
@@ -58,6 +58,7 @@ export default function TimetablePage() {
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [teacherData, setTeacherData] = useState<Teacher | null>(null);
 
   const [isYearPickerOpen, setIsYearPickerOpen] = useState(false);
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
@@ -70,6 +71,15 @@ export default function TimetablePage() {
     const timer = setInterval(() => setCurrentTime(new Date()), 30000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    const fetchTeacher = async () => {
+        const docSnap = await getDoc(doc(db, "teachers", user.uid));
+        if (docSnap.exists()) setTeacherData({ id: docSnap.id, ...docSnap.data() } as Teacher);
+    };
+    fetchTeacher();
+  }, [user]);
 
   useEffect(() => {
     if (!user?.uid) return;

@@ -109,7 +109,8 @@ export async function processTeacherPayroll(
                 title: "Class Cycle Finalized",
                 message: `${teacherName} has completed the cycle for ${cls.name}. Payroll record for ${month} is pending authorization.`,
                 type: "success",
-                link: "/admin/salaries"
+                link: "/admin/salaries",
+                sourceId: salaryId
             });
         }
 

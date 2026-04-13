@@ -328,7 +328,7 @@ export default function TeacherDashboard() {
     if (!user?.uid) return;
 
     if (classItem.isPaid) {
-      toast.error("Already paid.");
+      toast.error("Transactional integrity: This session is already settled and cannot be modified.");
       return;
     }
 
@@ -348,7 +348,7 @@ export default function TeacherDashboard() {
     slotDT.setHours(startH, startM, 0, 0);
 
     if (isAfter(slotDT, now) && !isCurrentlyCompleted) {
-      toast.error("This session hasn't started yet.");
+      toast.error("Early Access Restricted: Session logging is only available after the scheduled start time.");
       return;
     }
 
@@ -376,6 +376,15 @@ export default function TeacherDashboard() {
             const sessionsCovered = salarySnap.data().sessionsConducted || 0;
             pendingDelta = sessionsCovered - 1;
             batch.delete(salaryRef);
+
+            // 🚨 Revert Administrative Notifications
+            const notifQ = query(
+              collection(db, "notifications"),
+              where("sourceId", "==", completionData.salaryId),
+            );
+            const notifSnap = await getDocs(notifQ);
+            notifSnap.docs.forEach((ndoc) => batch.delete(ndoc.ref));
+
             const otherCompletionsQ = query(
               collection(db, "session_completions"),
               where("salaryId", "==", completionData.salaryId),
@@ -394,7 +403,7 @@ export default function TeacherDashboard() {
           sessionsSinceLastPayment: increment(pendingDelta),
         });
         await batch.commit();
-        toast.success(`Class undone.`);
+        toast.success("Session log reverted: Institutional counters have been adjusted.");
       } else {
         await setDoc(completionRef, {
           classId: classItem.id,
@@ -418,7 +427,7 @@ export default function TeacherDashboard() {
           completedSessions: increment(1),
           sessionsSinceLastPayment: increment(1),
         });
-        toast.success(`Class done!`);
+        toast.success("Session successfully recorded: Academic progress logged to repository.");
 
         try {
           const classQ = query(
@@ -443,12 +452,12 @@ export default function TeacherDashboard() {
               completionId,
             );
             if (pr.success)
-              toast.success("Payment ready!", { icon: "💰" });
+              toast.success("Cycle Milestone Reached: Payroll request generated and awaiting authorization.", { icon: "💰" });
           }
         } catch (e) {}
       }
     } catch (e) {
-      toast.error("Process failed.");
+      toast.error("System Synchronization Error: Failed to update session registry.");
     }
   };
 

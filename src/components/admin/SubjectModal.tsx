@@ -49,9 +49,10 @@ export default function SubjectModal({ isOpen, onClose, onSuccess, initialData }
     handleSubmit,
     reset,
     watch,
-    formState: { errors },
+    formState: { errors, isValid },
   } = useForm<SubjectForm>({
     resolver: zodResolver(subjectSchema),
+    mode: "onChange",
     defaultValues: {
         color: "bg-emerald-100 text-emerald-600",
         status: "active"
@@ -240,8 +241,8 @@ export default function SubjectModal({ isOpen, onClose, onSuccess, initialData }
                 <button 
                   form="subject-form"
                   type="submit"
-                  disabled={loading}
-                  className="px-10 py-3 bg-indigo-600 text-white rounded-xl text-xs font-black hover:bg-black transition-all shadow-xl shadow-indigo-100 flex items-center justify-center gap-2"
+                  disabled={loading || !isValid}
+                  className="px-10 py-3 bg-indigo-600 text-white rounded-xl text-xs font-black hover:bg-black transition-all shadow-xl shadow-indigo-100 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Refactor Subject" : "Create Subject")}
                 </button>

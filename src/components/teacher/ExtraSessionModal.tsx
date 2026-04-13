@@ -168,12 +168,12 @@ export default function ExtraSessionModal({ isOpen, onClose, onSuccess, classes,
         link: "/admin/timetable"
       });
 
-      toast.success("Extra class added!");
+      toast.success("Authorization Successful: Extra academic session has been scheduled and authorized.");
       onSuccess();
       onClose();
     } catch (e) {
       console.error(e);
-      toast.error("System error.");
+      toast.error("Synchronization Error: System encountered a conflict while authorizing the extra session.");
     } finally {
       setLoading(false);
     }
@@ -431,10 +431,10 @@ export default function ExtraSessionModal({ isOpen, onClose, onSuccess, classes,
             </button>
             <button 
               onClick={handleFinalSubmit}
-              disabled={loading}
-              className={`flex-1 sm:flex-none px-10 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-0 disabled:pointer-events-none ${activeTab === 'verify' ? '' : 'hidden'}`}
+              disabled={loading || !selectedClassId || !sessionDate || !startTime || !endTime || !room}
+              className="flex-1 sm:flex-none px-10 py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Add Class"}
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Authorize Extra Class"}
             </button>
           </div>
         </div>

@@ -23,6 +23,7 @@ export interface Notification {
   type: "info" | "success" | "warning" | "error";
   status: "unread" | "read";
   link?: string;
+  sourceId?: string;
   createdAt: any;
 }
 
@@ -83,7 +84,20 @@ export function useNotifications() {
     }
   };
 
-  return { notifications, unreadCount, loading, markAsRead, markAllAsRead };
+  const clearAll = async () => {
+    if (!user) return;
+    try {
+      const batch = writeBatch(db);
+      notifications.forEach(n => {
+        batch.delete(doc(db, "notifications", n.id));
+      });
+      await batch.commit();
+    } catch (error) {
+      console.error("Error clearing notifications:", error);
+    }
+  };
+
+  return { notifications, unreadCount, loading, markAsRead, markAllAsRead, clearAll };
 }
 
 export const createNotification = async (notif: Omit<Notification, "id" | "createdAt" | "status">) => {

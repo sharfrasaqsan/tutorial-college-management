@@ -278,13 +278,7 @@ export default function AdminProfilePage() {
                             </div>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pt-6 border-t border-slate-50">
-                            <div className="flex items-center gap-3">
-                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cloud Saved</p>
-                            </div>
-                          
-                        </div>
+                     
                     </form>
                 </div>
             </div>

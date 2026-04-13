@@ -10,6 +10,7 @@ import {
   History,
   Banknote,
   Settings,
+  Bell,
   LogOut
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -28,6 +29,7 @@ const navItems = [
     { name: "My Salary", href: "/teacher/salary", icon: Banknote },
   ]},
   { label: "Account", items: [
+    { name: "Activity Hub", href: "/teacher/notifications", icon: Bell },
     { name: "Profile", href: "/teacher/profile", icon: Settings },
   ]},
 ];

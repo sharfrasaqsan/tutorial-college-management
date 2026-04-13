@@ -1,16 +1,14 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { collection, getDocs, getDoc, query, orderBy, serverTimestamp, doc, writeBatch, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Loader2, BookOpen, Calendar, Clock, Plus, Trash2, X, Settings2, Hash, ArrowRight, ShieldCheck, CreditCard, Layers } from "lucide-react";
+import { Loader2, BookOpen, Calendar, Clock, Plus, Trash2, X, Settings2, ArrowRight, CreditCard, Layers, AlertTriangle } from "lucide-react";
 import { Teacher, Grade, Subject, Class } from "@/types/models";
 import toast from "react-hot-toast";
-import Skeleton from "@/components/ui/Skeleton";
-import { formatTime } from "@/lib/formatters";
 import { createNotification } from "@/hooks/useNotifications";
 
 const scheduleSchema = z.object({
@@ -48,6 +46,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [metaLoading, setMetaLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'curriculum' | 'schedule'>('curriculum');
+  const [conflicts, setConflicts] = useState<Record<number, string>>({});
 
   const {
     register,
@@ -191,6 +190,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
 
   const onSubmit = async (data: ClassForm) => {
     setLoading(true);
+    setConflicts({}); // Clear previous conflicts
     try {
       const classesSnap = await getDocs(collection(db, "classes"));
       const currentClasses = classesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Class));
@@ -199,21 +199,23 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
           return s1 < e2 && s2 < e1;
       };
 
+      const newConflicts: Record<number, string> = {};
+
       for (let i = 0; i < data.schedules.length; i++) {
-        for (let j = i + 1; j < data.schedules.length; j++) {
+        for (let j = 0; j < data.schedules.length; j++) {
+            if (i === j) continue;
             const slot1 = data.schedules[i];
             const slot2 = data.schedules[j];
             if (slot1.dayOfWeek.trim().toLowerCase() === slot2.dayOfWeek.trim().toLowerCase()) {
                 if (hasOverlap(slot1.startTime, slot1.endTime, slot2.startTime, slot2.endTime)) {
-                    toast.error(`Internal Schedule Conflict on ${slot1.dayOfWeek}.`);
-                    setLoading(false);
-                    return;
+                    newConflicts[i] = "Internal Day/Time Overlap";
                 }
             }
         }
       }
 
-      for (const newSlot of data.schedules) {
+      for (let i = 0; i < data.schedules.length; i++) {
+          const newSlot = data.schedules[i];
           for (const existing of currentClasses) {
               if (initialData && existing.id === initialData.id) continue;
               if (existing.status !== 'active') continue;
@@ -226,21 +228,26 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
                   if (!timeOverlap) continue;
 
                   if (newSlot.room.trim().toLowerCase() === existingSlot.room.trim().toLowerCase()) {
-                      toast.error(`Room Conflict: ${newSlot.room} is occupied.`);
-                      setLoading(false); return;
+                      newConflicts[i] = `Room "${newSlot.room}" occupied by ${existing.name}`;
                   }
 
                   if (data.teacherId === existing.teacherId) {
-                      toast.error(`Teacher Conflict: This instructor is busy.`);
-                      setLoading(false); return;
+                      newConflicts[i] = `Instructor busy with ${existing.name}`;
                   }
 
                   if (data.gradeId === existing.gradeId) {
-                      toast.error(`Grade Conflict: This level has another session scheduled.`);
-                      setLoading(false); return;
+                      newConflicts[i] = `Grade overlapping with ${existing.name}`;
                   }
               }
           }
+      }
+
+      if (Object.keys(newConflicts).length > 0) {
+        setConflicts(newConflicts);
+        toast.error("Timeline Collision Detected: Institutional resources (Teacher/Room) are overlapping. Review highlighted slots.");
+        setLoading(false);
+        setActiveTab('schedule');
+        return;
       }
 
       const batch = writeBatch(db);
@@ -281,7 +288,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
           link: "/teacher/classes"
         });
 
-        toast.success("Schedule refactored successfully.");
+        toast.success("Archive Update Successful: Class schedule has been refactored and synchronized.");
       } else {
         const classRef = doc(collection(db, "classes"));
         if (data.gradeId) batch.update(doc(db, "grades", data.gradeId), { classCount: increment(1) });
@@ -297,14 +304,14 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
           link: "/teacher/classes"
         });
 
-        toast.success("Academic class authorized.");
+        toast.success("Institutional Authorization Successful: New academic class has been registered in the terminal.");
       }
 
       onSuccess();
       onClose();
     } catch (error) {
       console.error(error);
-      toast.error("Process failed.");
+      toast.error("System Request Aborted: Failed to synchronize class configuration.");
     } finally {
       setLoading(false);
     }
@@ -455,13 +462,24 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
                     </div>
 
                     <div className="grid grid-cols-1 gap-6">
-                        {fields.map((field, index) => (
-                           <div key={field.id} className="p-6 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col gap-6 relative group animate-in slide-in-from-right-4 duration-300">
-                                {fields.length > 1 && (
-                                    <button type="button" onClick={() => remove(index)} className="absolute -top-3 -right-3 w-8 h-8 bg-white border border-slate-200 text-rose-500 rounded-full flex items-center justify-center hover:bg-rose-50 transition-all shadow-md">
-                                        <Trash2 className="w-4 h-4" />
-                                    </button>
-                                )}
+                        {fields.map((field, index) => {
+                           const hasConflict = conflicts[index];
+                           return (
+                             <div 
+                                key={field.id} 
+                                className={`p-6 rounded-2xl border transition-all relative group animate-in slide-in-from-right-4 duration-300 ${hasConflict ? 'bg-rose-50 border-rose-200 ring-2 ring-rose-500/20' : 'bg-slate-50 border-slate-100'}`}
+                             >
+                                  {hasConflict && (
+                                     <div className="absolute -top-3 left-6 px-3 py-1 bg-rose-500 text-white text-[9px] font-black uppercase tracking-widest rounded-full shadow-lg flex items-center gap-1.5 animate-bounce">
+                                         <AlertTriangle className="w-3 h-3" /> {hasConflict}
+                                     </div>
+                                  )}
+                                  
+                                  {fields.length > 1 && (
+                                      <button type="button" onClick={() => remove(index)} className="absolute -top-3 -right-3 w-8 h-8 bg-white border border-slate-200 text-rose-500 rounded-full flex items-center justify-center hover:bg-rose-50 transition-all shadow-md">
+                                          <Trash2 className="w-4 h-4" />
+                                      </button>
+                                  )}
                                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                     <div className="space-y-1.5 md:col-span-1">
                                         <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Day</label>
@@ -489,7 +507,8 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
                                     </div>
                                 </div>
                            </div>
-                        ))}
+                          );
+                        })}
                     </div>
                  </div>
               </div>
@@ -508,7 +527,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
               form="class-form" 
               type="submit" 
               disabled={loading || !isValid} 
-              className={`flex-1 sm:flex-none px-10 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-black transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-0 disabled:pointer-events-none ${activeTab === 'schedule' || initialData ? '' : 'hidden'}`}
+              className="flex-1 sm:flex-none px-10 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-black transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Refactor Schedule" : "Authorize Class")}
             </button>

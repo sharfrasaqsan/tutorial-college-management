@@ -332,25 +332,7 @@ export default function TeacherProfilePage() {
                   </div>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-6 pt-6 border-t border-slate-50">
-                  <div className="flex items-center gap-3">
-                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                      Saved Info
-                    </p>
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="w-full sm:w-auto px-10 py-4 bg-slate-900 text-white rounded-[1.5rem] font-bold text-[11px] uppercase tracking-wider hover:bg-indigo-600 transition-all shadow-2xl flex items-center justify-center gap-3 active:scale-95 disabled:opacity-0"
-                  >
-                    {saving ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      "Save Profile"
-                    )}
-                  </button>
-                </div>
+              
               </form>
             </div>
           </div>

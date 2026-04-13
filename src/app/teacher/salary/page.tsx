@@ -26,6 +26,8 @@ import { useAuth } from "@/context/AuthContext";
 import { format } from "date-fns";
 import Skeleton from "@/components/ui/Skeleton";
 import Link from "next/link";
+import toast from "react-hot-toast";
+import { generateSalaryPDF } from "@/lib/pdf-generator";
 
 export default function SalaryHistoryPage() {
   const { user } = useAuth();
@@ -121,6 +123,31 @@ export default function SalaryHistoryPage() {
     setFilterMonth("");
     setFilterYear(new Date().getFullYear().toString());
     setFilterStatus("");
+  };
+
+  const handlePrint = async (salary: Salary) => {
+    toast.promise(generateSalaryPDF(salary), {
+        loading: "Generating institutional salary slip...",
+        success: "Salary record exported successfully!",
+        error: "Failed to generate records. Contact administration."
+    });
+  };
+
+  const handleShare = async (salary: Salary) => {
+    const shareData = {
+        title: `Salary Receipt - ${salary.month}`,
+        text: `Faculty Payment Receipt for ${salary.month}. Amount: LKR ${salary.netAmount.toLocaleString()}`,
+        url: window.location.href
+    };
+
+    if (navigator.share) {
+        try {
+            await navigator.share(shareData);
+        } catch (err) {}
+    } else {
+        navigator.clipboard.writeText(`Invoice Ref: #INV-SLY-${salary.id.slice(-8).toUpperCase()}`);
+        toast.success("Invoice Reference copied to clipboard!");
+    }
   };
 
   if (loading) {
@@ -413,10 +440,18 @@ export default function SalaryHistoryPage() {
                           ID: {item.id.substring(0, 8).toUpperCase()}
                         </span>
                         <div className="flex items-center gap-2 mt-2 opacity-0 group-hover/row:opacity-100 transition-opacity">
-                          <button className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 transition-all">
+                          <button 
+                            onClick={() => handlePrint(item)}
+                            className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 transition-all"
+                            title="Export Institutional Invoice"
+                          >
                             <Printer className="w-3.5 h-3.5" />
                           </button>
-                          <button className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 transition-all">
+                          <button 
+                            onClick={() => handleShare(item)}
+                            className="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 transition-all"
+                            title="Share Reference"
+                          >
                             <Share2 className="w-3.5 h-3.5" />
                           </button>
                         </div>

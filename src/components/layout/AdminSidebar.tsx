@@ -13,6 +13,7 @@ import {
   Banknote,
   ClipboardCheck,
   Settings,
+  History,
   LogOut
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -35,6 +36,7 @@ const navItems = [
     { name: "Salaries", href: "/admin/salaries", icon: Banknote },
   ]},
   { label: "Settings", items: [
+    { name: "Activity Logs", href: "/admin/notifications", icon: History },
     { name: "Profile", href: "/admin/profile", icon: Settings },
   ]},
 ];
