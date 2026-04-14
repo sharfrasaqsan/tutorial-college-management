@@ -29,7 +29,9 @@ import {
   ArrowRight,
   Projector,
   AlertTriangle,
-  History
+  History,
+  Download,
+  Loader2
 } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
 import { Grade } from "@/types/models";
@@ -38,6 +40,7 @@ import ConfirmModal from "@/components/ui/ConfirmModal";
 import toast from "react-hot-toast";
 import { useDashboard } from "@/hooks/useDashboard";
 import { format } from "date-fns";
+import { generateGradeListPDF } from "@/lib/pdf-generator";
 
 export default function GradesPage() {
   const { stats, isLoading: statsLoading } = useDashboard();
@@ -46,6 +49,7 @@ export default function GradesPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedGrade, setSelectedGrade] = useState<Grade | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Delete State
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -132,6 +136,21 @@ export default function GradesPage() {
     }
   };
 
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+        let title = "Grade Configuration";
+        let subtitle = "System Institutional Architecture Overview";
+        
+        await generateGradeListPDF(filteredGrades, title, subtitle);
+        toast.success("Document Generated: Grade Configuration list exported successfully.");
+    } catch (error) {
+        toast.error("Export Failed: Unable to generate PDF document");
+    } finally {
+        setIsExporting(false);
+    }
+  };
+
   const filteredGrades = grades.filter((g) =>
     g.name.toLowerCase().includes(searchTerm.toLowerCase()),
   );
@@ -155,12 +174,22 @@ export default function GradesPage() {
             Configure academic levels and their requirements
           </p>
         </div>
-        <button
-          onClick={handleAdd}
-          className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-bold hover:bg-black transition-all flex items-center gap-2"
-        >
-          <Plus className="w-3.5 h-3.5" /> Add Grade Level
-        </button>
+        <div className="flex items-center gap-3">
+            <button 
+                onClick={handleExport}
+                disabled={isExporting || filteredGrades.length === 0}
+                className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-[11px] font-bold hover:bg-slate-50 transition-all flex items-center gap-2 disabled:opacity-50 shadow-sm"
+            >
+                {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                Export Registry
+            </button>
+            <button
+                onClick={handleAdd}
+                className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-bold hover:bg-black transition-all flex items-center gap-2 shadow-sm"
+            >
+                <Plus className="w-3.5 h-3.5" /> Add Grade Level
+            </button>
+        </div>
       </div>
 
       {/* 🏛️ Specialized Stats Header */}

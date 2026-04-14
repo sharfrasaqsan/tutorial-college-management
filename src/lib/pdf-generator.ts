@@ -897,3 +897,150 @@ export const generateStudentIDCardPDF = async (student: any, qrCodeData: string)
     console.error("ID Card Generation Error:", error);
   }
 };
+
+export const generateTeacherListPDF = async (teachers: any[], title: string, subtitle: string) => {
+  if (!teachers || teachers.length === 0) return;
+
+  try {
+    const doc = new jsPDF();
+    const primaryColor = [30, 41, 59]; // Slate 800
+    
+    // --- Header ---
+    doc.setFillColor(248, 250, 252);
+    doc.rect(0, 0, 210, 40, 'F');
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text("SMART ACADEMY", 15, 20);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    doc.text(title.toUpperCase(), 15, 28);
+    doc.text(subtitle, 15, 34);
+
+    doc.setFontSize(8);
+    doc.text(`Date: ${formatDate(new Date())}`, 160, 20);
+    doc.text(`Faculty: ${teachers.length}`, 160, 26);
+
+    // --- Table ---
+    const bodyData = teachers.map((t, idx) => {
+        const subjects = t.subjects?.join(', ') || "Not Assigned";
+        return [
+            idx + 1,
+            t.teacherId || "---",
+            t.name,
+            subjects,
+            t.phone || "—",
+            t.status.toUpperCase()
+        ];
+    });
+
+    autoTable(doc, {
+        startY: 50,
+        head: [['#', 'ID', 'Faculty Name', 'Subjects', 'Contact', 'Status']],
+        body: bodyData,
+        theme: 'striped',
+        headStyles: { 
+            fillColor: [30, 41, 59], 
+            fontSize: 8, 
+            fontStyle: 'bold',
+            halign: 'center'
+        },
+        columnStyles: {
+            0: { halign: 'center', cellWidth: 10 },
+            1: { halign: 'center', cellWidth: 25 },
+            2: { fontStyle: 'bold', cellWidth: 45 },
+            3: { cellWidth: 45 },
+            4: { halign: 'center', cellWidth: 30 },
+            5: { halign: 'center', cellWidth: 25 }
+        },
+        styles: { fontSize: 8, cellPadding: 4 }
+    });
+
+    // --- Footer ---
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(7);
+        doc.setTextColor(148, 163, 184);
+        doc.text(`Page ${i} of ${pageCount} • Smart Academy Faculty Report`, 105, 290, { align: 'center' });
+    }
+
+    doc.save(`${title.replace(/\s+/g, '_')}_Directory.pdf`);
+  } catch (error) {
+    console.error("Teacher List PDF Generation Error:", error);
+  }
+};
+
+export const generateGradeListPDF = async (grades: any[], title: string, subtitle: string) => {
+  if (!grades || grades.length === 0) return;
+
+  try {
+    const doc = new jsPDF();
+    const primaryColor = [30, 41, 59]; // Slate 800
+    
+    // --- Header ---
+    doc.setFillColor(248, 250, 252);
+    doc.rect(0, 0, 210, 40, 'F');
+    
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
+    doc.text("SMART ACADEMY", 15, 20);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100, 116, 139);
+    doc.text(title.toUpperCase(), 15, 28);
+    doc.text(subtitle, 15, 34);
+
+    doc.setFontSize(8);
+    doc.text(`Date: ${formatDate(new Date())}`, 160, 20);
+    doc.text(`Grade Levels: ${grades.length}`, 160, 26);
+
+    // --- Table ---
+    const bodyData = grades.map((g, idx) => {
+        return [
+            idx + 1,
+            g.name,
+            g.studentCount || 0,
+            g.classCount || 0,
+            g.status.toUpperCase()
+        ];
+    });
+
+    autoTable(doc, {
+        startY: 50,
+        head: [['#', 'Grade Level', 'Total Students', 'Active Classes', 'Status']],
+        body: bodyData,
+        theme: 'striped',
+        headStyles: { 
+            fillColor: [30, 41, 59], 
+            fontSize: 8, 
+            fontStyle: 'bold',
+            halign: 'center'
+        },
+        columnStyles: {
+            0: { halign: 'center', cellWidth: 10 },
+            1: { fontStyle: 'bold', cellWidth: 50 },
+            2: { halign: 'center', cellWidth: 40 },
+            3: { halign: 'center', cellWidth: 40 },
+            4: { halign: 'center', cellWidth: 40 }
+        },
+        styles: { fontSize: 8, cellPadding: 4 }
+    });
+
+    // --- Footer ---
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(7);
+        doc.setTextColor(148, 163, 184);
+        doc.text(`Page ${i} of ${pageCount} • Smart Academy Grade Configuration Report`, 105, 290, { align: 'center' });
+    }
+
+    doc.save(`${title.replace(/\s+/g, '_')}_Levels.pdf`);
+  } catch (error) {
+    console.error("Grade List PDF Generation Error:", error);
+  }
+};

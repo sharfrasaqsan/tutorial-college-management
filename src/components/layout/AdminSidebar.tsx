@@ -15,7 +15,8 @@ import {
   ClipboardCheck,
   Settings,
   History,
-  LogOut
+  LogOut,
+  FileText
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -38,6 +39,7 @@ const navItems = [
     { name: "Teacher Payments", href: "/admin/salaries", icon: Banknote },
   ]},
   { label: "Settings", items: [
+    { name: "System Reports", href: "/admin/reports", icon: FileText },
     { name: "System Logs", href: "/admin/notifications", icon: History },
     { name: "Profile", href: "/admin/profile", icon: Settings },
   ]},

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy, doc, updateDoc, writeBatch, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle, X, Users, CreditCard, Briefcase, ArrowRight, Projector, AlertTriangle, History } from "lucide-react";
+import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle, X, Users, CreditCard, Briefcase, ArrowRight, Projector, AlertTriangle, History, Loader2 } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
 import { Teacher, Subject } from "@/types/models";
 import Link from "next/link";
@@ -12,6 +12,8 @@ import ConfirmModal from "@/components/ui/ConfirmModal";
 import NextImage from "next/image";
 import toast from "react-hot-toast";
 import { useTeacherProfile } from "@/context/TeacherProfileContext";
+import { generateTeacherListPDF } from "@/lib/pdf-generator";
+import { Download } from "lucide-react";
 import { useDashboard } from "@/hooks/useDashboard";
 import { format } from "date-fns";
 
@@ -23,6 +25,7 @@ export default function TeachersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   // Filters
   const [showFilters, setShowFilters] = useState(false);
@@ -118,6 +121,28 @@ export default function TeachersPage() {
     }
   };
 
+  const handleExport = async () => {
+    setIsExporting(true);
+    try {
+        let title = "Faculty Directory";
+        let subtitle = "Institutional Active Teachers";
+        
+        if (filterStatus === "active") subtitle = "Active Teaching Staff";
+        else if (filterStatus === "inactive") subtitle = "Suspended Faculty Roster";
+
+        if (filterSubject) {
+            subtitle += ` • Subject Specialty: ${filterSubject}`;
+        }
+        
+        await generateTeacherListPDF(filteredTeachers, title, subtitle);
+        toast.success("Document Generated: Faculty list exported successfully.");
+    } catch (error) {
+        toast.error("Export Failed: Unable to generate PDF document");
+    } finally {
+        setIsExporting(false);
+    }
+  };
+
   const clearFilters = () => {
     setFilterStatus("");
     setFilterSubject("");
@@ -154,12 +179,22 @@ export default function TeachersPage() {
             View and manage all teachers
           </p>
         </div>
-        <button 
-          onClick={handleAdd}
-          className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-bold hover:bg-black transition-all flex items-center gap-2"
-        >
-          <Plus className="w-3.5 h-3.5" /> Add Teacher
-        </button>
+        <div className="flex items-center gap-3">
+            <button 
+                onClick={handleExport}
+                disabled={isExporting || filteredTeachers.length === 0}
+                className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-[11px] font-bold hover:bg-slate-50 transition-all flex items-center gap-2 disabled:opacity-50 shadow-sm"
+            >
+                {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                Export Registry
+            </button>
+            <button 
+                onClick={handleAdd}
+                className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-bold hover:bg-black transition-all flex items-center gap-2 shadow-sm"
+            >
+                <Plus className="w-3.5 h-3.5" /> Add Teacher
+            </button>
+        </div>
       </div>
 
       {/* 🏛️ Specialized Stats Header */}
