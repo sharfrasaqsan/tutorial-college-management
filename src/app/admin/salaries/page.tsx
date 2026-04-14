@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy, where, doc, updateDoc, deleteDoc, writeBatch, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, DollarSign, Search, Filter, Download, CreditCard, AlertCircle, CheckCircle, Printer, Trash2, Eye, History as HistoryIcon, FileText, Send, MessageCircle, ArrowRight, Clock, Users } from "lucide-react";
+import { Plus, DollarSign, Search, Filter, Download, CreditCard, AlertCircle, CheckCircle, Printer, Share2, Trash2, Eye, History as HistoryIcon, FileText, Send, MessageCircle, ArrowRight, Clock, Users } from "lucide-react";
 import { generateSalaryPDF } from "@/lib/pdf-generator";
 import { Teacher } from "@/types/models";
 import Skeleton from "@/components/ui/Skeleton";
@@ -145,6 +145,30 @@ export default function SalariesPage() {
     }
   };
 
+  const handlePrint = async (salary: Salary) => {
+    toast.promise(generateSalaryPDF(salary), {
+        loading: "Generating institutional salary slip...",
+        success: "Salary record exported successfully!",
+        error: "Failed to generate records. Contact administration."
+    });
+  };
+
+  const handleShare = async (salary: Salary) => {
+    const shareText = `Institutional Salary Reference: #INV-SLY-${salary.id.slice(-8).toUpperCase()}\nFaculty: ${salary.teacherName}\nAmount: LKR ${(salary.netAmount || 0).toLocaleString()}\nStatus: ${(salary.status || 'pending').toUpperCase()}`;
+    
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: "Institutional Payroll Record",
+                text: shareText
+            });
+        } catch (err) {}
+    } else {
+        navigator.clipboard.writeText(shareText);
+        toast.success("Record reference copied to clipboard for sharing.");
+    }
+  };
+
   const handleWhatsAppShare = (item: Salary) => {
     const teacher = teachersData[item.teacherId];
     if (!teacher || !teacher.phone) {
@@ -190,10 +214,10 @@ export default function SalariesPage() {
   ])).sort((a, b) => b.localeCompare(a));
 
   const statCards = [
-    { title: "Authorized Payout", value: `LKR ${totalPayout.toLocaleString()}`, icon: DollarSign, color: "text-indigo-500" },
-    { title: "Pending Claims", value: pendingCount, icon: Clock, color: "text-orange-500" },
-    { title: "Faculty Reach", value: activeTeachersCount, icon: Users, color: "text-blue-500" },
-    { title: "Settled Cycles", value: salaries.filter(s => s.status === 'paid').length, icon: CheckCircle, color: "text-emerald-500" },
+    { title: "Total Paid", value: `LKR ${totalPayout.toLocaleString()}`, icon: DollarSign, color: "text-indigo-500" },
+    { title: "To Pay", value: pendingCount, icon: Clock, color: "text-orange-500" },
+    { title: "Active Teachers", value: activeTeachersCount, icon: Users, color: "text-blue-500" },
+    { title: "Completed Months", value: salaries.filter(s => s.status === 'paid').length, icon: CheckCircle, color: "text-emerald-500" },
   ];
 
   return (
@@ -201,16 +225,16 @@ export default function SalariesPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Teacher Salaries</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Teacher Payments</h1>
           <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider">
-            Review and pay teacher salaries
+            Review and send teacher payments
           </p>
         </div>
         <button 
           onClick={() => setIsModalOpen(true)}
           className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-bold hover:bg-black transition-all flex items-center gap-2 shadow-sm"
         >
-          <CreditCard className="w-3.5 h-3.5" /> Start Payroll
+          <CreditCard className="w-3.5 h-3.5" /> Send Payment
         </button>
       </div>
 
@@ -247,40 +271,40 @@ export default function SalariesPage() {
         onClose={() => setIsDeleteOpen(false)} 
         onConfirm={handleDelete} 
         loading={actionLoading} 
-        title="CRITICAL: PURGE & HARD RESET" 
-        message={`DANGER: Deleting this record for ${selectedSalary?.teacherName} will PERMANENTLY ERASE the ${selectedSalary?.sessionsConducted} attendance logs associated with it. The teacher will need to RE-MARK these sessions as completed before a new salary can be generated. This action cannot be undone.`}
+        title="Warning: Clear Record" 
+        message={`Warning: Deleting this record for ${selectedSalary?.teacherName} will clear the ${selectedSalary?.sessionsConducted} session logs. The teacher will need to mark them again. This cannot be undone.`}
       />
 
-      {/* Breakdown Modal */}
-      <Modal isOpen={isViewOpen} onClose={() => setIsViewOpen(false)} title={`Ledger Entry: ${selectedSalary?.teacherName}`}>
+      {/* Payment Details Modal */}
+      <Modal isOpen={isViewOpen} onClose={() => setIsViewOpen(false)} title={`Payment Details: ${selectedSalary?.teacherName}`}>
         <div className="space-y-5 p-2">
            <div className="grid grid-cols-2 gap-4">
              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Cycle</p>
+                <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Month</p>
                 <p className="text-sm font-bold text-slate-800 tabular-nums">{selectedSalary?.month}</p>
              </div>
              <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl text-right">
-                <p className="text-[9px] font-black uppercase text-indigo-400 tracking-widest">Net Payable</p>
+                <p className="text-[9px] font-black uppercase text-indigo-400 tracking-widest">Final Amount</p>
                 <p className="text-lg font-black text-indigo-600 tabular-nums">LKR {selectedSalary?.netAmount?.toLocaleString()}</p>
              </div>
            </div>
            <div className="space-y-4">
               <div className="p-5 bg-slate-50 rounded-[2rem] border border-slate-100 flex items-center justify-between">
                 <div>
-                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-loose">Academic Unit</p>
+                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-loose">Class Name</p>
                     <p className="text-sm font-black text-slate-800">{selectedSalary?.className}</p>
                 </div>
                 <div className="text-right">
-                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-loose">Audit ID</p>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">#${selectedSalary?.classId?.slice(-6)}</p>
+                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-loose">Payment ID</p>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">#${selectedSalary?.id?.slice(-8).toUpperCase()}</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-3">
                  {[
-                    { label: 'Monthly Fee', value: `LKR ${selectedSalary?.monthlyFee?.toLocaleString()}` },
-                    { label: 'Students', value: `${selectedSalary?.studentCount} Enrolled` },
-                    { label: 'Revenue', value: `LKR ${selectedSalary?.totalMonthlyRevenue?.toLocaleString()}` },
+                    { label: 'Fee per Student', value: `LKR ${selectedSalary?.monthlyFee?.toLocaleString()}` },
+                    { label: 'Students', value: `${selectedSalary?.studentCount} Students` },
+                    { label: 'Total Fee', value: `LKR ${selectedSalary?.totalMonthlyRevenue?.toLocaleString()}` },
                  ].map((stat, i) => (
                     <div key={i} className="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
                         <p className="text-[8px] font-black uppercase text-slate-400 tracking-widest mb-1">{stat.label}</p>
@@ -291,40 +315,19 @@ export default function SalariesPage() {
 
               <div className="p-6 bg-primary/5 rounded-[2rem] border border-primary/10 flex items-center justify-between">
                  <div>
-                    <p className="text-[9px] font-black uppercase text-primary/60 tracking-widest">Sessions Authorized</p>
+                    <p className="text-[9px] font-black uppercase text-primary/60 tracking-widest">Sessions Finished</p>
                     <h4 className="text-2xl font-black text-primary tabular-nums">{selectedSalary?.sessionsConducted} <span className="text-sm text-primary/40 font-bold">/ {selectedSalary?.sessionsPerCycle}</span></h4>
                  </div>
                  <div className="text-right">
-                    <p className="text-[9px] font-black uppercase text-primary/60 tracking-widest">Calculated Rate</p>
+                    <p className="text-[9px] font-black uppercase text-primary/60 tracking-widest">Pay per Session</p>
                     <p className="text-sm font-black text-primary tabular-nums">LKR {selectedSalary?.perSessionRate?.toFixed(2)}</p>
                  </div>
               </div>
            </div>
-           <button onClick={() => setIsViewOpen(false)} className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-primary transition-all shadow-xl shadow-slate-200">Close Transaction Review</button>
+           <button onClick={() => setIsViewOpen(false)} className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-primary transition-all shadow-xl shadow-slate-200">Close</button>
         </div>
       </Modal>
 
-      {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {[
-          { icon: DollarSign, label: 'Total Paid', value: `LKR ${totalPayout.toLocaleString()}`, sub: 'Paid this month' },
-          { icon: AlertCircle, label: 'To Pay', value: `${pendingCount} Pending`, sub: 'Awaiting payment' },
-          { icon: HistoryIcon, label: 'Total Teachers', value: `${activeTeachersCount} Active`, sub: 'Active staff members' },
-        ].map((stat, i) => (
-          <div key={i} className="bg-white p-5 rounded-2xl border border-slate-200/60 transition-all duration-200 hover:border-primary/30 group cursor-default">
-             <div className="flex flex-col gap-3">
-                <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-slate-50 text-slate-400 group-hover:bg-primary/5 group-hover:text-primary transition-all">
-                    <stat.icon className="w-4 h-4" />
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">{stat.label}</p>
-                  <p className="text-base font-bold text-slate-900 tracking-tight group-hover:text-primary leading-none transition-colors">{stat.value}</p>
-                </div>
-                <p className="text-[9px] font-medium text-slate-400 uppercase tracking-widest opacity-60">{stat.sub}</p>
-             </div>
-          </div>
-        ))}
-      </div>
 
       {/* Main Workspace */}
       <div className="space-y-6">
@@ -334,7 +337,7 @@ export default function SalariesPage() {
                 <div className="flex items-center gap-4">
                     <div className="w-1.5 h-8 bg-primary rounded-full"></div>
                     <div>
-                        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">Salary List</h3>
+                        <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">Payment List</h3>
                         <p className="text-[10px] text-slate-400 font-medium uppercase tracking-widest leading-none mt-1">Manage teacher payments and history</p>
                     </div>
                 </div>
@@ -441,12 +444,16 @@ export default function SalariesPage() {
                             <button onClick={() => { setSelectedSalary(item); setIsViewOpen(true); }} className="p-2 text-slate-400 hover:text-primary transition-colors hover:bg-slate-100 rounded-lg" title="View"><Eye className="w-4 h-4" /></button>
                             <button onClick={() => toggleStatus(item)} className={`p-2 transition-colors rounded-lg ${item.status === 'paid' ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-amber-600 hover:text-green-600 hover:bg-green-50'}`} title="Change Status"><CheckCircle className="w-4 h-4" /></button>
                             
+                            <div className="w-[1px] h-4 bg-slate-100 mx-1"></div>
+
+                            <button onClick={() => handlePrint(item)} className="p-2 text-slate-400 hover:text-blue-600 transition-colors hover:bg-blue-50 rounded-lg" title="Print/Export PDF"><Printer className="w-4 h-4" /></button>
+                            <button onClick={() => handleShare(item)} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors hover:bg-indigo-50 rounded-lg" title="Share Reference"><Share2 className="w-4 h-4" /></button>
+                            
                             {item.status === 'paid' && (
-                                <>
-                                    <button onClick={async () => await generateSalaryPDF(item)} className="p-2 text-slate-400 hover:text-blue-600 transition-colors hover:bg-blue-50 rounded-lg" title="Download PDF"><FileText className="w-4 h-4" /></button>
-                                    <button onClick={() => handleWhatsAppShare(item)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors hover:bg-emerald-50 rounded-lg" title="WhatsApp"><MessageCircle className="w-4 h-4" /></button>
-                                </>
+                                <button onClick={() => handleWhatsAppShare(item)} className="p-2 text-slate-400 hover:text-emerald-600 transition-colors hover:bg-emerald-50 rounded-lg" title="Send WhatsApp Advice"><MessageCircle className="w-4 h-4" /></button>
                             )}
+
+                            <div className="w-[1px] h-4 bg-slate-100 mx-1"></div>
 
                             <button onClick={() => { setSelectedSalary(item); setIsDeleteOpen(true); setSalaryToDelete(item.id); }} className="p-2 text-slate-400 hover:text-red-500 transition-colors hover:bg-red-50 rounded-lg" title="Delete"><Trash2 className="w-4 h-4" /></button>
                           </div>

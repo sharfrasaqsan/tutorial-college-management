@@ -11,6 +11,7 @@ import {
   CalendarDays, 
   CreditCard, 
   Banknote,
+  Wallet,
   ClipboardCheck,
   Settings,
   History,
@@ -19,11 +20,11 @@ import {
 import { useAuth } from "@/context/AuthContext";
 
 const navItems = [
-  { label: "Overview", items: [
+  { label: "Main", items: [
     { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
     { name: "Timetable", href: "/admin/timetable", icon: CalendarDays },
   ]},
-  { label: "Academics", items: [
+  { label: "Classes & People", items: [
     { name: "Students", href: "/admin/students", icon: Users },
     { name: "Teachers", href: "/admin/teachers", icon: GraduationCap },
     { name: "Subjects", href: "/admin/subjects", icon: BookOpen },
@@ -31,12 +32,13 @@ const navItems = [
     { name: "Classes", href: "/admin/classes", icon: Layers },
     { name: "Attendance", href: "/admin/attendance", icon: ClipboardCheck },
   ]},
-  { label: "Finance", items: [
-    { name: "Payments", href: "/admin/payments", icon: CreditCard },
-    { name: "Salaries", href: "/admin/salaries", icon: Banknote },
+  { label: "Money", items: [
+    { name: "Finance Analytics", href: "/admin/finance", icon: Wallet },
+    { name: "Student Fees", href: "/admin/payments", icon: CreditCard },
+    { name: "Teacher Payments", href: "/admin/salaries", icon: Banknote },
   ]},
   { label: "Settings", items: [
-    { name: "Activity Logs", href: "/admin/notifications", icon: History },
+    { name: "System Logs", href: "/admin/notifications", icon: History },
     { name: "Profile", href: "/admin/profile", icon: Settings },
   ]},
 ];
@@ -54,7 +56,7 @@ export default function AdminSidebar() {
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white">
               SA
             </div>
-            Admin Portal
+            Admin Area
           </div>
         </div>
 

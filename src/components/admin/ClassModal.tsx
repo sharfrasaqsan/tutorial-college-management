@@ -304,14 +304,14 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
           link: "/teacher/classes"
         });
 
-        toast.success("Institutional Authorization Successful: New academic class has been registered in the terminal.");
+        toast.success("Class added successfully!");
       }
 
       onSuccess();
       onClose();
     } catch (error) {
       console.error(error);
-      toast.error("System Request Aborted: Failed to synchronize class configuration.");
+      toast.error("Error: Could not save class. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -333,11 +333,11 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
                 </div>
                 <div>
                     <h2 className="text-xl font-semibold text-slate-900 tracking-tight leading-none">
-                        {initialData ? "Refactor Class Session" : "Schedule Academic Class"}
+                        {initialData ? "Edit Class" : "Add Class"}
                     </h2>
                     <div className="flex items-center gap-3 mt-1.5">
                          <span className="text-xs font-medium text-slate-500 flex items-center gap-1 uppercase tracking-widest">
-                            <Layers className="w-3.5 h-3.5" /> Registry Config
+                            <Layers className="w-3.5 h-3.5" /> Registration
                          </span>
                          <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
                          <span className={`text-[10px] font-bold uppercase tracking-wider ${watch("status") === 'active' ? 'text-emerald-600' : 'text-amber-600'}`}>
@@ -359,7 +359,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
                     onClick={() => setActiveTab(tab)}
                     className={`px-5 py-4 text-sm font-medium transition-all relative capitalize ${activeTab === tab ? 'text-primary' : 'text-slate-500 hover:text-slate-800'}`}
                 >
-                    {tab}
+                    {tab === 'curriculum' ? 'Info' : 'Times'}
                     {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />}
                 </button>
             ))}
@@ -371,12 +371,12 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
               <div className="max-w-4xl mx-auto space-y-12">
                 <div className="space-y-8">
                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-4">
-                     <Settings2 className="w-3.5 h-3.5" /> Curriculum Configuration
+                     <Settings2 className="w-3.5 h-3.5" /> Class Details
                   </h4>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
                     <div className="col-span-full space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Class Display Identifier</label>
+                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Class Name</label>
                       <input {...register("name")} readOnly className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-500 font-bold" />
                       <p className="text-[9px] text-slate-400 italic ml-1">Auto-generated based on selection.</p>
                     </div>
@@ -384,7 +384,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Grade Level</label>
                       <select {...register("gradeId")} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/10 transition-all outline-none font-medium">
-                        <option value="">Select Plane</option>
+                        <option value="">Select Grade</option>
                         {filteredGrades.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                       </select>
                       {errors.gradeId && <p className="text-[10px] text-red-500 font-bold">{errors.gradeId.message}</p>}
@@ -399,10 +399,10 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Lead Instructor</label>
+                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Teacher</label>
                       {!fixedTeacherId ? (
                         <select {...register("teacherId")} disabled={!watchedSubjectId} className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl disabled:opacity-50 font-medium">
-                            <option value="">{watchedSubjectId ? "Assign Faculty" : "Pick Subject First"}</option>
+                            <option value="">{watchedSubjectId ? "Select Teacher" : "Pick Subject First"}</option>
                             {filteredTeachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                         </select>
                       ) : (
@@ -413,7 +413,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
                     </div>
 
                     <div className="space-y-1.5">
-                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Operational Status</label>
+                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Status</label>
                        <div className="flex gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200">
                           {["active", "inactive"].map((s) => (
                             <button key={s} type="button" onClick={() => setValue("status", s as any)} className={`flex-1 py-2 rounded-lg text-xs font-bold capitalize transition-all ${watch("status") === s ? 'bg-white shadow-sm text-primary border border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}>
@@ -424,7 +424,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Monthly Billing (LKR)</label>
+                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Monthly Fee (LKR)</label>
                       <div className="relative">
                         <input {...register("monthlyFee")} type="number" className="w-full pl-12 pr-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl font-bold" />
                         <CreditCard className="absolute left-4.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
@@ -442,7 +442,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
 
                   <div className="flex justify-end pt-6">
                      <button type="button" onClick={() => setActiveTab('schedule')} className="flex items-center gap-2 px-6 py-3 bg-slate-900 hover:bg-black text-white rounded-xl text-sm font-bold transition-all shadow-lg">
-                        Next: Schedule <ArrowRight className="w-4 h-4" />
+                        Next: Times <ArrowRight className="w-4 h-4" />
                      </button>
                   </div>
                 </div>
@@ -454,10 +454,10 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
                  <div className="space-y-8">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                           <Calendar className="w-3.5 h-3.5" /> Operational Timeline
+                           <Calendar className="w-3.5 h-3.5" /> Class Schedule
                         </h4>
                         <button type="button" onClick={() => append({ dayOfWeek: "monday", startTime: "", endTime: "", room: "" })} className="px-4 py-2 bg-primary/10 text-primary rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary/20 transition-all flex items-center gap-2">
-                            <Plus className="w-3.5 h-3.5" /> Add Session Slot
+                            <Plus className="w-3.5 h-3.5" /> Add Time
                         </button>
                     </div>
 
@@ -519,7 +519,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
         <div className="px-8 py-5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between bg-slate-50/30 z-10 shrink-0">
           <div className="hidden sm:flex items-center gap-3">
              <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
-             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Configuration Terminal Active</p>
+             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Class System Ready</p>
           </div>
           <div className="flex items-center gap-4 w-full sm:w-auto">
             <button type="button" onClick={onClose} className="px-6 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-800 transition-all">Discard</button>
@@ -529,7 +529,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
               disabled={loading || !isValid} 
               className="flex-1 sm:flex-none px-10 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-black transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Refactor Schedule" : "Authorize Class")}
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Save Changes" : "Add Class")}
             </button>
           </div>
         </div>

@@ -403,7 +403,7 @@ export default function TeacherDashboard() {
           sessionsSinceLastPayment: increment(pendingDelta),
         });
         await batch.commit();
-        toast.success("Session log reverted: Institutional counters have been adjusted.");
+        toast.success("Session log removed: Stats have been updated.");
       } else {
         await setDoc(completionRef, {
           classId: classItem.id,
@@ -427,7 +427,7 @@ export default function TeacherDashboard() {
           completedSessions: increment(1),
           sessionsSinceLastPayment: increment(1),
         });
-        toast.success("Session successfully recorded: Academic progress logged to repository.");
+        toast.success("Session saved: Progress recorded.");
 
         try {
           const classQ = query(
@@ -452,12 +452,12 @@ export default function TeacherDashboard() {
               completionId,
             );
             if (pr.success)
-              toast.success("Cycle Milestone Reached: Payroll request generated and awaiting authorization.", { icon: "💰" });
+              toast.success("Month Finished: Payment request sent for review.", { icon: "💰" });
           }
         } catch (e) {}
       }
     } catch (e) {
-      toast.error("System Synchronization Error: Failed to update session registry.");
+      toast.error("Error: Could not save session.");
     }
   };
 
@@ -639,7 +639,7 @@ export default function TeacherDashboard() {
               <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100">
                 <tr>
                   <th className="px-8 py-5">Class Name</th>
-                  <th className="px-8 py-5">Class Progress</th>
+                  <th className="px-8 py-5">Monthly Progress</th>
                   <th className="px-8 py-5 text-right">Students</th>
                 </tr>
               </thead>
@@ -695,7 +695,7 @@ export default function TeacherDashboard() {
                           {cls.studentCount || 0}
                         </p>
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">
-                          ENROLLED
+                          STUDENTS
                         </p>
                       </td>
                     </tr>
@@ -724,7 +724,7 @@ export default function TeacherDashboard() {
               href="/teacher/timetable"
               className="px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-bold uppercase tracking-wider border border-indigo-100 hover:bg-indigo-600 hover:text-white transition-all"
             >
-              View all sessions
+              View Schedule
             </Link>
           </div>
 

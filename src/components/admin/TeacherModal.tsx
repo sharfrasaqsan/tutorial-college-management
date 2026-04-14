@@ -175,7 +175,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
           phone: data.phone,
         });
 
-        toast.success("Faculty profile updated successfully!");
+        toast.success("Teacher updated successfully!");
       } else {
         const teacherId = await generateId("teacher");
         const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password!);
@@ -215,14 +215,14 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
     } catch (err) {
       const error = err as Error;
       console.error("Error saving teacher:", error);
-      toast.error(error.message || "Failed to save teacher profile.");
+      toast.error(error.message || "Failed to save teacher.");
     } finally {
       setLoading(false);
     }
   };
   const [activeTab, setActiveTab] = useState<'overview' | 'expertise' | 'security'>('overview');
 
-  const teacherName = watch("name") || (initialData?.name || "New Faculty");
+  const teacherName = watch("name") || (initialData?.name || "New Teacher");
   const teacherInitials = teacherName.charAt(0).toUpperCase();
 
   return (
@@ -238,7 +238,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
                 </div>
                 <div>
                     <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-3 leading-none">
-                        {initialData ? "Refactor Faculty Profile" : "Authorize New Faculty"}
+                        {initialData ? "Edit Teacher" : "Add Teacher"}
                     </h2>
                     <div className="flex items-center gap-3 mt-1.5">
                          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
@@ -264,7 +264,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
                     onClick={() => setActiveTab(tab)}
                     className={`px-5 py-4 text-sm font-medium transition-all relative capitalize ${activeTab === tab ? 'text-primary' : 'text-slate-500 hover:text-slate-800'}`}
                 >
-                    {tab}
+                    {tab === 'overview' ? 'Info' : tab === 'expertise' ? 'Subjects' : 'Account'}
                     {activeTab === tab && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />}
                 </button>
             ))}
@@ -276,28 +276,28 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
               <div className="max-w-4xl mx-auto space-y-10">
                 <div className="space-y-8">
                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                     <User className="w-3.5 h-3.5" /> Faculty Identity
+                     <User className="w-3.5 h-3.5" /> Teacher Info
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Legal Full Name</label>
+                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Full Name</label>
                       <input {...register("name")} placeholder="e.g. Mr. Sunil Perera" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-medium text-slate-700" />
                       {errors.name && <p className="text-[10px] text-red-500 ml-1 font-bold">{errors.name.message}</p>}
                     </div>
                     <div className="space-y-1.5">
                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">NIC Number</label>
-                       <input {...register("nic")} placeholder="Institutional ID Card No." className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 transition-all font-medium text-slate-700" />
+                       <input {...register("nic")} placeholder="ID Card Number" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 transition-all font-medium text-slate-700" />
                        {errors.nic && <p className="text-[10px] text-red-500 ml-1 font-bold">{errors.nic.message}</p>}
                     </div>
                     <div className="space-y-1.5">
-                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">WhatsApp / Contact</label>
+                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Phone Number</label>
                        <div className="relative">
                           <input {...register("phone")} placeholder="07XXXXXXXX" className="w-full pl-12 pr-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 transition-all font-medium text-slate-700" />
                           <Phone className="absolute left-4.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
                        </div>
                     </div>
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Gender Identification</label>
+                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Gender</label>
                       <div className="flex gap-2 bg-slate-50 p-1 rounded-xl border border-slate-200">
                         {["male", "female", "other"].map((g) => (
                           <button key={g} type="button" onClick={() => setValue("gender", g as any)} className={`flex-1 py-2.5 rounded-lg text-xs font-bold capitalize transition-all ${watch("gender") === g ? 'bg-white shadow-sm text-primary border border-slate-200' : 'text-slate-400 hover:text-slate-600'}`}>
@@ -317,7 +317,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
                         </div>
                     </div>
                     <div className="col-span-full space-y-1.5">
-                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Residential Coordinates</label>
+                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Home Address</label>
                        <div className="relative">
                           <textarea {...register("address")} rows={4} placeholder="Full home or mailing address..." className="w-full pl-12 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 transition-all font-medium text-slate-700 resize-none pt-4" />
                           <MapPin className="absolute left-4.5 top-5.5 w-4 h-4 text-slate-300" />
@@ -333,7 +333,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
                  <div className="space-y-6">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                          <BookOpen className="w-3.5 h-3.5" /> Subject specializations
+                          <BookOpen className="w-3.5 h-3.5" /> Teaching Subjects
                        </h4>
                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{selectedSubjects.length} Selected</span>
                     </div>
@@ -349,7 +349,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
                  <div className="space-y-6">
                     <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                          <GraduationCap className="w-3.5 h-3.5" /> Assigned Grade Levels
+                          <GraduationCap className="w-3.5 h-3.5" /> Teaching Grades
                        </h4>
                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{selectedGrades.length} Levels</span>
                     </div>
@@ -369,24 +369,24 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
               <div className="max-w-4xl mx-auto space-y-10 py-4">
                 <div className="space-y-8">
                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-4">
-                     <Shield className="w-3.5 h-3.5" /> System Access & Credentials
+                     <Shield className="w-3.5 h-3.5" /> Login Details
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
                     <div className="space-y-1.5">
-                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Official Email Address</label>
+                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Email</label>
                        <div className="relative">
                           <input {...register("email")} disabled={!!initialData} type="email" placeholder="teacher@tutorial.edu" className={`w-full pl-12 pr-5 py-3.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 transition-all font-medium text-slate-700 ${initialData ? 'bg-slate-100 cursor-not-allowed opacity-70' : 'bg-slate-50'}`} />
                           <Mail className="absolute left-4.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
                        </div>
-                       {initialData && <p className="text-[9px] text-slate-400 font-medium ml-1 mt-2">Login identifiers are locked. Use security link to reset credentials.</p>}
+                       {initialData && <p className="text-[9px] text-slate-400 font-medium ml-1 mt-2">Email cannot be changed. Contact admin for help.</p>}
                     </div>
                     <div className="space-y-1.5">
                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">
-                          {initialData ? 'Security Management' : 'Primary Access Key'}
+                          {initialData ? 'Password Control' : 'Password'}
                        </label>
                        {initialData ? (
                           <button type="button" onClick={handlePasswordReset} className="w-full px-5 py-3.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-3 shadow-lg">
-                              <Shield className="w-4 h-4" /> Send Recovery Link
+                              <Shield className="w-4 h-4" /> Reset Password
                           </button>
                        ) : (
                           <input {...register("password")} type="password" placeholder="Min 6 characters required" className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 transition-all font-medium text-slate-700" />
@@ -397,9 +397,9 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
                   <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 flex items-start gap-4">
                      <AlertCircle className="w-5 h-5 text-slate-400 shrink-0 mt-0.5" />
                      <div>
-                        <p className="text-[10px] font-bold uppercase text-slate-900 tracking-wider">Operational Security Awareness</p>
+                        <p className="text-[10px] font-bold uppercase text-slate-900 tracking-wider">Account Safety</p>
                         <p className="text-xs text-slate-500 font-medium mt-1 leading-relaxed">
-                          Personnel credentials are encrypted and stored in institutional vaults. Modifying primary email accounts requires administrative authority clearing.
+                          Account details are stored safely. Changing the main email requires admin approval.
                         </p>
                      </div>
                   </div>
@@ -412,7 +412,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
         <div className="px-8 py-5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between bg-slate-50/30 z-10 shrink-0">
           <div className="hidden sm:flex items-center gap-3">
              <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse shadow-lg shadow-indigo-100"></div>
-             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Faculty Management System Active</p>
+             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Teacher System Ready</p>
           </div>
           <div className="flex items-center gap-4 w-full sm:w-auto">
             <button type="button" onClick={onClose} className="px-6 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-800 transition-all">
@@ -424,7 +424,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
                 disabled={loading || !isValid} 
                 className="flex-1 sm:flex-none px-10 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-black transition-all shadow-xl flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Refactor Profile" : "Authorize Faculty")}
+              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Save Changes" : "Add Teacher")}
             </button>
           </div>
         </div>

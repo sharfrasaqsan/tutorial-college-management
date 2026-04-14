@@ -156,7 +156,7 @@ export default function SessionHistoryPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 py-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Class History
+            Finished Classes
           </h1>
           <p className="text-xs font-medium text-slate-400 mt-1 uppercase tracking-wider leading-none">
             Your previous classes and payments
@@ -197,7 +197,7 @@ export default function SessionHistoryPage() {
                     new Date().getFullYear().toString(),
                     ...salaries.map(s => s.month.split('-')[0])
                 ])).sort((a, b) => b.localeCompare(a)).map(y => (
-                    <option key={y} value={y.toString()}>{y} Academic Year</option>
+                    <option key={y} value={y.toString()}>{y} Year</option>
                 ))}
             </select>
           </div>
@@ -230,7 +230,7 @@ export default function SessionHistoryPage() {
                     <div className="p-6 flex-1 bg-white">
                         <div className="grid grid-cols-2 gap-4 mb-6">
                             <div>
-                                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Classes Done</p>
+                                <p className="text-[9px] font-black uppercase tracking-wider text-slate-400 mb-1">Sessions</p>
                                 <p className="text-xl font-black text-slate-800">{salary.sessionsConducted} <span className="text-xs text-slate-400 font-bold">/ {salary.sessionsPerCycle}</span></p>
                             </div>
                             <div className="text-right">
@@ -247,7 +247,7 @@ export default function SessionHistoryPage() {
                             onClick={() => openCycleModal(salary)}
                             className="w-full py-3 bg-white text-slate-600 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-indigo-600 hover:text-white transition-all shadow-sm flex items-center justify-center gap-2 border border-slate-200 group-hover:border-indigo-600"
                         >
-                            View Classes <Navigation className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
+                            Details <Navigation className="w-3 h-3 group-hover:translate-x-1 transition-transform" />
                         </button>
                     </div>
                 </div>

@@ -18,18 +18,18 @@ import { useAuth } from "@/context/AuthContext";
 const navItems = [
   { label: "Main", items: [
     { name: "Dashboard", href: "/teacher/dashboard", icon: LayoutDashboard },
-    { name: "Class History", href: "/teacher/ledger", icon: History },
+    { name: "Finished Classes", href: "/teacher/ledger", icon: History },
     { name: "My Classes", href: "/teacher/classes", icon: Layers },
   ]},
   { label: "Classes", items: [
     { name: "Students", href: "/teacher/students", icon: Users },
     { name: "Schedule", href: "/teacher/timetable", icon: CalendarDays },
   ]},
-  { label: "Salary", items: [
-    { name: "My Salary", href: "/teacher/salary", icon: Banknote },
+  { label: "Payments", items: [
+    { name: "My Payments", href: "/teacher/salary", icon: Banknote },
   ]},
   { label: "Account", items: [
-    { name: "Activity Hub", href: "/teacher/notifications", icon: Bell },
+    { name: "Notifications", href: "/teacher/notifications", icon: Bell },
     { name: "Profile", href: "/teacher/profile", icon: Settings },
   ]},
 ];
@@ -47,7 +47,7 @@ export default function TeacherSidebar() {
             <div className="w-8 h-8 bg-[#4f39f6] rounded-lg flex items-center justify-center text-white">
               TC
             </div>
-            Teacher Portal
+            Teacher Area
           </div>
         </div>
 
@@ -97,7 +97,7 @@ export default function TeacherSidebar() {
       <div className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-slate-200 z-50 flex items-center justify-around px-2 pb-safe">
         {[
           { name: "Dash", href: "/teacher/dashboard", icon: LayoutDashboard },
-          { name: "Ledger", href: "/teacher/ledger", icon: History },
+          { name: "Done", href: "/teacher/ledger", icon: History },
           { name: "Classes", href: "/teacher/classes", icon: Layers },
           { name: "Schedule", href: "/teacher/timetable", icon: CalendarDays },
           { name: "Salary", href: "/teacher/salary", icon: Banknote },

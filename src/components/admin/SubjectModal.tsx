@@ -143,11 +143,11 @@ export default function SubjectModal({ isOpen, onClose, onSuccess, initialData }
                 </div>
                 <div>
                     <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-3 leading-none">
-                        {initialData ? "Refactor Curricular Subject" : "Initialize Subject Schema"}
+                        {initialData ? "Edit Subject" : "Add Subject"}
                     </h2>
                     <div className="flex items-center gap-3 mt-1.5">
                          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-                            <Hash className="w-3.5 h-3.5" /> Registry Config
+                            <Hash className="w-3.5 h-3.5" /> Registration
                          </span>
                          <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
                          <span className={`text-[10px] font-bold uppercase tracking-wider ${watch("status") === 'active' ? 'text-emerald-600' : 'text-amber-600'}`}>
@@ -188,7 +188,7 @@ export default function SubjectModal({ isOpen, onClose, onSuccess, initialData }
 
                     <div className="space-y-4">
                         <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-2">
-                            <Palette className="w-3.5 h-3.5" /> Visual Style Identity
+                            <Palette className="w-3.5 h-3.5" /> Color
                         </label>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                             {colors.map((c) => (
@@ -210,7 +210,7 @@ export default function SubjectModal({ isOpen, onClose, onSuccess, initialData }
                     </div>
 
                     <div className="space-y-2 border-t border-slate-100 pt-8">
-                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Registry Status</label>
+                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Status</label>
                         <div className="flex gap-2 bg-slate-50 p-1.5 rounded-2xl border border-slate-200 w-full sm:w-80">
                             {["active", "inactive"].map((s) => (
                                 <button
@@ -229,7 +229,7 @@ export default function SubjectModal({ isOpen, onClose, onSuccess, initialData }
         </div>
 
         <div className="px-8 py-5 border-t border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Subject Schema Configuration • Verified</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ready</p>
             <div className="flex items-center gap-4">
                 <button 
                   type="button"
@@ -244,7 +244,7 @@ export default function SubjectModal({ isOpen, onClose, onSuccess, initialData }
                   disabled={loading || !isValid}
                   className="px-10 py-3 bg-indigo-600 text-white rounded-xl text-xs font-black hover:bg-black transition-all shadow-xl shadow-indigo-100 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Refactor Subject" : "Create Subject")}
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : (initialData ? "Save Changes" : "Add Subject")}
                 </button>
             </div>
         </div>

@@ -66,7 +66,7 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
 
   const calculateSalary = async () => {
     if (!selectedTeacherId || !selectedMonth) {
-        toast.error("Complete mandatory configuration fields.");
+        toast.error("Please fill in all required items.");
         return;
     }
     
@@ -78,7 +78,7 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
       const teacherClasses = classSnap.docs.map(d => ({ id: d.id, ...d.data() } as Class));
 
       if (teacherClasses.length === 0) {
-        toast.error("No active academic units found for this instructor.");
+        toast.error("No active classes found for this teacher.");
         setCalculating(false);
         return;
       }
@@ -250,7 +250,7 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
                     disabled={tab === 'settlement' && earningsDetails.length === 0}
                     className={`px-5 py-4 text-sm font-medium transition-all relative capitalize disabled:opacity-30 ${activeTab === tab ? 'text-primary' : 'text-slate-500 hover:text-slate-800'}`}
                 >
-                    {tab}
+                    {tab === 'configuration' ? 'Details' : 'Review'}
                     {activeTab === tab && (
                         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full transition-all" />
                     )}
@@ -265,12 +265,12 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
               <div className="max-w-4xl mx-auto space-y-12">
                 <div className="space-y-8">
                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-4">
-                     <User className="w-3.5 h-3.5" /> Faculty Alignment
+                     <User className="w-3.5 h-3.5" /> Teacher Information
                   </h4>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Target Instructor</label>
+                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Select Teacher</label>
                         <div className="relative group">
                             <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-hover:text-primary transition-colors" />
                             <select 
@@ -278,14 +278,14 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
                                 onChange={(e) => setSelectedTeacherId(e.target.value)}
                                 className="w-full pl-12 pr-4 py-3.5 bg-white border border-slate-200 rounded-xl focus:ring-4 focus:ring-primary/5 focus:border-primary outline-none transition-all font-bold text-slate-700 appearance-none shadow-sm"
                             >
-                                <option value="">Choose Registry ID</option>
+                                <option value="">Select a Teacher</option>
                                 {teachers.map(t => <option key={t.id} value={t.id}>{t.name} ({t.teacherId})</option>)}
                             </select>
                         </div>
                     </div>
 
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Payroll Cycle</label>
+                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 ml-1">Select Month</label>
                         <div className="relative group">
                             <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-hover:text-primary transition-colors" />
                             <input 
@@ -305,8 +305,8 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
                          <Calculator className="w-6 h-6" />
                       </div>
                       <div>
-                         <p className="text-sm font-bold text-slate-900">Earnings Initialization</p>
-                         <p className="text-[10px] text-slate-400 font-medium uppercase tracking-widest mt-1">Cross-referencing logged sessions with curriculum</p>
+                         <p className="text-sm font-bold text-slate-900">Calculate Payment</p>
+                         <p className="text-[10px] text-slate-400 font-medium uppercase tracking-widest mt-1">Check sessions and class details</p>
                       </div>
                    </div>
                    <button 
@@ -314,7 +314,7 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
                       disabled={calculating || !selectedTeacherId}
                       className="px-8 py-3.5 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-primary transition-all flex items-center gap-3 shadow-xl shadow-slate-200 disabled:opacity-50"
                    >
-                      {calculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Zap className="w-4 h-4 shadow-emerald-500" /> Map Earnings Territory</>}
+                      {calculating ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Zap className="w-4 h-4 shadow-emerald-500" /> Run Calculation</>}
                    </button>
                 </div>
               </div>
@@ -325,10 +325,10 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
                 <div className="flex items-center justify-between border-b border-slate-100 pb-6">
                     <div>
                         <h4 className="text-xl font-bold text-slate-900 tracking-tight">{selectedTeacher?.name}</h4>
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Fiscal Preview for {selectedMonth}</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Payment Review for {selectedMonth}</p>
                     </div>
                     <div className="text-right">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Net Cumulative</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Total Amount</p>
                         <p className="text-2xl font-black text-primary tabular-nums">LKR {totalNet.toLocaleString()}</p>
                     </div>
                 </div>
@@ -346,10 +346,9 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Fee: LKR {item.monthlyFee} × {item.studentCount} Students</p>
                              </div>
                           </div>
-
-                          <div className="flex items-center gap-8">
+                           <div className="flex items-center gap-8">
                              <div className="text-center">
-                                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1.5">Logged</p>
+                                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1.5">Sessions</p>
                                 <div className="flex items-center gap-2">
                                   <input 
                                     type="number" 
@@ -363,9 +362,10 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
                              </div>
                              
                              <div className="text-right min-w-[120px]">
-                                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Settlement</p>
+                                <p className="text-[9px] font-black text-slate-300 uppercase tracking-widest mb-1">Amount</p>
                                 <p className="text-base font-black text-slate-800 tabular-nums">LKR {item.finalPayout.toLocaleString()}</p>
                              </div>
+
 
                              <button 
                                 onClick={() => processPayment(item)}
@@ -380,18 +380,18 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
                   ))}
                 </div>
 
-                <div className="p-6 bg-slate-900 rounded-[2.5rem] border border-slate-800 flex items-start gap-5 text-white">
-                   <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center shrink-0">
-                      <AlertCircle className="w-6 h-6 text-white/40" />
-                   </div>
-                   <div>
-                      <h4 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1.5">Authorization Logic</h4>
-                      <p className="text-xs text-slate-400 leading-relaxed max-w-2xl font-medium">
-                         Initial session count is synchronized with the teacher ledger. Manual overrides propagate 
-                         to the net value immediately. Settlement creates a pending invoice and locks the associated activity logs.
-                      </p>
-                   </div>
-                </div>
+                 <div className="p-6 bg-slate-900 rounded-[2.5rem] border border-slate-800 flex items-start gap-5 text-white">
+                    <div className="w-12 h-12 bg-white/5 rounded-2xl flex items-center justify-center shrink-0">
+                       <AlertCircle className="w-6 h-6 text-white/40" />
+                    </div>
+                    <div>
+                       <h4 className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1.5">Important Note</h4>
+                       <p className="text-xs text-slate-400 leading-relaxed max-w-2xl font-medium">
+                          The session count comes from the teacher's records. You can change it if needed. 
+                          Paying will create a receipt and lock these sessions for this month.
+                       </p>
+                    </div>
+                 </div>
               </div>
             )}
           </div>

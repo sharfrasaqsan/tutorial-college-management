@@ -21,8 +21,8 @@ export default function ConfirmModal({
   onConfirm,
   title,
   message,
-  confirmText = "Delete Permanently",
-  cancelText = "Keep Record",
+  confirmText = "Confirm Delete",
+  cancelText = "Cancel",
   loading = false,
   variant = "danger",
 }: ConfirmModalProps) {

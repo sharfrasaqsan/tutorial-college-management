@@ -116,7 +116,7 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
                     onClick={() => setActiveTab(tab)}
                     className={`px-5 py-4 text-sm font-medium transition-all relative capitalize ${activeTab === tab ? 'text-primary' : 'text-slate-500 hover:text-slate-800'}`}
                 >
-                    {tab}
+                    {tab === 'overview' ? 'Overview' : tab === 'classes' ? 'Classes' : tab === 'financials' ? 'Payments' : 'Profile'}
                     {activeTab === tab && (
                         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
                     )}
@@ -142,10 +142,10 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
                             {/* KPI Board */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {[
-                                    { label: 'Active Batches', value: assignedClasses.length, icon: Clock, color: 'bg-primary/5 text-primary border-primary/10' },
-                                    { label: 'Tutoring Subjects', value: (teacher.subjects?.length || 1), icon: BookOpen, color: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
-                                    { label: 'Verification (NIC)', value: teacher.nic || 'Verified', icon: Award, color: 'bg-slate-50 text-slate-500 border-slate-200' },
-                                    { label: 'Instructor since', value: formatDate(teacher.createdAt), icon: Calendar, color: 'bg-slate-50 text-slate-500 border-slate-200' },
+                                    { label: 'Classes', value: assignedClasses.length, icon: Clock, color: 'bg-primary/5 text-primary border-primary/10' },
+                                    { label: 'Subjects', value: (teacher.subjects?.length || 1), icon: BookOpen, color: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+                                    { label: 'NIC Number', value: teacher.nic || 'Verified', icon: Award, color: 'bg-slate-50 text-slate-500 border-slate-200' },
+                                    { label: 'Teacher since', value: formatDate(teacher.createdAt), icon: Calendar, color: 'bg-slate-50 text-slate-500 border-slate-200' },
                                 ].map((stat, i) => (
                                     <div key={i} className={`p-4 rounded-xl border flex flex-col gap-2 ${stat.color}`}>
                                         <stat.icon className="w-4 h-4" />
@@ -160,26 +160,26 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                 <div className="space-y-8">
                                     <div>
-                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Instructor Directory Files</h4>
+                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Teacher Details</h4>
                                         <div className="space-y-6">
                                             <div className="flex items-start gap-4">
                                                 <div className="w-9 h-9 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400"><Mail className="w-4 h-4" /></div>
                                                 <div>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 leading-none">Authentication Email</p>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 leading-none">Email</p>
                                                     <p className="text-sm font-semibold text-slate-800">{teacher.email || 'N/A'}</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-start gap-4">
                                                 <div className="w-9 h-9 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400"><Phone className="w-4 h-4" /></div>
                                                 <div>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 leading-none">Verified Phone Line</p>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 leading-none">Phone Number</p>
                                                     <p className="text-sm font-semibold text-slate-800 tracking-tight">{teacher.phone || 'N/A'}</p>
                                                 </div>
                                             </div>
                                             <div className="flex items-start gap-4">
                                                 <div className="w-9 h-9 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400"><MapPin className="w-4 h-4" /></div>
                                                 <div>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 leading-none">Registered Residence</p>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 leading-none">Home Address</p>
                                                     <p className="text-sm font-semibold text-slate-800 leading-relaxed">{teacher.address || 'N/A'}</p>
                                                 </div>
                                             </div>
@@ -196,12 +196,12 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
                                                 <span className="text-xs font-bold text-slate-800 uppercase">{teacher.subjects?.[0] || 'Gen'} Science</span>
                                             </div>
                                             <div className="flex justify-between items-center py-2 border-b border-slate-200/50 hover:border-primary/20 transition-colors">
-                                                <span className="text-xs font-semibold text-slate-500">Assigned Batches</span>
+                                                <span className="text-xs font-semibold text-slate-500">Classes</span>
                                                 <span className="text-xs font-black text-primary px-2 bg-primary/5 rounded">{assignedClasses.length} Units</span>
                                             </div>
                                             <div className="flex justify-between items-center py-2 border-b border-slate-200/50 hover:border-primary/20 transition-colors">
-                                                <span className="text-xs font-semibold text-slate-500">Current Work Status</span>
-                                                <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 rounded uppercase tracking-widest border border-emerald-100">Full Access</span>
+                                                <span className="text-xs font-semibold text-slate-500">Status</span>
+                                                <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 rounded uppercase tracking-widest border border-emerald-100">Active</span>
                                             </div>
                                         </div>
                                    </div>
@@ -213,8 +213,8 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
                     {activeTab === 'classes' && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-right-10 duration-500">
                              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Academic Responsibility</h4>
-                                <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100 uppercase tracking-widest">{assignedClasses.length} Units</span>
+                                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Assigned Classes</h4>
+                                <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100 uppercase tracking-widest">{assignedClasses.length} Classes</span>
                              </div>
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {assignedClasses.length > 0 ? assignedClasses.map((cls) => (
@@ -244,16 +244,16 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
                     {activeTab === 'financials' && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-left-10 duration-500">
                              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Salary Disbursement History</h4>
+                                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Payment History</h4>
                                 <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100 uppercase tracking-widest">{recentSalaries.length} Records</span>
                              </div>
                              <div className="overflow-hidden border border-slate-100 rounded-2xl">
                                 <table className="w-full text-sm text-left">
                                     <thead className="bg-slate-50/80 text-slate-400 font-bold uppercase text-[10px] tracking-widest border-b border-slate-100">
                                         <tr>
-                                            <th className="px-6 py-4">Financial Term</th>
-                                            <th className="px-6 py-4">Fulfillment Status</th>
-                                            <th className="px-6 py-4 text-right">Settled Amount</th>
+                                            <th className="px-6 py-4">Month</th>
+                                            <th className="px-6 py-4">Status</th>
+                                            <th className="px-6 py-4 text-right">Amount</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -269,7 +269,7 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
                                             </tr>
                                         )) : (
                                             <tr>
-                                                <td colSpan={3} className="px-6 py-16 text-center text-slate-400 font-medium italic">No financial footprints detected in current ledger.</td>
+                                                <td colSpan={3} className="px-6 py-16 text-center text-slate-400 font-medium italic">No payment records found.</td>
                                             </tr>
                                         )}
                                     </tbody>
@@ -283,7 +283,7 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                 <div className="space-y-8">
                                     <div>
-                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Verification Compliance</h4>
+                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Verifications</h4>
                                         <div className="space-y-4">
                                             <div className="p-4 rounded-xl border border-slate-100 bg-emerald-50/30 flex items-center gap-4">
                                                 <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600"><Award className="w-5 h-5" /></div>
@@ -295,8 +295,8 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
                                             <div className="p-4 rounded-xl border border-slate-100 bg-blue-50/30 flex items-center gap-4">
                                                 <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600"><Hash className="w-5 h-5" /></div>
                                                 <div>
-                                                    <p className="text-xs font-bold text-slate-800 leading-none mb-1">Access Protocol</p>
-                                                    <p className="text-[10px] text-blue-600 font-semibold uppercase tracking-widest">Type: Faculty Instructor</p>
+                                                    <p className="text-xs font-bold text-slate-800 leading-none mb-1">Account Type</p>
+                                                    <p className="text-[10px] text-blue-600 font-semibold uppercase tracking-widest">Teacher</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -305,14 +305,14 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
 
                                 <div className="space-y-8">
                                     <div>
-                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Operational Logs</h4>
+                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">System Info</h4>
                                         <div className="p-6 rounded-2xl border border-slate-100 bg-slate-50/50 space-y-4">
                                             <div className="flex justify-between items-center text-xs">
                                                 <span className="font-semibold text-slate-500 flex items-center gap-2"><Calendar className="w-3.5 h-3.5" /> Registered Date</span>
                                                 <span className="font-bold text-slate-800">{formatDate(teacher.createdAt)}</span>
                                             </div>
                                             <div className="flex justify-between items-center text-xs">
-                                                <span className="font-semibold text-slate-500 flex items-center gap-2"><Clock className="w-3.5 h-3.5" /> Work Status</span>
+                                                <span className="font-semibold text-slate-500 flex items-center gap-2"><Clock className="w-3.5 h-3.5" /> Account Status</span>
                                                 <span className="text-[10px] font-black text-emerald-600 px-2 bg-emerald-50 rounded uppercase tracking-widest animate-pulse">Online</span>
                                             </div>
                                         </div>
@@ -329,14 +329,14 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
         <div className="px-8 py-5 border-t border-slate-100 flex justify-between items-center bg-slate-50/50">
             <div className="flex items-center gap-2">
                 <Activity className="w-4 h-4 text-slate-300" />
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pt-0.5">Faculty Audit Finalized</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pt-0.5">Note: Details verified</p>
             </div>
             <div className="flex gap-3">
                 <button 
                     onClick={onClose}
                     className="px-8 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest rounded-lg border border-slate-200 hover:bg-white transition-all shadow-sm active:scale-95"
                 >
-                    Dismiss View
+                    Close
                 </button>
             </div>
         </div>

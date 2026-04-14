@@ -211,7 +211,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
         });
         
         await batch.commit();
-        toast.success("Profile Synchronization Successful: Student records updated and verified.");
+        toast.success("Student updated successfully.");
       } else {
         const studentRef = doc(collection(db, "students"));
         const studentId = await generateId("student");
@@ -226,13 +226,13 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
         });
 
         await batch.commit();
-        toast.success("Admission Authorized: New student successfully registered to the institution registry.");
+        toast.success("Student added successfully.");
       }
       onSuccess();
       onClose();
     } catch (error) {
       console.error("Error saving student:", error);
-      toast.error("Data Persistence Failure: System could not finalize the registry entry.");
+      toast.error("Error: Could not save student.");
     } finally {
       setLoading(false);
     }
@@ -254,7 +254,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
                 </div>
                 <div>
                     <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-3 leading-none">
-                        {initialData ? "Edit Student Profile" : "New Student Admission"}
+                        {initialData ? "Edit Student" : "Add Student"}
                     </h2>
                     <div className="flex items-center gap-3 mt-1.5">
                          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
@@ -283,7 +283,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
                     onClick={() => setActiveTab(tab)}
                     className={`px-5 py-4 text-sm font-medium transition-all relative capitalize ${activeTab === tab ? 'text-primary' : 'text-slate-500 hover:text-slate-800'}`}
                 >
-                    {tab}
+                    {tab === 'overview' ? 'Info' : tab === 'academics' ? 'Classes' : 'Contact'}
                     {activeTab === tab && (
                         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full transition-all" />
                     )}
@@ -297,7 +297,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
               <div className="max-w-4xl mx-auto space-y-12">
                 <div className="space-y-8">
                   <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-4">
-                     <User className="w-3.5 h-3.5" /> Personal Details
+                     <User className="w-3.5 h-3.5" /> Basic Info
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
                     <div className="space-y-1.5">
@@ -367,11 +367,11 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
               <div className="max-w-4xl mx-auto space-y-12">
                  <div className="space-y-8">
                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-4">
-                       <GraduationCap className="w-3.5 h-3.5" /> Grade & Class Selection
+                       <GraduationCap className="w-3.5 h-3.5" /> Grade and Classes
                     </h4>
                     
                     <div className="space-y-6">
-                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Select Grade Level</label>
+                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Select Grade</label>
                        <div className="grid grid-cols-3 md:grid-cols-5 gap-3">
                           {metaLoading ? (
                             Array(5).fill(0).map((_, i) => <Skeleton key={i} height="50px" className="rounded-xl" />)
@@ -391,7 +391,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
 
                     {selectedGrade && (
                        <div className="space-y-6 animate-in slide-in-from-top-4 duration-500">
-                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Enrollment Batches</label>
+                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Select Classes</label>
                           {fetchingClasses ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                <Skeleton height="80px" className="rounded-2xl" />
@@ -419,7 +419,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
                                ))}
                             </div>
                           ) : (
-                            <p className="text-xs font-bold text-slate-400 italic">No batches available for this grade level.</p>
+                            <p className="text-xs font-bold text-slate-400 italic">No classes available for this grade level.</p>
                           )}
                        </div>
                     )}
@@ -431,7 +431,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
                        onClick={() => setActiveTab('logistics')}
                        className="flex items-center gap-2 px-6 py-3 bg-slate-900 hover:bg-black text-white rounded-xl text-sm font-bold transition-all shadow-lg"
                     >
-                       Next: Logistics <ArrowRight className="w-4 h-4" />
+                       Next: Contact Info <ArrowRight className="w-4 h-4" />
                     </button>
                  </div>
               </div>
@@ -441,12 +441,12 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
                <div className="max-w-4xl mx-auto space-y-12">
                   <div className="space-y-8">
                     <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 border-b border-slate-100 pb-4">
-                       <MapPin className="w-3.5 h-3.5" /> Admission Logistics
+                       <MapPin className="w-3.5 h-3.5" /> Contact Information
                     </h4>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8">
                        <div className="col-span-full space-y-1.5">
-                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Residential Address</label>
+                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Home Address</label>
                           <textarea {...register("address")} rows={4} placeholder="Full Home Address" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all font-medium text-slate-700 resize-none pt-4" />
                           {errors.address && <p className="text-[10px] text-red-500 ml-1 font-bold">{errors.address.message}</p>}
                        </div>

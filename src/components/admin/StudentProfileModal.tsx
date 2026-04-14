@@ -6,10 +6,14 @@ import { db } from "@/lib/firebase";
 import { 
   X, User, Mail, Phone, MapPin, School, GraduationCap, 
   BookOpen, Clock, Calendar, CreditCard, Activity,
-  ChevronRight, ArrowUpRight, Loader2, Hash, History
+  ChevronRight, ArrowUpRight, Loader2, Hash, History,
+  QrCode, Download
 } from "lucide-react";
 import { Student, Class, Payment } from "@/types/models";
 import Skeleton from "@/components/ui/Skeleton";
+import PaymentModal from "./PaymentModal";
+import QRCode from "qrcode";
+import { generateStudentIDCardPDF } from "@/lib/pdf-generator";
 
 interface StudentProfileModalProps {
   studentId: string;
@@ -23,6 +27,8 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
   const [recentPayments, setRecentPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'academics' | 'financials' | 'history'>('overview');
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [qrCodeData, setQrCodeData] = useState<string>("");
 
   useEffect(() => {
     if (isOpen && studentId) {
@@ -40,6 +46,18 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
       }
       const stdData = { id: stdDoc.id, ...stdDoc.data() } as Student;
       setStudent(stdData);
+
+      // 🔳 Generate QR Code (Verification URL or Internal ID)
+      const verifyUrl = `https://smart-academy-portal.vercel.app/verify/student/${stdData.id}`;
+      const qrData = await QRCode.toDataURL(verifyUrl, {
+        margin: 1,
+        width: 400,
+        color: {
+            dark: '#1e293b', 
+            light: '#ffffff'
+        }
+      });
+      setQrCodeData(qrData);
 
       if (stdData.enrolledClasses && stdData.enrolledClasses.length > 0) {
         const classPromises = stdData.enrolledClasses.map(cid => getDoc(doc(db, "classes", cid)));
@@ -79,9 +97,7 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
       <div className={`fixed inset-0 bg-slate-900/40 transition-all duration-300 ${isOpen ? "backdrop-blur-sm" : ""}`} onClick={onClose}></div>
 
       <div className={`relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all duration-300 ease-out flex flex-col h-[85vh] ${isOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
-        
-        {/* Top Header - Professional & Subtle */}
-        <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white z-10">
+        <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white z-10 shrink-0">
             <div className="flex items-center gap-5">
                 <div className="w-14 h-14 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-primary text-xl font-bold">
                     {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : student?.name.charAt(0)}
@@ -101,12 +117,32 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
                     </div>
                 </div>
             </div>
-            <button 
-                onClick={onClose}
-                className="p-2.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all group"
-            >
-                <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+                {!loading && student && (
+                    <>
+                        <button 
+                            onClick={() => generateStudentIDCardPDF(student, qrCodeData)}
+                            className="px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200 hover:bg-slate-100 transition-all shadow-sm active:scale-95 flex items-center gap-2"
+                        >
+                            <QrCode className="w-3.5 h-3.5" />
+                            Download ID Card
+                        </button>
+                        <button 
+                            onClick={() => setIsPaymentOpen(true)}
+                            className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-100 hover:bg-emerald-600 hover:text-white transition-all shadow-sm active:scale-95 flex items-center gap-2"
+                        >
+                            <CreditCard className="w-3.5 h-3.5" />
+                            Quick Pay
+                        </button>
+                    </>
+                )}
+                <button 
+                    onClick={onClose}
+                    className="p-2.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all group"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+            </div>
         </div>
 
         {/* Professional Navigation Bar */}
@@ -117,7 +153,7 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
                     onClick={() => setActiveTab(tab)}
                     className={`px-5 py-4 text-sm font-medium transition-all relative capitalize ${activeTab === tab ? 'text-primary' : 'text-slate-500 hover:text-slate-800'}`}
                 >
-                    {tab}
+                    {tab === 'overview' ? 'Overview' : tab === 'academics' ? 'Classes' : tab === 'financials' ? 'Payments' : 'History'}
                     {activeTab === tab && (
                         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"></div>
                     )}
@@ -145,9 +181,9 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {[
                                     { label: 'Grade Level', value: student.grade || 'N/A', icon: GraduationCap, color: 'bg-blue-50 text-blue-600' },
-                                    { label: 'Modules', value: student.enrolledSubjects?.length || 0, icon: BookOpen, color: 'bg-indigo-50 text-indigo-600' },
-                                    { label: 'Active Batches', value: student.enrolledClasses?.length || 0, icon: Clock, color: 'bg-emerald-50 text-emerald-600' },
-                                    { label: 'Join Date', value: formatDate(student.createdAt), icon: Calendar, color: 'bg-slate-50 text-slate-600' },
+                                    { label: 'Subjects', value: student.enrolledSubjects?.length || 0, icon: BookOpen, color: 'bg-indigo-50 text-indigo-600' },
+                                    { label: 'Classes', value: student.enrolledClasses?.length || 0, icon: Clock, color: 'bg-emerald-50 text-emerald-600' },
+                                    { label: 'Started On', value: formatDate(student.createdAt), icon: Calendar, color: 'bg-slate-50 text-slate-600' },
                                 ].map((stat, i) => (
                                     <div key={i} className="p-4 rounded-xl border border-slate-100 flex flex-col gap-2">
                                         <div className={`w-8 h-8 rounded-lg ${stat.color} flex items-center justify-center`}>
@@ -161,59 +197,79 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
                                 ))}
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
                                 {/* Informational Blocks */}
-                                <div className="space-y-8">
-                                    <div>
-                                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Contact Details</h4>
-                                        <div className="space-y-5">
-                                            <div className="flex items-start gap-4">
-                                                <Mail className="w-4 h-4 text-slate-400 mt-0.5" />
-                                                <div>
-                                                    <p className="text-xs text-slate-400 font-medium mb-0.5">Primary Contact</p>
-                                                    <p className="text-sm font-semibold text-slate-700">{student.phone || 'N/A'}</p>
+                                <div className="md:col-span-8 space-y-8">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                        <div className="space-y-8">
+                                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Contact Details</h4>
+                                            <div className="space-y-5">
+                                                <div className="flex items-start gap-4">
+                                                    <Phone className="w-4 h-4 text-slate-400 mt-0.5" />
+                                                    <div>
+                                                        <p className="text-xs text-slate-400 font-medium mb-0.5">Phone Number</p>
+                                                        <p className="text-sm font-semibold text-slate-700">{student.phone || 'N/A'}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-start gap-4">
+                                                    <MapPin className="w-4 h-4 text-slate-400 mt-0.5" />
+                                                    <div>
+                                                        <p className="text-xs text-slate-400 font-medium mb-0.5">Home Address</p>
+                                                        <p className="text-sm font-semibold text-slate-700 leading-relaxed">{student.address || 'N/A'}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-start gap-4">
+                                                    <School className="w-4 h-4 text-slate-400 mt-0.5" />
+                                                    <div>
+                                                        <p className="text-xs text-slate-400 font-medium mb-0.5">School</p>
+                                                        <p className="text-sm font-semibold text-slate-700">{student.schoolName || 'N/A'}</p>
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="flex items-start gap-4">
-                                                <MapPin className="w-4 h-4 text-slate-400 mt-0.5" />
-                                                <div>
-                                                    <p className="text-xs text-slate-400 font-medium mb-0.5">Residential Address</p>
-                                                    <p className="text-sm font-semibold text-slate-700 leading-relaxed">{student.address || 'N/A'}</p>
+                                        </div>
+
+                                        <div className="space-y-8">
+                                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Guardian Profile</h4>
+                                            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 space-y-6">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400">
+                                                        <User className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs text-slate-400 font-medium mb-0.5">Full Name</p>
+                                                        <p className="text-sm font-bold text-slate-800">{student.parentName || 'N/A'}</p>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                            <div className="flex items-start gap-4">
-                                                <School className="w-4 h-4 text-slate-400 mt-0.5" />
-                                                <div>
-                                                    <p className="text-xs text-slate-400 font-medium mb-0.5">School / Institution</p>
-                                                    <p className="text-sm font-semibold text-slate-700">{student.schoolName || 'N/A'}</p>
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400">
+                                                        <Phone className="w-5 h-5" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-xs text-slate-400 font-medium mb-0.5">Phone Number</p>
+                                                        <p className="text-sm font-bold text-slate-800 uppercase tracking-tight">{student.parentPhone || 'N/A'}</p>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="space-y-8">
-                                    <div>
-                                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Guardian Profile</h4>
-                                        <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 space-y-6">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400">
-                                                    <User className="w-5 h-5" />
+                                {/* QR Code Identity Widget */}
+                                <div className="md:col-span-4 flex flex-col items-center">
+                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 w-full text-center md:text-left">Digital Identity</h4>
+                                    <div className="p-6 rounded-[2rem] bg-white border border-slate-100 shadow-xl shadow-slate-100/50 flex flex-col items-center gap-4 group">
+                                        <div className="relative p-2 bg-slate-50 rounded-2xl border border-slate-100 group-hover:scale-[1.02] transition-transform duration-500">
+                                            {qrCodeData ? (
+                                                <img src={qrCodeData} alt="Verification QR" className="w-32 h-32 md:w-40 md:h-40" />
+                                            ) : (
+                                                <div className="w-32 h-32 md:w-40 md:h-40 flex items-center justify-center">
+                                                    <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
                                                 </div>
-                                                <div>
-                                                    <p className="text-xs text-slate-400 font-medium mb-0.5">Full Name</p>
-                                                    <p className="text-sm font-bold text-slate-800">{student.parentName || 'N/A'}</p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400">
-                                                    <Phone className="w-5 h-5" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-xs text-slate-400 font-medium mb-0.5">Direct Line</p>
-                                                    <p className="text-sm font-bold text-slate-800 uppercase tracking-tight">{student.parentPhone || 'N/A'}</p>
-                                                </div>
-                                            </div>
+                                            )}
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">Verify Enrollment</p>
+                                            <p className="text-[9px] font-medium text-slate-400 max-w-[150px]">Scan to authenticate student status via the official portal</p>
                                         </div>
                                     </div>
                                 </div>
@@ -224,8 +280,8 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
                     {activeTab === 'academics' && (
                         <div className="space-y-6">
                              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Current academic enrollments</h4>
-                                <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full uppercase tracking-widest leading-none border border-slate-100">{enrolledClasses.length} Units</span>
+                                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Enrolled Classes</h4>
+                                <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full uppercase tracking-widest leading-none border border-slate-100">{enrolledClasses.length} Classes</span>
                              </div>
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {enrolledClasses.length > 0 ? enrolledClasses.map((cls) => (
@@ -255,16 +311,16 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
                     {activeTab === 'financials' && (
                         <div className="space-y-6">
                              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Recent Financial Activity</h4>
+                                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Recent Payments</h4>
                              </div>
                              <div className="overflow-hidden border border-slate-100 rounded-2xl">
                                 <table className="w-full text-sm text-left">
                                     <thead className="bg-slate-50/80 text-slate-400 font-bold uppercase text-[10px] tracking-widest border-b border-slate-100">
                                         <tr>
-                                            <th className="px-6 py-4">Transaction Reference</th>
-                                            <th className="px-6 py-4">Financial Term</th>
-                                            <th className="px-6 py-4">Fulfillment</th>
-                                            <th className="px-6 py-4 text-right">Settlement Value</th>
+                                            <th className="px-6 py-4">Ref Number</th>
+                                            <th className="px-6 py-4">Month</th>
+                                            <th className="px-6 py-4">Method</th>
+                                            <th className="px-6 py-4 text-right">Amount</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
@@ -290,13 +346,13 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
 
                     {activeTab === 'history' && (
                         <div className="space-y-6">
-                            <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-4">Lifecycle history</h4>
+                             <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-4">Update History</h4>
                             <div className="relative pl-6 space-y-8 before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-slate-100">
                                 <div className="relative">
                                     <div className="absolute -left-[1.75rem] top-1.5 w-3 h-3 rounded-full bg-white border-2 border-primary"></div>
                                     <div>
-                                        <p className="text-xs font-bold text-slate-700 leading-none">System Enrollment Initiated</p>
-                                        <p className="text-[11px] text-slate-400 mt-1.5 font-medium leading-relaxed">Student profile successfully established in the central management directory.</p>
+                                        <p className="text-xs font-bold text-slate-700 leading-none">Student Registered</p>
+                                        <p className="text-[11px] text-slate-400 mt-1.5 font-medium leading-relaxed">Student added to the system.</p>
                                         <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-3 font-semibold uppercase tracking-widest group bg-slate-50 w-fit px-2 py-0.5 rounded border border-slate-100">
                                             <Calendar className="w-3 h-3" />
                                             {formatDate(student.createdAt)}
@@ -306,8 +362,8 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
                                 <div className="relative">
                                     <div className="absolute -left-[1.75rem] top-1.5 w-3 h-3 rounded-full bg-white border-2 border-slate-300"></div>
                                     <div>
-                                        <p className="text-xs font-bold text-slate-700 leading-none">Grade Mapping Configured</p>
-                                        <p className="text-[11px] text-slate-400 mt-1.5 font-medium leading-relaxed">Associated with {student.grade || 'unspecified'} curriculum path.</p>
+                                        <p className="text-xs font-bold text-slate-700 leading-none">Grade Set</p>
+                                        <p className="text-[11px] text-slate-400 mt-1.5 font-medium leading-relaxed">Added to {student.grade || 'unspecified'} grade.</p>
                                     </div>
                                 </div>
                             </div>
@@ -321,7 +377,7 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
         <div className="px-8 py-5 border-t border-slate-100 flex justify-between items-center bg-slate-50/50">
             <div className="flex items-center gap-2">
                 <Activity className="w-4 h-4 text-slate-300" />
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none pt-0.5">Profile Audit Complete</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none pt-0.5">Details Checked</p>
             </div>
             <button 
                 onClick={onClose}
@@ -331,6 +387,13 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
             </button>
         </div>
       </div>
+
+      <PaymentModal 
+        isOpen={isPaymentOpen}
+        onClose={() => setIsPaymentOpen(false)}
+        initialStudentId={studentId}
+        onSuccess={loadStudentData}
+      />
     </div>
   );
 }

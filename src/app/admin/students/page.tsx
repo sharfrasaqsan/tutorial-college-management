@@ -3,30 +3,35 @@
 import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy, doc, updateDoc, writeBatch, increment } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle, X, Users, Layers, CreditCard, Briefcase, ArrowRight, Projector, AlertTriangle, History } from "lucide-react";
+import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle, X, Users, Layers, CreditCard, Briefcase, ArrowRight, Projector, AlertTriangle, History, GraduationCap, ArrowLeft, Loader2, Download } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
 import { Student, Grade, Subject } from "@/types/models";
 import Link from "next/link";
 import StudentModal from "@/components/admin/StudentModal";
+import PaymentModal from "@/components/admin/PaymentModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import toast from "react-hot-toast";
 import { useStudentProfile } from "@/context/StudentProfileContext";
 import { useDashboard } from "@/hooks/useDashboard";
 import { format } from "date-fns";
+import { generateStudentListPDF, generateMasterRosterPDF } from "@/lib/pdf-generator";
 
 export default function StudentsPage() {
   const { openStudentProfile } = useStudentProfile();
   const { stats, isLoading: statsLoading } = useDashboard();
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   
+  // Payment Modal State
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [paymentStudentId, setPaymentStudentId] = useState<string | null>(null);
+  
   // Filters State
   const [showFilters, setShowFilters] = useState(false);
-  const [filterGrade, setFilterGrade] = useState("");
-  const [filterSubject, setFilterSubject] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [grades, setGrades] = useState<Grade[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -37,6 +42,13 @@ export default function StudentsPage() {
   const [deleting, setDeleting] = useState(false);
 
   const [classesList, setClassesList] = useState<Record<string, boolean>>({});
+  
+  // Hierarchical Filter State
+  const [selectedGradeId, setSelectedGradeId] = useState("");
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [allClasses, setAllClasses] = useState<Class[]>([]);
+  
+  const [forceShowAll, setForceShowAll] = useState(false);
   
   const loadStudents = async () => {
     setLoading(true);
@@ -61,6 +73,9 @@ export default function StudentsPage() {
       setGrades(gradeSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Grade)));
       setSubjects(subjectSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)));
       
+      const cList = classSnap.docs.map(d => ({ id: d.id, ...d.data() } as Class));
+      setAllClasses(cList);
+
       const classMap: Record<string, boolean> = {};
       classSnap.docs.forEach(d => classMap[d.id] = true);
       setClassesList(classMap);
@@ -93,6 +108,11 @@ export default function StudentsPage() {
   const handleAdd = () => {
     setSelectedStudent(null);
     setIsModalOpen(true);
+  };
+
+  const handleCollectPayment = (sid?: string) => {
+    setPaymentStudentId(sid || null);
+    setIsPaymentOpen(true);
   };
 
   const confirmDelete = (id: string) => {
@@ -144,30 +164,48 @@ export default function StudentsPage() {
   };
 
   const clearFilters = () => {
-    setFilterGrade("");
     setFilterStatus("");
-    setFilterSubject("");
     setSearchTerm("");
   };
 
   const filteredStudents = students.filter(s => {
+    const matchesGrade = !selectedGradeId || s.gradeId === selectedGradeId;
+    const matchesClass = !selectedClassId || (s.enrolledClasses && s.enrolledClasses.includes(selectedClassId));
+    
     const matchesSearch = 
       s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
       (s.phone?.includes(searchTerm)) ||
       (s.studentId?.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesGrade = filterGrade === "" || s.grade === filterGrade;
-    const matchesStatus = filterStatus === "" || s.status === filterStatus;
-    const matchesSubject = filterSubject === "" || (s.enrolledSubjects && s.enrolledSubjects.includes(filterSubject));
     
-    return matchesSearch && matchesGrade && matchesStatus && matchesSubject;
+    const matchesStatus = filterStatus === "" || s.status === filterStatus;
+    
+    return matchesGrade && matchesClass && matchesSearch && matchesStatus;
   });
 
+  const activeGrade = grades.find(g => g.id === selectedGradeId);
+  const activeClass = allClasses.find(c => c.id === selectedClassId);
+
+  const handleExport = () => {
+      const title = activeClass ? `${activeClass.name} Student List` : activeGrade ? `${activeGrade.name} Student List` : "Institutional Student List";
+      const subtitle = activeClass ? `Curriculum: ${activeClass.subject}` : activeGrade ? `Level: ${activeGrade.name}` : "Comprehensive Directory";
+      generateStudentListPDF(filteredStudents, title, subtitle);
+  };
+
   const statCards = [
-    { title: "Total Students", value: students.length, icon: Users, color: "text-blue-500" },
-    { title: "Active Enrollment", value: students.filter(s => s.status === 'active').length, icon: CheckCircle, color: "text-emerald-500" },
-    { title: "Suspended Accounts", value: students.filter(s => s.status === 'inactive').length, icon: Ban, color: "text-rose-500" },
-    { title: "Grade Diversity", value: grades.length, icon: Layers, color: "text-indigo-500" },
+    { title: "Filtered Students", value: filteredStudents.length, icon: Users, color: "text-blue-500" },
+    { title: "Active Enrollment", value: filteredStudents.filter(s => s.status === 'active').length, icon: CheckCircle, color: "text-emerald-500" },
+    { title: "Suspended Accounts", value: filteredStudents.filter(s => s.status === 'inactive').length, icon: Ban, color: "text-rose-500" },
+    { title: "Available Classes", value: allClasses.filter(c => c.gradeId === selectedGradeId).length, icon: Layers, color: "text-indigo-500" },
   ];
+
+  const handleMasterExport = async () => {
+    setIsExporting(true);
+    try {
+        await generateMasterRosterPDF(students, grades, allClasses);
+    } finally {
+        setIsExporting(false);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20">
@@ -179,42 +217,133 @@ export default function StudentsPage() {
             Manage all student enrollments and records
           </p>
         </div>
-        <button 
-          onClick={handleAdd}
-          className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-bold hover:bg-black transition-all flex items-center gap-2"
-        >
-          <Plus className="w-3.5 h-3.5" /> Enroll Student
-        </button>
+        <div className="flex items-center gap-3">
+            <button 
+                onClick={() => setForceShowAll(true)}
+                className="px-5 py-2.5 bg-white text-slate-600 border border-slate-200 rounded-xl text-[11px] font-bold hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2"
+            >
+                <Users className="w-3.5 h-3.5" /> All students
+            </button>
+            <button 
+                onClick={handleMasterExport}
+                disabled={isExporting || students.length === 0}
+                className="px-5 py-2.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-xl text-[11px] font-bold hover:bg-indigo-600 hover:text-white transition-all shadow-sm flex items-center gap-2 disabled:opacity-50"
+            >
+                {isExporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Layers className="w-3.5 h-3.5" />} 
+                Export All Students
+            </button>
+            <button 
+                onClick={() => handleCollectPayment()}
+                className="px-5 py-2.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl text-[11px] font-bold hover:bg-emerald-600 hover:text-white transition-all shadow-sm flex items-center gap-2"
+            >
+                <CreditCard className="w-3.5 h-3.5" /> Collect Payment
+            </button>
+            <button 
+                onClick={handleAdd}
+                className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-bold hover:bg-black transition-all flex items-center gap-2"
+            >
+                <Plus className="w-3.5 h-3.5" /> Enroll Student
+            </button>
+        </div>
       </div>
 
-      {/* 🏛️ Specialized Stats Header */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 py-4">
-        {loading ? (
-            [1, 2, 3, 4].map(idx => (
-                <Skeleton key={idx} variant="rect" width="100%" height="80px" className="rounded-2xl" />
-            ))
-        ) : statCards.map((card, idx) => (
-          <div 
-            key={idx} 
-            className={`bg-white p-5 rounded-2xl border border-slate-200/60 transition-all duration-200 hover:border-primary/30 group shadow-sm`}
-          >
-            <div className="flex flex-col gap-3">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${card.color.replace('text-', 'bg-').split('-').slice(0, 2).join('-')}-50 ${card.color} transition-all shadow-sm`}>
-                <card.icon className="w-4 h-4" />
+      {/* 🏛️ Grade Selection (Visible when no grade selected and not force showing all) */}
+      {!selectedGradeId && !forceShowAll && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
+              <div className="p-10 rounded-[2.5rem] border-2 border-dashed border-slate-100 bg-slate-50/50 flex flex-col items-center justify-center text-center">
+                  <div className="w-20 h-20 rounded-full bg-white shadow-xl flex items-center justify-center text-primary mb-6 animate-bounce transition-all duration-1000">
+                      <GraduationCap className="w-10 h-10" />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-800">Select Academic Level</h3>
+                  <p className="text-sm text-slate-500 max-w-sm mt-2">Please select a grade level to access the student directory and enrollment records.</p>
               </div>
-              <div>
-                <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">{card.title}</p>
-                <div className="flex items-center gap-1">
-                  <p className="text-base font-bold text-slate-900 tracking-tight group-hover:text-primary transition-colors">{card.value}</p>
-                  <ArrowRight className="w-2.5 h-2.5 text-primary opacity-0 group-hover:opacity-100 transition-all translate-x-[-4px] group-hover:translate-x-0" />
-                </div>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  {loading ? (
+                       [1,2,3,4].map(i => <Skeleton key={i} variant="rect" width="100%" height="80px" className="rounded-2xl" />)
+                  ) : grades.map(g => (
+                      <button
+                        key={g.id}
+                        onClick={() => setSelectedGradeId(g.id)}
+                        className="p-6 rounded-2xl border border-slate-200 bg-white hover:border-primary hover:shadow-xl hover:shadow-primary/5 transition-all group flex flex-col items-center gap-3"
+                      >
+                          <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-primary group-hover:text-white transition-all shadow-sm">
+                              <GraduationCap className="w-5 h-5" />
+                          </div>
+                          <span className="text-sm font-bold text-slate-800 tracking-tight">{g.name}</span>
+                          <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none">{g.studentCount || 0} Students</span>
+                      </button>
+                  ))}
               </div>
-            </div>
           </div>
-        ))}
-      </div>
+      )}
 
-      <StudentModal 
+      {/* 🏛️ Specialized Stats Header (Visible when grade selected or force show all) */}
+      {(selectedGradeId || forceShowAll) && (
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                    <button onClick={() => { setSelectedGradeId(""); setSelectedClassId(""); setForceShowAll(false); }} className="p-2 hover:bg-white rounded-xl border border-slate-100 shadow-sm text-slate-400 hover:text-primary transition-all group">
+                        <ArrowLeft className="w-5 h-5 group-hover:translate-x-[-2px] transition-transform" />
+                    </button>
+                    <div>
+                        <h2 className="text-lg font-bold text-slate-800">{forceShowAll ? "Institutional Roster" : `${activeGrade?.name} Directory`}</h2>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Academic Year 2026 • Verified Records</p>
+                    </div>
+                </div>
+                {filteredStudents.length > 0 && (
+                    <button 
+                        onClick={handleExport}
+                        className="px-5 py-2.5 bg-white border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 hover:bg-primary hover:text-white hover:border-primary transition-all flex items-center gap-2 shadow-sm"
+                    >
+                        <Download className="w-3.5 h-3.5" /> Export {activeClass ? "Class" : "Grade"} List
+                    </button>
+                )}
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {statCards.map((card, idx) => (
+                <div 
+                    key={idx} 
+                    className={`bg-white p-5 rounded-2xl border border-slate-200/60 transition-all duration-200 hover:border-primary/30 group shadow-sm`}
+                >
+                    <div className="flex flex-col gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${card.color.replace('text-', 'bg-').split('-').slice(0, 2).join('-')}-50 ${card.color} transition-all shadow-sm`}>
+                        <card.icon className="w-4 h-4" />
+                    </div>
+                    <div>
+                        <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">{card.title}</p>
+                        <div className="flex items-center gap-1">
+                        <p className="text-base font-bold text-slate-900 tracking-tight group-hover:text-primary transition-colors">{card.value}</p>
+                        <ArrowRight className="w-2.5 h-2.5 text-primary opacity-0 group-hover:opacity-100 transition-all translate-x-[-4px] group-hover:translate-x-0" />
+                        </div>
+                    </div>
+                    </div>
+                </div>
+                ))}
+            </div>
+
+            {/* Class Filter Bar */}
+            <div className="flex flex-wrap gap-2 p-2 bg-slate-100 rounded-2xl border border-slate-200/50">
+                <button
+                    onClick={() => setSelectedClassId("")}
+                    className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${selectedClassId === "" ? 'bg-primary text-white shadow-lg' : 'bg-white text-slate-400 hover:text-slate-600'}`}
+                >
+                    All Students
+                </button>
+                {allClasses.filter(c => c.gradeId === selectedGradeId).map(cls => (
+                    <button
+                        key={cls.id}
+                        onClick={() => setSelectedClassId(cls.id)}
+                        className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${selectedClassId === cls.id ? 'bg-emerald-600 text-white shadow-lg' : 'bg-white text-slate-400 hover:text-slate-600'}`}
+                    >
+                        {cls.name}
+                    </button>
+                ))}
+            </div>
+        </div>
+      )}
+
+        <StudentModal 
         isOpen={isModalOpen} 
         onClose={() => {
           setIsModalOpen(false);
@@ -222,6 +351,16 @@ export default function StudentsPage() {
         }} 
         onSuccess={loadStudents}
         initialData={selectedStudent}
+      />
+
+      <PaymentModal 
+        isOpen={isPaymentOpen}
+        onClose={() => {
+            setIsPaymentOpen(false);
+            setPaymentStudentId(null);
+        }}
+        initialStudentId={paymentStudentId || ""}
+        onSuccess={loadStudents}
       />
 
       <ConfirmModal 
@@ -236,24 +375,25 @@ export default function StudentsPage() {
         message="This action will permanently remove all enrollment data, attendance history, and payment logs associated with this student from the cloud. This cannot be undone."
       />
 
-      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
-        <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center bg-slate-50/50">
-          <div className="relative w-full sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input 
-              type="text" 
-              placeholder="Search by name or phone..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-            />
-          </div>
+      {(selectedGradeId || forceShowAll) && (
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col animate-in fade-in zoom-in-95 duration-700">
+            <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center bg-slate-50/50">
+            <div className="relative w-full sm:max-w-xs">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input 
+                type="text" 
+                placeholder="Search by name or phone..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                />
+            </div>
           <button 
             onClick={() => setShowFilters(!showFilters)}
             className={`px-4 py-2 border rounded-lg text-sm font-medium flex items-center gap-2 transition-all ${showFilters ? 'bg-primary/10 border-primary text-primary' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
           >
             <Filter className="w-4 h-4" /> Filters
-            {(filterGrade || filterSubject || filterStatus) && (
+            {filterStatus && (
               <span className="w-2 h-2 bg-primary rounded-full animate-pulse"></span>
             )}
           </button>
@@ -261,34 +401,8 @@ export default function StudentsPage() {
 
         {/* Filter Panel */}
         {showFilters && (
-          <div className="p-4 border-b border-slate-100 bg-slate-50/30 grid grid-cols-1 sm:grid-cols-3 gap-4 animate-in slide-in-from-top duration-300">
-             <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Grade Level</label>
-                <select 
-                  value={filterGrade}
-                  onChange={(e) => setFilterGrade(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                >
-                  <option value="">All Grades</option>
-                  {grades.map(g => (
-                    <option key={g.id} value={g.name}>{g.name}</option>
-                  ))}
-                </select>
-             </div>
-             <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Subject Enrollment</label>
-                <select 
-                  value={filterSubject}
-                  onChange={(e) => setFilterSubject(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
-                >
-                  <option value="">All Subjects</option>
-                  {subjects.map(sub => (
-                    <option key={sub.id} value={sub.id}>{sub.name}</option>
-                  ))}
-                </select>
-             </div>
-             <div className="space-y-1 flex flex-col">
+          <div className="p-4 border-b border-slate-100 bg-slate-50/30 flex justify-between items-end gap-4 animate-in slide-in-from-top duration-300">
+             <div className="flex-1 space-y-1">
                 <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Account Status</label>
                 <div className="flex gap-2">
                   <select 
@@ -300,15 +414,14 @@ export default function StudentsPage() {
                     <option value="active">Active</option>
                     <option value="inactive">Suspended</option>
                   </select>
-                  <button 
-                    onClick={clearFilters}
-                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors border border-transparent hover:border-red-100"
-                    title="Clear All Filters"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
                 </div>
              </div>
+             <button 
+                onClick={clearFilters}
+                className="h-[38px] px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2"
+              >
+                <X className="w-4 h-4" /> Clear All Filters
+              </button>
           </div>
         )}
         
@@ -421,6 +534,13 @@ export default function StudentsPage() {
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button 
+                          onClick={() => handleCollectPayment(student.id)}
+                          className="p-2 text-slate-400 hover:text-emerald-600 transition-colors hover:bg-emerald-50 rounded-lg"
+                          title="Collect Payment"
+                        >
+                          <CreditCard className="w-4 h-4" />
+                        </button>
+                        <button 
                           onClick={() => toggleStatus(student)}
                           title={student.status === 'active' ? "Suspend Account" : "Restore Account"}
                           className={`p-2 transition-colors rounded-lg ${student.status === 'active' ? 'text-slate-400 hover:text-amber-600 hover:bg-amber-50' : 'text-amber-600 hover:text-green-600 hover:bg-green-50'}`}
@@ -462,14 +582,9 @@ export default function StudentsPage() {
         </div>
         
         <div className="p-4 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500 bg-slate-50">
-          <p>Showing {filteredStudents.length} entr{filteredStudents.length === 1 ? 'y' : 'ies'}</p>
-          <div className="flex gap-1">
-            <button className="px-3 py-1 border border-slate-200 rounded hover:bg-slate-100" disabled>Previous</button>
-            <button className="px-3 py-1 bg-primary text-white rounded">1</button>
-            <button className="px-3 py-1 border border-slate-200 rounded hover:bg-slate-100" disabled>Next</button>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
