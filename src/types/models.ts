@@ -64,6 +64,8 @@ export interface Class {
   sessionsSinceLastPayment?: number;
   sessionsPerCycle?: number;
   status: 'active' | 'inactive';
+  createdAt?: FirestoreTimestamp;
+  updatedAt?: FirestoreTimestamp;
 }
 
 export interface Payment {
@@ -75,6 +77,17 @@ export interface Payment {
   method: string;
   description: string;
   status: string;
+  subject?: string;
+  classId?: string;
+  classIds?: string[];
+  className?: string;
+  classNames?: string[];
+  subjects?: string[];
+  items?: {
+    name: string;
+    subject: string;
+    amount: number;
+  }[];
   createdAt: FirestoreTimestamp;
 }
 
@@ -123,6 +136,8 @@ export interface Subject {
   studentCount?: number;
   color?: string;
   status: 'active' | 'inactive';
+  createdAt?: FirestoreTimestamp;
+  updatedAt?: FirestoreTimestamp;
 }
 
 export interface Grade {
@@ -132,4 +147,6 @@ export interface Grade {
   studentCount?: number;
   classCount?: number;
   status: 'active' | 'inactive';
+  createdAt?: FirestoreTimestamp;
+  updatedAt?: FirestoreTimestamp;
 }

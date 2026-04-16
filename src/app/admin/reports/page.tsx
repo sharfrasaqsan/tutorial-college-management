@@ -378,8 +378,7 @@ export default function ReportsHubPage() {
                                     <BarChart3 className="w-5 h-5 text-slate-400" />
                                 </div>
                             </div>
-                            
-                            <div className="h-[300px] w-full">
+                            <div className="h-[300px] w-full min-h-[300px]">
                                 {analyticsLoading ? (
                                     <div className="h-full w-full bg-slate-50/50 rounded-2xl flex items-center justify-center">
                                         <Loader2 className="w-6 h-6 text-slate-300 animate-spin" />
@@ -413,8 +412,7 @@ export default function ReportsHubPage() {
                                     <ShieldCheck className="w-5 h-5 text-slate-400" />
                                 </div>
                             </div>
-                            
-                            <div className="h-[300px] w-full">
+                            <div className="h-[300px] w-full min-h-[300px]">
                                 {analyticsLoading ? (
                                     <div className="h-full w-full bg-slate-50/50 rounded-2xl flex items-center justify-center">
                                         <Loader2 className="w-6 h-6 text-slate-300 animate-spin" />
@@ -442,7 +440,7 @@ export default function ReportsHubPage() {
                 </div>
             )}
 
-            {activeTab === 'directories' && ( activeTab === 'directories' && (
+            {activeTab === 'directories' && (
                 <div className="space-y-8 animate-in slide-in-from-bottom-2 duration-500">
                     <div className="space-y-4">
                         <div className="flex items-center gap-5 px-1">

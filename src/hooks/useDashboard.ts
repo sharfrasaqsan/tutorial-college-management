@@ -133,7 +133,7 @@ export function useDashboard() {
                 studentName: data.studentName,
                 amount: data.paidAmount || 0,
                 status: data.status,
-                date: data.paymentDate || data.createdAt || ""
+                date: data.paymentDate || (data.createdAt?.seconds ? new Date(data.createdAt.seconds * 1000).toISOString() : "") || ""
             });
 
             if (data.status === "unpaid" || data.status === "partial") {
@@ -147,11 +147,17 @@ export function useDashboard() {
             }
         });
 
+        const sortedPayments = paymentList.sort((a, b) => {
+            if (!a.date) return 1;
+            if (!b.date) return -1;
+            return b.date.localeCompare(a.date);
+        });
+
         setStats(prev => ({
             ...(prev || {} as DashboardStats),
             feesCollected,
             unpaidFeesCount,
-            monthlyPayments: paymentList.sort((a, b) => b.date.localeCompare(a.date)),
+            monthlyPayments: sortedPayments,
             unpaidList: unpaidList.sort((a, b) => a.studentName.localeCompare(b.studentName))
         } as DashboardStats));
     });

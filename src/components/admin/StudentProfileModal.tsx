@@ -1,19 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { doc, getDoc, collection, query, where, getDocs, orderBy, limit, Timestamp } from "firebase/firestore";
+import { useState, useEffect, useCallback } from "react";
+import { doc, getDoc, collection, query, where, getDocs, Timestamp, orderBy, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { 
-  X, User, Mail, Phone, MapPin, School, GraduationCap, 
-  BookOpen, Clock, Calendar, CreditCard, Activity,
-  ChevronRight, ArrowUpRight, Loader2, Hash, History,
-  QrCode, Download
+  X, Phone, MapPin, 
+  BookOpen, Calendar, Activity,
+  Loader2, Award, Hash, 
+  Trash2, Download, ShieldCheck, GraduationCap,
+  CreditCard, Users, QrCode
 } from "lucide-react";
 import { Student, Class, Payment } from "@/types/models";
 import Skeleton from "@/components/ui/Skeleton";
-import PaymentModal from "./PaymentModal";
+import ConfirmModal from "@/components/ui/ConfirmModal";
+import PaymentModal from "@/components/admin/PaymentModal";
+import toast from "react-hot-toast";
+import { generateStudentPaymentPDF, generateStudentIDCardPDF, generateStudentPaymentHistoryPDF } from "@/lib/pdf-generator";
+import { format } from "date-fns";
 import QRCode from "qrcode";
-import { generateStudentIDCardPDF } from "@/lib/pdf-generator";
 
 interface StudentProfileModalProps {
   studentId: string;
@@ -24,62 +28,127 @@ interface StudentProfileModalProps {
 export default function StudentProfileModal({ studentId, isOpen, onClose }: StudentProfileModalProps) {
   const [student, setStudent] = useState<Student | null>(null);
   const [enrolledClasses, setEnrolledClasses] = useState<Class[]>([]);
-  const [recentPayments, setRecentPayments] = useState<Payment[]>([]);
+  const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'academics' | 'financials' | 'history'>('overview');
-  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
-  const [qrCodeData, setQrCodeData] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<'overview' | 'classes' | 'financials' | 'administration'>('overview');
+  const [deletingPayment, setDeletingPayment] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [paymentToDeleteId, setPaymentToDeleteId] = useState<string | null>(null);
+  const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
+  const [generatingId, setGeneratingId] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
-  useEffect(() => {
-    if (isOpen && studentId) {
-      loadStudentData();
-    }
-  }, [isOpen, studentId]);
-
-  const loadStudentData = async () => {
+  const loadStudentData = useCallback(async () => {
     setLoading(true);
     try {
-      const stdDoc = await getDoc(doc(db, "students", studentId));
-      if (!stdDoc.exists()) {
+      // 1. Fetch Student Basic Info
+      const sDoc = await getDoc(doc(db, "students", studentId));
+      if (!sDoc.exists()) {
         setLoading(false);
         return;
       }
-      const stdData = { id: stdDoc.id, ...stdDoc.data() } as Student;
-      setStudent(stdData);
+      const sData = { id: sDoc.id, ...sDoc.data() } as Student;
+      setStudent(sData);
 
-      // 🔳 Generate QR Code (Verification URL or Internal ID)
-      const verifyUrl = `https://smart-academy-portal.vercel.app/verify/student/${stdData.id}`;
-      const qrData = await QRCode.toDataURL(verifyUrl, {
-        margin: 1,
-        width: 400,
-        color: {
-            dark: '#1e293b', 
-            light: '#ffffff'
-        }
-      });
-      setQrCodeData(qrData);
-
-      if (stdData.enrolledClasses && stdData.enrolledClasses.length > 0) {
-        const classPromises = stdData.enrolledClasses.map(cid => getDoc(doc(db, "classes", cid)));
+      // 2. Fetch Enrolled Classes
+      if (sData.enrolledClasses && sData.enrolledClasses.length > 0) {
+        const classPromises = sData.enrolledClasses.map(cid => getDoc(doc(db, "classes", cid)));
         const classSnaps = await Promise.all(classPromises);
         setEnrolledClasses(classSnaps.filter(s => s.exists()).map(s => ({ id: s.id, ...s.data() } as Class)));
-      } else {
-        setEnrolledClasses([]);
       }
 
+      // 3. Fetch Payment History
       const payQuery = query(
         collection(db, "payments"), 
         where("studentId", "==", studentId),
-        orderBy("createdAt", "desc"),
-        limit(5)
+        orderBy("createdAt", "desc")
       );
       const paySnap = await getDocs(payQuery);
-      setRecentPayments(paySnap.docs.map(d => ({ id: d.id, ...d.data() } as Payment)));
+      setPaymentHistory(paySnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
+
+      // 4. Generate QR Code
+      try {
+        const qrData = await QRCode.toDataURL(sData.id, {
+          margin: 1,
+          color: {
+            dark: "#1e293b",
+            light: "#ffffff"
+          }
+        });
+        setQrCodeUrl(qrData);
+      } catch (e) {
+        console.error("QR Generation failed", e);
+      }
 
     } catch (error) {
       console.error("Error loading student profile:", error);
     } finally {
       setLoading(false);
+    }
+  }, [studentId]);
+
+  useEffect(() => {
+    if (isOpen && studentId) {
+      loadStudentData();
+    }
+  }, [isOpen, studentId, loadStudentData]);
+
+  const openDeleteConfirm = (payId: string) => {
+    setPaymentToDeleteId(payId);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeletePayment = async () => {
+    if (!paymentToDeleteId) return;
+    
+    setDeletingPayment(paymentToDeleteId);
+    try {
+      await deleteDoc(doc(db, "payments", paymentToDeleteId));
+      setPaymentHistory(prev => prev.filter(p => p.id !== paymentToDeleteId));
+      toast.success("Transaction purged from ledger.");
+      setShowDeleteConfirm(false);
+      setPaymentToDeleteId(null);
+    } catch (error) {
+      toast.error("Process failed.");
+    } finally {
+      setDeletingPayment(null);
+    }
+  };
+
+  const handleDownloadReceipt = async (payment: any) => {
+    try {
+      // Re-format items if missing (for older records)
+      const paymentToPrint = {
+        ...payment,
+        createdAt: payment.createdAt instanceof Timestamp ? payment.createdAt.toDate() : new Date(payment.createdAt)
+      };
+      await generateStudentPaymentPDF(paymentToPrint, student?.name, student?.studentId);
+      toast.success("Receipt generated.");
+    } catch (error) {
+      toast.error("Failed to generate PDF.");
+    }
+  };
+
+  const handleDownloadIdCard = async () => {
+    if (!student || !qrCodeUrl) return;
+    setGeneratingId(true);
+    try {
+      await generateStudentIDCardPDF(student, qrCodeUrl);
+      toast.success("ID Card generated.");
+    } catch (error) {
+      toast.error("Generation failed.");
+    } finally {
+      setGeneratingId(false);
+    }
+  };
+
+  const handleDownloadHistory = async () => {
+    if (!student || paymentHistory.length === 0) return;
+    try {
+      await generateStudentPaymentHistoryPDF(paymentHistory, student);
+      toast.success("Payment history statement generated.");
+    } catch (error) {
+      toast.error("Failed to generate statement.");
     }
   };
 
@@ -88,7 +157,7 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
   const formatDate = (date: any) => {
     if (!date) return 'N/A';
     const d = date instanceof Timestamp ? date.toDate() : new Date(date);
-    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return format(d, "MMM dd, yyyy");
   };
 
   return (
@@ -97,10 +166,12 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
       <div className={`fixed inset-0 bg-slate-900/40 transition-all duration-300 ${isOpen ? "backdrop-blur-sm" : ""}`} onClick={onClose}></div>
 
       <div className={`relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all duration-300 ease-out flex flex-col h-[85vh] ${isOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
+        
+        {/* Header Segment */}
         <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white z-10 shrink-0">
             <div className="flex items-center gap-5">
                 <div className="w-14 h-14 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-primary text-xl font-bold">
-                    {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : student?.name.charAt(0)}
+                    {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : student?.name.charAt(0).toUpperCase()}
                 </div>
                 <div>
                     <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-3 leading-none">
@@ -108,7 +179,7 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
                     </h2>
                     <div className="flex items-center gap-3 mt-1.5">
                          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-                            <Hash className="w-3.5 h-3.5" /> {loading ? "..." : (student?.studentId || "STD-101")}
+                            <Hash className="w-3.5 h-3.5" /> ID: {loading ? "..." : student?.studentId || student?.id.substring(0,8).toUpperCase()}
                          </span>
                          <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
                          <span className={`text-[10px] font-bold uppercase tracking-wider ${student?.status === 'active' ? 'text-emerald-600' : 'text-amber-600'}`}>
@@ -117,25 +188,23 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
                     </div>
                 </div>
             </div>
-            <div className="flex items-center gap-2">
-                {!loading && student && (
-                    <>
-                        <button 
-                            onClick={() => generateStudentIDCardPDF(student, qrCodeData)}
-                            className="px-4 py-2 bg-slate-50 text-slate-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-slate-200 hover:bg-slate-100 transition-all shadow-sm active:scale-95 flex items-center gap-2"
-                        >
-                            <QrCode className="w-3.5 h-3.5" />
-                            Download ID Card
-                        </button>
-                        <button 
-                            onClick={() => setIsPaymentOpen(true)}
-                            className="px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-100 hover:bg-emerald-600 hover:text-white transition-all shadow-sm active:scale-95 flex items-center gap-2"
-                        >
-                            <CreditCard className="w-3.5 h-3.5" />
-                            Quick Pay
-                        </button>
-                    </>
-                )}
+            <div className="flex items-center gap-3">
+                <button 
+                  onClick={() => setIsPaymentModalOpen(true)}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-primary text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg active:scale-95"
+                >
+                  <CreditCard className="w-3.5 h-3.5" />
+                  Collect Fee
+                </button>
+                <div className="w-[1px] h-6 bg-slate-100 mx-1"></div>
+                <button 
+                    onClick={handleDownloadIdCard}
+                    disabled={generatingId || !student}
+                    className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all border border-emerald-100 disabled:opacity-50"
+                >
+                    {generatingId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <QrCode className="w-3.5 h-3.5" />}
+                    Download ID
+                </button>
                 <button 
                     onClick={onClose}
                     className="p-2.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all group"
@@ -145,17 +214,17 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
             </div>
         </div>
 
-        {/* Professional Navigation Bar */}
-        <div className="px-8 bg-slate-50/50 border-b border-slate-100 flex items-center gap-1">
-            {(['overview', 'academics', 'financials', 'history'] as const).map((tab) => (
+        {/* Navigation Bar */}
+        <div className="px-8 bg-slate-50/50 border-b border-slate-100 flex items-center gap-1 shrink-0 scrollbar-hide overflow-x-auto">
+            {(['overview', 'classes', 'financials', 'administration'] as const).map((tab) => (
                 <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-5 py-4 text-sm font-medium transition-all relative capitalize ${activeTab === tab ? 'text-primary' : 'text-slate-500 hover:text-slate-800'}`}
+                    className={`px-5 py-4 text-sm font-medium transition-all relative capitalize shrink-0 ${activeTab === tab ? 'text-primary' : 'text-slate-500 hover:text-slate-800'}`}
                 >
-                    {tab === 'overview' ? 'Overview' : tab === 'academics' ? 'Classes' : tab === 'financials' ? 'Payments' : 'History'}
+                    {tab === 'overview' ? 'Overview' : tab === 'classes' ? 'Enrollment' : tab === 'financials' ? 'Payments' : 'Profile'}
                     {activeTab === tab && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full"></div>
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full transition-all" />
                     )}
                 </button>
             ))}
@@ -165,143 +234,126 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
         <div className="flex-1 overflow-y-auto p-8 scrollbar-hide bg-white">
             {loading ? (
                 <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <Skeleton variant="rect" width="100%" height="100px" className="rounded-xl" />
-                        <Skeleton variant="rect" width="100%" height="100px" className="rounded-xl" />
-                        <Skeleton variant="rect" width="100%" height="100px" className="rounded-xl" />
+                    <Skeleton variant="rect" width="100%" height="150px" className="rounded-2xl" />
+                    <div className="grid grid-cols-2 gap-4">
+                        <Skeleton variant="rect" width="100%" height="80px" className="rounded-xl" />
+                        <Skeleton variant="rect" width="100%" height="80px" className="rounded-xl" />
                     </div>
-                    <Skeleton variant="rect" width="100%" height="300px" className="rounded-xl" />
                 </div>
             ) : student && (
-                <div className="max-w-5xl mx-auto space-y-10 animate-in fade-in duration-500">
-                    
+                <div className="animate-in fade-in duration-500">
                     {activeTab === 'overview' && (
                         <div className="space-y-10">
-                            {/* Summary Metrics */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {[
-                                    { label: 'Grade Level', value: student.grade || 'N/A', icon: GraduationCap, color: 'bg-blue-50 text-blue-600' },
-                                    { label: 'Subjects', value: student.enrolledSubjects?.length || 0, icon: BookOpen, color: 'bg-indigo-50 text-indigo-600' },
-                                    { label: 'Classes', value: student.enrolledClasses?.length || 0, icon: Clock, color: 'bg-emerald-50 text-emerald-600' },
-                                    { label: 'Started On', value: formatDate(student.createdAt), icon: Calendar, color: 'bg-slate-50 text-slate-600' },
+                                    { label: 'Grade Level', value: student.grade || 'N/A', icon: GraduationCap, color: 'bg-primary/5 text-primary border-primary/10' },
+                                    { label: 'Classes', value: enrolledClasses.length, icon: BookOpen, color: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+                                    { label: 'Payments', value: paymentHistory.length, icon: CreditCard, color: 'bg-indigo-50 text-indigo-500 border-indigo-100' },
+                                    { label: 'Enrollment', value: formatDate(student.createdAt), icon: Calendar, color: 'bg-slate-50 text-slate-500 border-slate-200' },
                                 ].map((stat, i) => (
-                                    <div key={i} className="p-4 rounded-xl border border-slate-100 flex flex-col gap-2">
-                                        <div className={`w-8 h-8 rounded-lg ${stat.color} flex items-center justify-center`}>
-                                            <stat.icon className="w-4 h-4" />
-                                        </div>
+                                    <div key={i} className={`p-4 rounded-xl border flex flex-col gap-2 ${stat.color}`}>
+                                        <stat.icon className="w-4 h-4" />
                                         <div>
-                                            <p className="text-[11px] font-medium text-slate-500">{stat.label}</p>
-                                            <p className="text-base font-bold text-slate-800">{stat.value}</p>
+                                            <p className="text-[10px] font-bold uppercase tracking-wider opacity-60 mb-0.5">{stat.label}</p>
+                                            <p className="text-base font-bold tracking-tight">{stat.value}</p>
                                         </div>
                                     </div>
                                 ))}
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-12 gap-10">
-                                {/* Informational Blocks */}
-                                <div className="md:col-span-8 space-y-8">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                                        <div className="space-y-8">
-                                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Contact Details</h4>
-                                            <div className="space-y-5">
-                                                <div className="flex items-start gap-4">
-                                                    <Phone className="w-4 h-4 text-slate-400 mt-0.5" />
-                                                    <div>
-                                                        <p className="text-xs text-slate-400 font-medium mb-0.5">Phone Number</p>
-                                                        <p className="text-sm font-semibold text-slate-700">{student.phone || 'N/A'}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-start gap-4">
-                                                    <MapPin className="w-4 h-4 text-slate-400 mt-0.5" />
-                                                    <div>
-                                                        <p className="text-xs text-slate-400 font-medium mb-0.5">Home Address</p>
-                                                        <p className="text-sm font-semibold text-slate-700 leading-relaxed">{student.address || 'N/A'}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-start gap-4">
-                                                    <School className="w-4 h-4 text-slate-400 mt-0.5" />
-                                                    <div>
-                                                        <p className="text-xs text-slate-400 font-medium mb-0.5">School</p>
-                                                        <p className="text-sm font-semibold text-slate-700">{student.schoolName || 'N/A'}</p>
-                                                    </div>
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                                <div className="space-y-8">
+                                    <div>
+                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Contact & Personal</h4>
+                                        <div className="space-y-6">
+                                            <div className="flex items-start gap-4">
+                                                <div className="w-9 h-9 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400"><Phone className="w-4 h-4" /></div>
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 leading-none">Parent Phone</p>
+                                                    <p className="text-sm font-semibold text-slate-800 tracking-tight">{student.parentPhone || student.phone || 'N/A'}</p>
                                                 </div>
                                             </div>
-                                        </div>
-
-                                        <div className="space-y-8">
-                                            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Guardian Profile</h4>
-                                            <div className="p-6 rounded-2xl bg-slate-50 border border-slate-100 space-y-6">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400">
-                                                        <User className="w-5 h-5" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-xs text-slate-400 font-medium mb-0.5">Full Name</p>
-                                                        <p className="text-sm font-bold text-slate-800">{student.parentName || 'N/A'}</p>
-                                                    </div>
+                                            <div className="flex items-start gap-4">
+                                                <div className="w-9 h-9 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400"><Users className="w-4 h-4" /></div>
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 leading-none">Parent Name</p>
+                                                    <p className="text-sm font-semibold text-slate-800">{student.parentName || 'N/A'}</p>
                                                 </div>
-                                                <div className="flex items-center gap-4">
-                                                    <div className="w-10 h-10 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400">
-                                                        <Phone className="w-5 h-5" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-xs text-slate-400 font-medium mb-0.5">Phone Number</p>
-                                                        <p className="text-sm font-bold text-slate-800 uppercase tracking-tight">{student.parentPhone || 'N/A'}</p>
-                                                    </div>
+                                            </div>
+                                            <div className="flex items-start gap-4">
+                                                <div className="w-9 h-9 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400"><MapPin className="w-4 h-4" /></div>
+                                                <div>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 leading-none">Home Address</p>
+                                                    <p className="text-sm font-semibold text-slate-800 leading-relaxed">{student.address || 'N/A'}</p>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                {/* QR Code Identity Widget */}
-                                <div className="md:col-span-4 flex flex-col items-center">
-                                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 w-full text-center md:text-left">Digital Identity</h4>
-                                    <div className="p-6 rounded-[2rem] bg-white border border-slate-100 shadow-xl shadow-slate-100/50 flex flex-col items-center gap-4 group">
-                                        <div className="relative p-2 bg-slate-50 rounded-2xl border border-slate-100 group-hover:scale-[1.02] transition-transform duration-500">
-                                            {qrCodeData ? (
-                                                <img src={qrCodeData} alt="Verification QR" className="w-32 h-32 md:w-40 md:h-40" />
-                                            ) : (
-                                                <div className="w-32 h-32 md:w-40 md:h-40 flex items-center justify-center">
-                                                    <Loader2 className="w-6 h-6 animate-spin text-slate-300" />
-                                                </div>
-                                            )}
+                                <div className="space-y-8">
+                                    <div className="p-6 rounded-2xl border border-slate-100 bg-slate-50/50">
+                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-5">School Info</h4>
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-center py-2 border-b border-slate-200/50">
+                                                <span className="text-xs font-semibold text-slate-500">Day School</span>
+                                                <span className="text-xs font-bold text-slate-800">{student.schoolName || 'N/A'}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center py-2 border-b border-slate-200/50">
+                                                <span className="text-xs font-semibold text-slate-500">Academic Status</span>
+                                                <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 rounded uppercase tracking-widest">Active</span>
+                                            </div>
                                         </div>
-                                        <div className="text-center">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-primary mb-1">Verify Enrollment</p>
-                                            <p className="text-[9px] font-medium text-slate-400 max-w-[150px]">Scan to authenticate student status via the official portal</p>
-                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-8">
+                                    <div>
+                                         <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Digital Identity</h4>
+                                         <div className="p-5 rounded-3xl border border-slate-100 bg-white flex flex-col items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
+                                              {qrCodeUrl ? (
+                                                  <div className="p-3 border-4 border-slate-50 rounded-2xl bg-white">
+                                                      <img src={qrCodeUrl} alt="Student QR" className="w-32 h-32" />
+                                                  </div>
+                                              ) : (
+                                                  <div className="w-32 h-32 bg-slate-50 animate-pulse rounded-2xl" />
+                                              )}
+                                              <div className="text-center">
+                                                  <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mb-1">Institutional Hash</p>
+                                                  <p className="text-[8px] font-bold text-slate-400 font-mono">{student.id.toUpperCase()}</p>
+                                              </div>
+                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    {activeTab === 'academics' && (
-                        <div className="space-y-6">
+                    {activeTab === 'classes' && (
+                        <div className="space-y-6 animate-in slide-in-from-right-10 duration-500">
                              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Enrolled Classes</h4>
-                                <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full uppercase tracking-widest leading-none border border-slate-100">{enrolledClasses.length} Classes</span>
+                                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Course Enrollment</h4>
+                                <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100 uppercase tracking-widest">{enrolledClasses.length} Active Units</span>
                              </div>
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {enrolledClasses.length > 0 ? enrolledClasses.map((cls) => (
-                                    <div key={cls.id} className="p-5 rounded-2xl border border-slate-100 hover:border-slate-300 transition-all bg-white group flex flex-col justify-between min-h-[140px]">
-                                        <div>
-                                            <div className="flex justify-between items-start mb-2">
-                                                <p className="text-[10px] font-bold text-primary tracking-[0.2em] uppercase leading-none">{cls.subject}</p>
-                                                <ArrowUpRight className="w-4 h-4 text-slate-200 group-hover:text-primary transition-colors" />
+                                    <div key={cls.id} className="p-5 rounded-2xl border border-slate-100 hover:border-primary/20 transition-all bg-white group flex flex-col justify-between min-h-[140px]">
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-start">
+                                                <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 group-hover:bg-primary/5 group-hover:text-primary transition-all flex items-center justify-center">
+                                                    <BookOpen className="w-5 h-5" />
+                                                </div>
+                                                <div className="px-2 py-0.5 bg-slate-50 rounded text-[8px] font-black text-slate-400 uppercase tracking-widest">Verified</div>
                                             </div>
-                                            <h5 className="font-bold text-slate-800 text-lg">{cls.name}</h5>
-                                            <p className="text-xs font-medium text-slate-400 mt-1">{cls.grade}</p>
-                                        </div>
-                                        <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-50">
-                                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">{cls.schedules?.[0]?.dayOfWeek || 'Schedule Pending'}</span>
+                                            <div>
+                                                <h5 className="font-bold text-slate-800 text-lg group-hover:text-primary transition-colors">{cls.name}</h5>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1.5">{cls.subject} • {cls.grade}</p>
+                                            </div>
                                         </div>
                                     </div>
                                 )) : (
-                                    <div className="col-span-full py-16 text-center border-2 border-dashed border-slate-100 rounded-2xl">
-                                        <p className="text-sm text-slate-400 font-medium">No recorded enrollments found at this time.</p>
+                                    <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-100 rounded-3xl bg-slate-50/50">
+                                        <p className="text-sm font-bold text-slate-300 uppercase tracking-widest">No active enrollment units detected</p>
                                     </div>
                                 )}
                              </div>
@@ -309,33 +361,64 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
                     )}
 
                     {activeTab === 'financials' && (
-                        <div className="space-y-6">
+                        <div className="space-y-6 animate-in slide-in-from-left-10 duration-500">
                              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Recent Payments</h4>
+                                <div className="flex items-center gap-3">
+                                    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Fee Collection History</h4>
+                                    <button 
+                                        onClick={handleDownloadHistory}
+                                        className="flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-indigo-600 hover:text-white transition-all border border-indigo-100"
+                                    >
+                                        <Download className="w-3 h-3" />
+                                        Download History
+                                    </button>
+                                </div>
+                                <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100 uppercase tracking-widest">{paymentHistory.length} Transactions</span>
                              </div>
                              <div className="overflow-hidden border border-slate-100 rounded-2xl">
                                 <table className="w-full text-sm text-left">
                                     <thead className="bg-slate-50/80 text-slate-400 font-bold uppercase text-[10px] tracking-widest border-b border-slate-100">
                                         <tr>
-                                            <th className="px-6 py-4">Ref Number</th>
-                                            <th className="px-6 py-4">Month</th>
-                                            <th className="px-6 py-4">Method</th>
-                                            <th className="px-6 py-4 text-right">Amount</th>
+                                            <th className="px-6 py-4">Financial Cycle</th>
+                                            <th className="px-6 py-4">Subjects</th>
+                                            <th className="px-6 py-4 text-right">Settlement</th>
+                                            <th className="px-6 py-4 text-right pr-8 whitespace-nowrap">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
-                                        {recentPayments.length > 0 ? recentPayments.map((pay) => (
-                                            <tr key={pay.id} className="hover:bg-slate-50/50 transition-colors">
-                                                <td className="px-6 py-5 font-mono text-xs text-slate-600 font-bold tracking-tight">#{pay.id.substring(0,10).toUpperCase()}</td>
-                                                <td className="px-6 py-5 text-slate-600 font-semibold capitalize">{pay.month}</td>
+                                        {paymentHistory.length > 0 ? paymentHistory.map((pay) => (
+                                            <tr key={pay.id} className="hover:bg-slate-50/50 transition-colors group/row">
                                                 <td className="px-6 py-5">
-                                                    <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-bold uppercase tracking-widest border border-slate-200">{pay.method}</span>
+                                                    <p className="font-bold text-slate-700 capitalize leading-none">{pay.month}</p>
+                                                    <p className="text-[10px] text-slate-400 mt-1.5 font-medium">{formatDate(pay.createdAt)}</p>
                                                 </td>
-                                                <td className="px-6 py-5 text-right font-bold text-slate-800">LKR {pay.amount.toLocaleString()}</td>
+                                                <td className="px-6 py-5">
+                                                    <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded uppercase">{pay.subject || 'Standard'}</span>
+                                                </td>
+                                                <td className="px-6 py-5 text-right font-black text-slate-900 tabular-nums">LKR {pay.amount?.toLocaleString()}</td>
+                                                <td className="px-6 py-5 text-right pr-6 whitespace-nowrap">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <button 
+                                                            onClick={() => handleDownloadReceipt(pay)}
+                                                            className="w-8 h-8 flex items-center justify-center bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all shadow-sm"
+                                                            title="Download Receipt"
+                                                        >
+                                                            <Download className="w-4 h-4" />
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => openDeleteConfirm(pay.id)}
+                                                            disabled={deletingPayment === pay.id}
+                                                            className="w-8 h-8 flex items-center justify-center bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-all shadow-sm disabled:opacity-50"
+                                                            title="Delete Transaction"
+                                                        >
+                                                            {deletingPayment === pay.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                                        </button>
+                                                    </div>
+                                                </td>
                                             </tr>
                                         )) : (
                                             <tr>
-                                                <td colSpan={4} className="px-6 py-12 text-center text-slate-400 font-medium italic">Record vault empty.</td>
+                                                <td colSpan={4} className="px-6 py-20 text-center text-slate-400 font-medium italic">No financial footprints detected in cloud storage.</td>
                                             </tr>
                                         )}
                                     </tbody>
@@ -344,26 +427,43 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
                         </div>
                     )}
 
-                    {activeTab === 'history' && (
-                        <div className="space-y-6">
-                             <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider border-b border-slate-100 pb-4">Update History</h4>
-                            <div className="relative pl-6 space-y-8 before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-slate-100">
-                                <div className="relative">
-                                    <div className="absolute -left-[1.75rem] top-1.5 w-3 h-3 rounded-full bg-white border-2 border-primary"></div>
+                    {activeTab === 'administration' && (
+                        <div className="space-y-10 animate-in fade-in duration-500">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                <div className="space-y-8">
                                     <div>
-                                        <p className="text-xs font-bold text-slate-700 leading-none">Student Registered</p>
-                                        <p className="text-[11px] text-slate-400 mt-1.5 font-medium leading-relaxed">Student added to the system.</p>
-                                        <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-3 font-semibold uppercase tracking-widest group bg-slate-50 w-fit px-2 py-0.5 rounded border border-slate-100">
-                                            <Calendar className="w-3 h-3" />
-                                            {formatDate(student.createdAt)}
+                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Security & Identity</h4>
+                                        <div className="space-y-4">
+                                            <div className="p-4 rounded-xl border border-slate-100 bg-emerald-50/30 flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600"><Award className="w-5 h-5" /></div>
+                                                <div>
+                                                    <p className="text-xs font-bold text-slate-800 leading-none mb-1">Status Verified</p>
+                                                    <p className="text-[10px] text-emerald-600 font-semibold uppercase tracking-widest">Authentic Record</p>
+                                                </div>
+                                            </div>
+                                            <div className="p-4 rounded-xl border border-slate-100 bg-blue-50/30 flex items-center gap-4">
+                                                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600"><ShieldCheck className="w-5 h-5" /></div>
+                                                <div>
+                                                    <p className="text-xs font-bold text-slate-800 leading-none mb-1">Managed Resource</p>
+                                                    <p className="text-[10px] text-blue-600 font-semibold uppercase tracking-widest">Level: {student.grade || 'Standard'}</p>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="relative">
-                                    <div className="absolute -left-[1.75rem] top-1.5 w-3 h-3 rounded-full bg-white border-2 border-slate-300"></div>
+                                <div className="space-y-8">
                                     <div>
-                                        <p className="text-xs font-bold text-slate-700 leading-none">Grade Set</p>
-                                        <p className="text-[11px] text-slate-400 mt-1.5 font-medium leading-relaxed">Added to {student.grade || 'unspecified'} grade.</p>
+                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Archive Footprint</h4>
+                                        <div className="p-6 rounded-2xl border border-slate-100 bg-slate-50/50 space-y-4">
+                                            <div className="flex justify-between items-center text-xs">
+                                                <span className="font-semibold text-slate-500 flex items-center gap-2"><Calendar className="w-3.5 h-3.5" /> Registration Index</span>
+                                                <span className="font-bold text-slate-800">{formatDate(student.createdAt)}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-xs">
+                                                <span className="font-semibold text-slate-500 flex items-center gap-2"><Activity className="w-3.5 h-3.5" /> Last Modified</span>
+                                                <span className="text-[10px] font-black text-slate-400 uppercase">Cloud Synced</span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -373,27 +473,41 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
             )}
         </div>
 
-        {/* Professional Footer */}
         <div className="px-8 py-5 border-t border-slate-100 flex justify-between items-center bg-slate-50/50">
             <div className="flex items-center gap-2">
-                <Activity className="w-4 h-4 text-slate-300" />
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none pt-0.5">Details Checked</p>
+                <ShieldCheck className="w-4 h-4 text-slate-300" />
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pt-0.5">Note: Secure archive record</p>
             </div>
             <button 
                 onClick={onClose}
-                className="px-8 py-2.5 bg-slate-800 text-white text-[10px] font-bold uppercase tracking-widest rounded-lg hover:bg-slate-900 transition-all shadow-sm active:scale-95"
+                className="px-8 py-2.5 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-black transition-all shadow-xl active:scale-95"
             >
                 Close Profile
             </button>
         </div>
       </div>
 
-      <PaymentModal 
-        isOpen={isPaymentOpen}
-        onClose={() => setIsPaymentOpen(false)}
-        initialStudentId={studentId}
-        onSuccess={loadStudentData}
+      <ConfirmModal 
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDeletePayment}
+        loading={!!deletingPayment}
+        title="Purge Transaction"
+        message="This will permanently remove this payment record from the institutional ledger. This action is irreversible and will affect monthly revenue summaries."
+        confirmText="Yes, Purge Record"
       />
+
+      {student && (
+        <PaymentModal 
+          isOpen={isPaymentModalOpen}
+          onClose={() => setIsPaymentModalOpen(false)}
+          initialStudentId={studentId}
+          onSuccess={() => {
+            loadStudentData();
+            setIsPaymentModalOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

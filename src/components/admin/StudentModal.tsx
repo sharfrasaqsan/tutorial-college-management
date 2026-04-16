@@ -12,6 +12,7 @@ import Modal from "@/components/ui/Modal";
 import toast from "react-hot-toast";
 import { generateId } from "@/lib/id-generator";
 import Skeleton from "@/components/ui/Skeleton";
+import { format } from "date-fns";
 
 const studentSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
@@ -26,6 +27,7 @@ const studentSchema = z.object({
   status: z.enum(["active", "inactive"]),
   enrolledSubjects: z.array(z.string()).optional(),
   enrolledClasses: z.array(z.string()).optional(),
+  admissionFee: z.coerce.number().min(0).default(500),
 });
 
 type StudentForm = z.infer<typeof studentSchema>;
@@ -79,6 +81,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
       gender: "male",
       enrolledSubjects: [],
       enrolledClasses: [],
+      admissionFee: 500,
     }
   });
 
@@ -147,6 +150,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
         status: "active",
         enrolledClasses: [],
         enrolledSubjects: [],
+        admissionFee: 500,
       });
     }
   }, [initialData, reset, isOpen]);
@@ -224,6 +228,22 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
           studentId,
           createdAt: serverTimestamp(),
         });
+
+        // 3. Create Admission Fee Payment Record if applicable
+        if (data.admissionFee > 0) {
+          const paymentRef = doc(collection(db, "payments"));
+          batch.set(paymentRef, {
+            studentId: studentId, // Use the generated ID
+            studentName: data.name,
+            amount: data.admissionFee,
+            month: format(new Date(), "MMMM"),
+            method: "cash",
+            description: "Institutional Admission Fee",
+            status: "paid",
+            subject: "Admission",
+            createdAt: serverTimestamp(),
+          });
+        }
 
         await batch.commit();
         toast.success("Student added successfully.");
@@ -450,6 +470,24 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
                           <textarea {...register("address")} rows={4} placeholder="Full Home Address" className="w-full px-5 py-4 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 outline-none transition-all font-medium text-slate-700 resize-none pt-4" />
                           {errors.address && <p className="text-[10px] text-red-500 ml-1 font-bold">{errors.address.message}</p>}
                        </div>
+
+                       {!initialData && (
+                        <div className="col-span-full space-y-1.5 p-6 bg-indigo-50/50 rounded-2xl border border-indigo-100">
+                           <div className="flex items-center justify-between mb-2">
+                             <label className="text-[11px] font-bold text-indigo-900 uppercase tracking-wider ml-1">Admission Fee (Settled on Reg)</label>
+                             <span className="text-[10px] font-black text-indigo-400 bg-white px-2 py-0.5 rounded border border-indigo-100">Standard Rate: LKR 500</span>
+                           </div>
+                           <div className="relative">
+                             <input 
+                               type="number" 
+                               {...register("admissionFee")} 
+                               className="w-full pl-12 pr-5 py-3.5 bg-white border border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500/20 font-bold text-slate-800" 
+                             />
+                             <div className="absolute left-4.5 top-1/2 -translate-y-1/2 text-sm font-black text-indigo-300">LKR</div>
+                           </div>
+                           <p className="text-[9px] font-medium text-slate-400 mt-2 italic px-1">Generating this record will automatically append a paid transaction to the student's financial ledger.</p>
+                        </div>
+                       )}
 
                        <div className="col-span-full space-y-1.5">
                           <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Student Status</label>
