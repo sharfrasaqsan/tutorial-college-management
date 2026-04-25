@@ -47,6 +47,8 @@ export async function processTeacherPayroll(
             const salaryId = `${teacherId}-${cls.id}-${month}-${Date.now()}`;
             const salaryRef = doc(db, "salaries", salaryId);
             
+            const currentCycle = (cls.completedCycles || 0) + 1;
+            
             const salaryDoc = {
                 teacherId,
                 teacherName,
@@ -65,15 +67,21 @@ export async function processTeacherPayroll(
                 createdAt: serverTimestamp(),
                 processedAt: serverTimestamp(),
                 paymentMethod: "Bank Transfer",
-                type: "automatic"
+                type: "automatic",
+                cycleNumber: currentCycle
             };
 
             // 1. Create the salary record
             batch.set(salaryRef, salaryDoc);
 
-            // 2. Decrement sessionsSinceLastPayment (don't hard-reset to 0, preserve any new sessions)
+            // 2. Update Class & Teacher Stats
             batch.update(doc(db, "classes", cls.id), {
-                sessionsSinceLastPayment: increment(-sessionsConducted)
+                sessionsSinceLastPayment: increment(-sessionsConducted),
+                completedCycles: increment(1)
+            });
+
+            batch.update(doc(db, "teachers", teacherId), {
+                completedCycles: increment(1)
             });
 
             // 3. Tag only UNPAID session completions for this class with the salary ID
@@ -97,9 +105,20 @@ export async function processTeacherPayroll(
             }
 
             completionIds.forEach(id => {
-                batch.update(doc(db, "session_completions", id), {
-                    salaryId: salaryId
-                });
+                const compDoc = completionsSnap.docs.find(d => d.id === id);
+                if (compDoc) {
+                    const compData = compDoc.data();
+                    if (!compData.salaryId) {
+                        batch.update(doc(db, "session_completions", id), {
+                            salaryId: salaryId
+                        });
+                    }
+                } else if (newSessionId === id) {
+                    // If it's the brand new session, it definitely won't have a salaryId yet
+                    batch.update(doc(db, "session_completions", id), {
+                        salaryId: salaryId
+                    });
+                }
             });
 
             await batch.commit();

@@ -47,6 +47,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
   const [metaLoading, setMetaLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'curriculum' | 'schedule'>('curriculum');
   const [conflicts, setConflicts] = useState<Record<number, string>>({});
+  const [allClasses, setAllClasses] = useState<Class[]>([]);
 
   const {
     register,
@@ -89,14 +90,16 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
           teachersList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Teacher));
         }
 
-        const [gradesSnap, subjectsSnap] = await Promise.all([
+        const [gradesSnap, subjectsSnap, classesSnap] = await Promise.all([
           getDocs(query(collection(db, "grades"), orderBy("name", "asc"))),
-          getDocs(query(collection(db, "subjects"), orderBy("name", "asc")))
+          getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
+          getDocs(collection(db, "classes"))
         ]);
         
         setTeachers(teachersList);
         setGrades(gradesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Grade)));
         setSubjects(subjectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)));
+        setAllClasses(classesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Class)));
       } catch (error) {
         console.error("Error loading dropdown data:", error);
       } finally {
@@ -128,7 +131,84 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
     }
   }, [watchedGradeId, watchedSubjectId, watchedTeacherId, grades, subjects, teachers, setValue]);
 
-  // Filter logic
+  const watchedSchedules = watch("schedules");
+
+  useEffect(() => {
+    if (!isOpen || allClasses.length === 0) return;
+
+    // Robust time comparison using minutes from midnight
+    const timeToMinutes = (timeStr: string) => {
+      if (!timeStr) return 0;
+      const [hours, minutes] = timeStr.split(':').map(Number);
+      return (hours || 0) * 60 + (minutes || 0);
+    };
+
+    const hasOverlap = (s1: string, e1: string, s2: string, e2: string) => {
+      const start1 = timeToMinutes(s1);
+      const end1 = timeToMinutes(e1);
+      const start2 = timeToMinutes(s2);
+      const end2 = timeToMinutes(e2);
+      
+      // Basic validation: end must be after start
+      if (end1 <= start1 || end2 <= start2) return false;
+      
+      return start1 < end2 && start2 < end1;
+    };
+
+    const newConflicts: Record<number, string> = {};
+
+    // 1. Internal conflict check (within current form)
+    for (let i = 0; i < watchedSchedules.length; i++) {
+      for (let j = 0; j < watchedSchedules.length; j++) {
+        if (i === j) continue;
+        const slot1 = watchedSchedules[i];
+        const slot2 = watchedSchedules[j];
+        if (slot1.dayOfWeek && slot1.startTime && slot1.endTime &&
+            slot2.dayOfWeek && slot2.startTime && slot2.endTime) {
+          if (slot1.dayOfWeek.trim().toLowerCase() === slot2.dayOfWeek.trim().toLowerCase()) {
+            if (hasOverlap(slot1.startTime, slot1.endTime, slot2.startTime, slot2.endTime)) {
+              newConflicts[i] = "Internal Day/Time Overlap";
+            }
+          }
+        }
+      }
+    }
+
+    // 2. External conflict check (against database)
+    if (watchedTeacherId || watchedGradeId) {
+      for (let i = 0; i < watchedSchedules.length; i++) {
+        const newSlot = watchedSchedules[i];
+        // Only check if all time fields are filled
+        if (!newSlot.dayOfWeek || !newSlot.startTime || !newSlot.endTime) continue;
+
+        for (const existing of allClasses) {
+          // Skip if it's the class we are currently editing
+          if (initialData && existing.id === initialData.id) continue;
+          if (existing.status !== 'active') continue;
+
+          for (const existingSlot of (existing.schedules || [])) {
+            // Safety check for malformed database records
+            if (!existingSlot.dayOfWeek || !existingSlot.startTime || !existingSlot.endTime) continue;
+
+            const sameDay = newSlot.dayOfWeek.trim().toLowerCase() === existingSlot.dayOfWeek.trim().toLowerCase();
+            if (!sameDay) continue;
+
+            const timeOverlap = hasOverlap(newSlot.startTime, newSlot.endTime, existingSlot.startTime, existingSlot.endTime);
+            if (!timeOverlap) continue;
+
+            // Priority: Teacher conflict then Grade conflict
+            if (watchedTeacherId === existing.teacherId) {
+              newConflicts[i] = `Instructor busy with ${existing.name}`;
+            } else if (watchedGradeId === existing.gradeId) {
+              newConflicts[i] = `Grade overlapping with ${existing.name}`;
+            }
+          }
+        }
+      }
+    }
+
+    setConflicts(newConflicts);
+  }, [watchedSchedules, watchedTeacherId, watchedGradeId, allClasses, initialData, isOpen]);
   const fixedTeacher = teachers.find(t => t.id === fixedTeacherId);
 
   const filteredGrades = grades.filter(g => {
@@ -161,32 +241,34 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
   });
 
   useEffect(() => {
-      if (initialData) {
-        reset({
-          name: initialData.name,
-          subjectId: initialData.subjectId || "",
-          gradeId: initialData.gradeId || "",
-          teacherId: initialData.teacherId,
-          schedules: initialData.schedules || [{ dayOfWeek: "monday", startTime: "", endTime: "", room: "" }],
-          status: initialData.status || "active",
-          monthlyFee: initialData.monthlyFee || 0,
-          sessionsPerCycle: initialData.sessionsPerCycle || 8,
-        });
-        setActiveTab('curriculum');
-      } else {
-        reset({
-          name: "",
-          subjectId: "",
-          gradeId: "",
-          teacherId: fixedTeacherId || "",
-          schedules: [{ dayOfWeek: "monday", startTime: "", endTime: "", room: "" }],
-          status: "active",
-          monthlyFee: 0,
-          sessionsPerCycle: 8,
-        });
-        setActiveTab('curriculum');
-      }
-  }, [initialData, reset, isOpen]);
+    setActiveTab('curriculum');
+    setConflicts({}); // Clear any previous conflict highlights
+    if (initialData) {
+      reset({
+        name: initialData.name,
+        subjectId: initialData.subjectId || "",
+        gradeId: initialData.gradeId || "",
+        teacherId: initialData.teacherId,
+        schedules: initialData.schedules || [{ dayOfWeek: "monday", startTime: "", endTime: "", room: "" }],
+        status: initialData.status || "active",
+        monthlyFee: initialData.monthlyFee || 0,
+        sessionsPerCycle: initialData.sessionsPerCycle || 8,
+      });
+      setActiveTab('curriculum');
+    } else {
+      reset({
+        name: "",
+        subjectId: "",
+        gradeId: "",
+        teacherId: fixedTeacherId || "",
+        schedules: [{ dayOfWeek: "monday", startTime: "", endTime: "", room: "" }],
+        status: "active",
+        monthlyFee: 0,
+        sessionsPerCycle: 8,
+      });
+      setActiveTab('curriculum');
+    }
+  }, [initialData, reset, isOpen, fixedTeacherId]);
 
   const onSubmit = async (data: ClassForm) => {
     setLoading(true);
@@ -227,10 +309,6 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
                   const timeOverlap = hasOverlap(newSlot.startTime, newSlot.endTime, existingSlot.startTime, existingSlot.endTime);
                   if (!timeOverlap) continue;
 
-                  if (newSlot.room.trim().toLowerCase() === existingSlot.room.trim().toLowerCase()) {
-                      newConflicts[i] = `Room "${newSlot.room}" occupied by ${existing.name}`;
-                  }
-
                   if (data.teacherId === existing.teacherId) {
                       newConflicts[i] = `Instructor busy with ${existing.name}`;
                   }
@@ -244,7 +322,7 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
 
       if (Object.keys(newConflicts).length > 0) {
         setConflicts(newConflicts);
-        toast.error("Timeline Collision Detected: Institutional resources (Teacher/Room) are overlapping. Review highlighted slots.");
+        toast.error("Timeline Collision Detected: Institutional resources (Teacher/Grade) are overlapping. Review highlighted slots.");
         setLoading(false);
         setActiveTab('schedule');
         return;
@@ -285,7 +363,8 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
           title: "Class Refactored",
           message: `The schedule for ${data.name} (${selectedSubject?.name}) has been updated by administration.`,
           type: "info",
-          link: "/teacher/classes"
+          link: "/teacher/classes",
+          sourceId: initialData.id
         });
 
         toast.success("Archive Update Successful: Class schedule has been refactored and synchronized.");
@@ -301,7 +380,8 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
           title: "New Class Assigned",
           message: `You have been assigned to a new ${selectedGrade?.name} ${selectedSubject?.name} class: ${data.name}.`,
           type: "success",
-          link: "/teacher/classes"
+          link: "/teacher/classes",
+          sourceId: classRef.id
         });
 
         toast.success("Class added successfully!");
@@ -326,6 +406,14 @@ export default function ClassModal({ isOpen, onClose, onSuccess, initialData, fi
 
       <div className={`relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all duration-300 ease-out flex flex-col h-[85vh] ${isOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
         
+        {/* ⚠️ Live Conflict Banner */}
+        {Object.keys(conflicts).length > 0 && (
+          <div className="bg-rose-500 text-white px-8 py-2 text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-3 animate-pulse shrink-0 z-50">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            Scheduling Conflict Detected - Review Time Slots
+          </div>
+        )}
+
         <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white z-10 shrink-0">
             <div className="flex items-center gap-5">
                 <div className="w-14 h-14 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-primary text-xl font-bold">

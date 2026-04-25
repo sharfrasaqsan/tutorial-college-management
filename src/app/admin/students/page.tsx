@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import {
   collection,
   query,
+  onSnapshot,
   getDocs,
   orderBy,
   doc,
@@ -152,55 +153,48 @@ export default function StudentsPage() {
     }
   };
 
-  const loadStudents = async () => {
-    setLoading(true);
-    try {
-      const q = query(collection(db, "students"), orderBy("createdAt", "desc"));
-      const snap = await getDocs(q);
+  useEffect(() => {
+    // 1. Real-time Students Listener
+    const studentsQ = query(collection(db, "students"), orderBy("createdAt", "desc"));
+    const unsubscribeStudents = onSnapshot(studentsQ, (snap) => {
       const fetchedStudents = snap.docs.map(
         (doc) => ({ id: doc.id, ...doc.data() }) as Student,
       );
       setStudents(fetchedStudents);
-      await loadArrearsStatus(fetchedStudents);
-    } catch (error) {
-      console.error("Error loading students", error);
-    } finally {
+      loadArrearsStatus(fetchedStudents);
       setLoading(false);
-    }
-  };
+    }, (error) => {
+      console.error("Error listening to students:", error);
+      setLoading(false);
+    });
 
-  const loadInitialData = async () => {
-    try {
-      const [gradeSnap, subjectSnap, classSnap] = await Promise.all([
-        getDocs(query(collection(db, "grades"), orderBy("name", "asc"))),
-        getDocs(query(collection(db, "subjects"), orderBy("name", "asc"))),
-        getDocs(collection(db, "classes")),
-      ]);
-      setGrades(
-        gradeSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Grade),
-      );
-      setSubjects(
-        subjectSnap.docs.map(
-          (doc) => ({ id: doc.id, ...doc.data() }) as Subject,
-        ),
-      );
+    // 2. Real-time Grades & Subjects Listener
+    const gradesQ = query(collection(db, "grades"), orderBy("name", "asc"));
+    const unsubscribeGrades = onSnapshot(gradesQ, (snap) => {
+      setGrades(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Grade));
+    });
 
-      const cList = classSnap.docs.map(
-        (d) => ({ id: d.id, ...d.data() }) as Class,
-      );
+    const subjectsQ = query(collection(db, "subjects"), orderBy("name", "asc"));
+    const unsubscribeSubjects = onSnapshot(subjectsQ, (snap) => {
+      setSubjects(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Subject));
+    });
+
+    const classesQ = collection(db, "classes");
+    const unsubscribeClasses = onSnapshot(classesQ, (snap) => {
+      const cList = snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Class);
       setAllClasses(cList);
-
+      
       const classMap: Record<string, boolean> = {};
-      classSnap.docs.forEach((d) => (classMap[d.id] = true));
+      snap.docs.forEach((d) => (classMap[d.id] = true));
       setClassesList(classMap);
-    } catch (error) {
-      console.error("Error loading filters data", error);
-    }
-  };
+    });
 
-  useEffect(() => {
-    loadStudents();
-    loadInitialData();
+    return () => {
+      unsubscribeStudents();
+      unsubscribeGrades();
+      unsubscribeSubjects();
+      unsubscribeClasses();
+    };
   }, []);
 
   const toggleStatus = async (student: Student) => {
@@ -214,7 +208,6 @@ export default function StudentsPage() {
           ? "Student account restored."
           : "Student account suspended.",
       );
-      loadStudents();
     } catch {
       toast.error("Status update failed.");
     }
@@ -280,7 +273,6 @@ export default function StudentsPage() {
       toast.success("Student record purged and enrollment counts updated.");
       setIsDeleteOpen(false);
       setStudentToDelete(null);
-      loadStudents();
     } catch (error) {
       console.error("Error deleting student:", error);
       toast.error("Process failed.");
@@ -558,7 +550,7 @@ export default function StudentsPage() {
           setIsModalOpen(false);
           setSelectedStudent(null);
         }}
-        onSuccess={loadStudents}
+        onSuccess={() => {}}
         initialData={selectedStudent}
       />
 
@@ -569,7 +561,7 @@ export default function StudentsPage() {
           setPaymentStudentId(null);
         }}
         initialStudentId={paymentStudentId || ""}
-        onSuccess={loadStudents}
+        onSuccess={() => {}}
       />
 
       <ConfirmModal
@@ -802,7 +794,7 @@ export default function StudentsPage() {
                           <p
                             className={`${student.status === "inactive" ? "text-slate-400" : "text-slate-700"} font-medium`}
                           >
-                            {student.phone || student.parentPhone}
+                            {student.parentPhone || student.phone}
                           </p>
                           <p className="text-xs text-slate-500">
                             {student.parentName}

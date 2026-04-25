@@ -478,7 +478,9 @@ export default function TimetablePage() {
                     {/* Class Info Module */}
                     <div className="flex flex-col gap-1 flex-1">
                         <div className="flex items-center gap-2">
-                           <h4 className={`text-base font-bold text-slate-900 tracking-tight transition-colors ${slot.isCompleted ? 'text-slate-400' : 'group-hover/row:text-indigo-600'}`}>{slot.className}</h4>
+                           <h4 className={`text-base font-bold text-slate-900 tracking-tight transition-colors ${slot.isCompleted ? 'text-slate-400' : 'group-hover/row:text-indigo-600'}`}>
+                             {slot.className.replace(/\s*\([^)]*\)$/, "").trim()}
+                           </h4>
                            {slot.isExtra && <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-500 text-[7px] font-black uppercase rounded border border-indigo-100 tracking-tighter">Extra Class</span>}
                         </div>
                         <div className="flex items-center gap-4">

@@ -27,7 +27,7 @@ const studentSchema = z.object({
   status: z.enum(["active", "inactive"]),
   enrolledSubjects: z.array(z.string()).optional(),
   enrolledClasses: z.array(z.string()).optional(),
-  admissionFee: z.coerce.number().min(0).default(500),
+  admissionFee: z.coerce.number().min(0).optional(),
 });
 
 type StudentForm = z.infer<typeof studentSchema>;
@@ -74,7 +74,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
     watch,
     formState: { errors, isValid },
   } = useForm<StudentForm>({
-    resolver: zodResolver(studentSchema),
+    resolver: zodResolver(studentSchema) as any,
     mode: "onChange",
     defaultValues: {
       status: "active",
@@ -117,6 +117,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
   }
 
   useEffect(() => {
+    setActiveTab('overview');
     if (initialData) {
       isInitializing.current = true;
       reset({
@@ -230,12 +231,12 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
         });
 
         // 3. Create Admission Fee Payment Record if applicable
-        if (data.admissionFee > 0) {
+        if ((data.admissionFee || 0) > 0) {
           const paymentRef = doc(collection(db, "payments"));
           batch.set(paymentRef, {
             studentId: studentId, // Use the generated ID
             studentName: data.name,
-            amount: data.admissionFee,
+            amount: data.admissionFee || 0,
             month: format(new Date(), "MMMM"),
             method: "cash",
             description: "Institutional Admission Fee",
@@ -312,7 +313,7 @@ export default function StudentModal({ isOpen, onClose, onSuccess, initialData, 
         </div>
 
         <div className="flex-1 overflow-y-auto p-8 scrollbar-hide bg-white">
-          <form id="student-form" onSubmit={handleSubmit(onSubmit)} className="animate-in fade-in duration-500 pb-10">
+          <form id="student-form" onSubmit={handleSubmit(onSubmit as any)} className="animate-in fade-in duration-500 pb-10">
             {activeTab === 'overview' && (
               <div className="max-w-4xl mx-auto space-y-12">
                 <div className="space-y-8">

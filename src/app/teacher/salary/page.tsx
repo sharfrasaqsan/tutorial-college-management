@@ -86,11 +86,12 @@ export default function SalaryHistoryPage() {
   }, [user]);
 
   const stats = useMemo(() => {
-    const totalEarnings = salaries.reduce(
+    const paidSalaries = salaries.filter((s) => s.status === "paid");
+    const totalEarnings = paidSalaries.reduce(
       (acc, curr) => acc + (curr.netAmount || 0),
       0,
     );
-    const lastPayment = salaries[0];
+    const lastPayment = paidSalaries[0];
     const pendingSessions = classes.reduce(
       (acc, curr) => acc + Math.max(0, curr.sessionsSinceLastPayment || 0),
       0,

@@ -16,7 +16,8 @@ import {
   Settings,
   History,
   LogOut,
-  FileText
+  FileText,
+  TrendingUp
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
@@ -32,6 +33,7 @@ const navItems = [
     { name: "Grades", href: "/admin/grades", icon: Layers },
     { name: "Classes", href: "/admin/classes", icon: Layers },
     { name: "Attendance", href: "/admin/attendance", icon: ClipboardCheck },
+    { name: "Academic Promotion", href: "/admin/promotion", icon: TrendingUp },
   ]},
   { label: "Money", items: [
     { name: "Finance Analytics", href: "/admin/finance", icon: Wallet },
@@ -93,7 +95,15 @@ export default function AdminSidebar() {
           ))}
         </div>
 
-        <div className="p-4 border-t border-slate-100">
+        <div className="p-4 border-t border-slate-100 space-y-4">
+          <div className="px-3 py-4 bg-slate-50/50 rounded-2xl border border-slate-100">
+             <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-2">Dev Authority</p>
+             <p className="text-[11px] font-black text-slate-900 leading-none">AM. Sharfras Aqsan</p>
+             <div className="mt-2 space-y-1">
+                <p className="text-[9px] font-bold text-slate-400 truncate">sharfrasaqsan@gmail.com</p>
+                <p className="text-[9px] font-bold text-slate-400">0751230001</p>
+             </div>
+          </div>
           <button
             onClick={signOut}
             className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-sm font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-all font-bold"

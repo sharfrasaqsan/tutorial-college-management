@@ -82,6 +82,15 @@ export default function TeacherSidebar() {
           ))}
         </div>
 
+        <div className="px-3 py-4 border-t border-slate-100 bg-slate-50/50">
+           <div className="bg-white p-3 rounded-xl border border-slate-200/60 shadow-sm">
+             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-2">Developer Authority</p>
+             <p className="text-[11px] font-bold text-slate-800 tracking-tight">AM. Sharfras Aqsan</p>
+             <p className="text-[9px] font-medium text-slate-500 mt-1 opacity-80 leading-tight">sharfrasaqsan@gmail.com</p>
+             <div className="mt-2 text-[8px] font-black text-[#4f39f6] uppercase bg-[#4f39f6]/5 inline-block px-1.5 py-0.5 rounded">System Architect</div>
+           </div>
+        </div>
+
         <div className="p-4 border-t border-slate-100">
           <button
             onClick={signOut}

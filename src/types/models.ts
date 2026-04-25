@@ -17,6 +17,8 @@ export interface Student {
   status: 'active' | 'inactive';
   grade?: string;
   gradeId?: string;
+  enrolledYear?: number;      // e.g. 2026
+  academicYear?: number;      // Current focus year (2026, 2027)
   enrolledSubjects?: string[]; // IDs of subjects
   enrolledClasses?: string[];  // IDs of classes
   createdAt?: FirestoreTimestamp;
@@ -39,6 +41,7 @@ export interface Teacher {
   address: string;
   createdAt?: FirestoreTimestamp;
   updatedAt?: FirestoreTimestamp;
+  completedCycles?: number;
 }
 
 export interface ClassSchedule {
@@ -64,8 +67,12 @@ export interface Class {
   sessionsSinceLastPayment?: number;
   sessionsPerCycle?: number;
   status: 'active' | 'inactive';
+  academicYear?: number;      // e.g. 2026
+  syllabusCompleted?: boolean; 
+  completedAt?: FirestoreTimestamp;
   createdAt?: FirestoreTimestamp;
   updatedAt?: FirestoreTimestamp;
+  completedCycles?: number;
 }
 
 export interface Payment {
@@ -108,6 +115,7 @@ export interface Salary {
   netAmount: number;   // final payout
   status: string;      // 'paid' | 'pending'
   createdAt: FirestoreTimestamp;
+  cycleNumber?: number;
 }
 
 export interface AttendanceRecord {

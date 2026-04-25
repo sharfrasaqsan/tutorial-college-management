@@ -169,7 +169,7 @@ export default function MyStudentsPage() {
                                         </div>
                                         <div>
                                             <p className="text-sm font-black text-slate-800 group-hover:text-indigo-600 transition-colors">{s.name}</p>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{s.phone || s.parentPhone}</p>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{s.parentPhone || s.phone}</p>
                                         </div>
                                     </button>
                                 </td>

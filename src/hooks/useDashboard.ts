@@ -44,7 +44,16 @@ export function useDashboard() {
             totalStudents: snapshot.size,
             recentStudents: studentDocs
                 .slice(0, 5)
-                .map(d => ({ id: d.id, ...d.data() } as DashboardStudent))
+                .map(d => ({ 
+                    id: d.id, 
+                    name: (d.data() as any).name,
+                    phone: (d.data() as any).phone,
+                    parentPhone: (d.data() as any).parentPhone,
+                    grade: (d.data() as any).grade,
+                    schoolName: (d.data() as any).schoolName,
+                    status: (d.data() as any).status,
+                    createdAt: (d.data() as any).createdAt
+                } as DashboardStudent))
         } as DashboardStats));
         setIsLoading(false);
     }, () => {
@@ -82,12 +91,34 @@ export function useDashboard() {
         const activeClassesCount = classes.filter((c: Class) => c.status === "active").length;
         
         const timetable: DashboardTimetableSlot[] = [];
+        const tomorrowTimetable: DashboardTimetableSlot[] = [];
+        
+        const tomorrowObj = new Date();
+        tomorrowObj.setDate(tomorrowObj.getDate() + 1);
+        const tomorrowDayOfWeek = days[tomorrowObj.getDay()];
+
         classes.forEach((cls: Class) => {
             if (cls.status !== "active") return;
+            
+            // Today
             const todaySlots = (cls.schedules || []).filter((s) => s.dayOfWeek.toLowerCase() === dayOfWeek);
             todaySlots.forEach((slot) => {
                 timetable.push({
                     id: `${cls.id}|${slot.startTime}`,
+                    className: cls.name,
+                    teacherName: cls.teacherName,
+                    startTime: slot.startTime,
+                    endTime: slot.endTime || "",
+                    room: slot.room || "Main Hall",
+                    grade: cls.grade
+                });
+            });
+
+            // Tomorrow
+            const tomorrowSlots = (cls.schedules || []).filter((s) => s.dayOfWeek.toLowerCase() === tomorrowDayOfWeek);
+            tomorrowSlots.forEach((slot) => {
+                tomorrowTimetable.push({
+                    id: `${cls.id}|${slot.startTime}|tmr`,
                     className: cls.name,
                     teacherName: cls.teacherName,
                     startTime: slot.startTime,
@@ -101,10 +132,13 @@ export function useDashboard() {
         setStats(prev => {
             const extraSlots = (prev?.timetable || []).filter(s => (s as any).isExtra);
             const combined = [...timetable, ...extraSlots].sort(compareTimes);
+            const sortedTomorrow = tomorrowTimetable.sort(compareTimes);
+            
             return {
                 ...(prev || {} as DashboardStats),
                 activeClassesCount,
                 timetable: combined,
+                tomorrowTimetable: sortedTomorrow,
                 studentBreakdown: classes.map(c => ({
                     id: c.id,
                     name: c.name,
@@ -126,22 +160,22 @@ export function useDashboard() {
         
         snapshot.forEach((doc) => {
             const data = doc.data();
-            if (data.status === "paid" || data.status === "partial") feesCollected += data.paidAmount || 0;
+            if (data.status === "paid" || data.status === "partial") feesCollected += data.amount || 0;
             
             paymentList.push({
                 id: doc.id,
                 studentName: data.studentName,
-                amount: data.paidAmount || 0,
+                amount: data.amount || 0,
                 status: data.status,
                 date: data.paymentDate || (data.createdAt?.seconds ? new Date(data.createdAt.seconds * 1000).toISOString() : "") || ""
             });
 
-            if (data.status === "unpaid" || data.status === "partial") {
+            if (data.status === "unpaid") {
                 unpaidFeesCount += 1;
                 unpaidList.push({
                     id: doc.id,
                     studentName: data.studentName,
-                    amount: data.balanceAmount || data.totalAmount || 0,
+                    amount: data.amount || 0,
                     month: data.month
                 });
             }
@@ -172,14 +206,15 @@ export function useDashboard() {
     });
 
     // 6. Listen for Pending Salaries
-    const salariesQ = query(collection(db, "salaryRequests"), where("status", "==", "pending"));
+    const salariesQ = query(collection(db, "salaries"), where("status", "==", "pending"));
     const unsubscribeSalaries = onSnapshot(salariesQ, (snapshot) => {
         const salaryList = snapshot.docs.map(doc => {
             const data = doc.data();
             return {
                 id: doc.id,
                 teacherName: data.teacherName,
-                amount: data.totalAmount || 0,
+                className: data.className,
+                amount: data.netAmount || 0,
                 requestDate: data.createdAt?.seconds ? new Date(data.createdAt.seconds * 1000).toISOString() : ""
             };
         }).sort((a, b) => b.requestDate.localeCompare(a.requestDate));

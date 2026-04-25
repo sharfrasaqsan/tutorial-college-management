@@ -2,6 +2,7 @@ export interface DashboardStudent {
   id: string;
   name: string;
   phone: string;
+  parentPhone: string;
   grade: string;
   schoolName: string;
   status: string;
@@ -35,6 +36,8 @@ export interface DashboardStats {
   activeClassesCount: number;
   recentStudents: DashboardStudent[];
   timetable: DashboardTimetableSlot[];
+  tomorrowTimetable?: DashboardTimetableSlot[];
+  pendingPayments?: UnpaidDetail[];
   studentBreakdown?: ClassStudentBreakdown[];
   totalSubjects?: number;
   pendingSalariesCount?: number;

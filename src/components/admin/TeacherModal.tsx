@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { serverTimestamp, setDoc, doc, collection, getDocs, orderBy, query, updateDoc, where } from "firebase/firestore";
 import { createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
-import { db, auth } from "@/lib/firebase";
+import { db, auth, secondaryAuth } from "@/lib/firebase";
 import { Loader2, User, Mail, BookOpen, AlertCircle, X, Phone, MapPin, Shield, CheckCircle, Hash, GraduationCap } from "lucide-react";
 import Link from "next/link";
 import toast from "react-hot-toast";
@@ -178,7 +178,7 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
         toast.success("Teacher updated successfully!");
       } else {
         const teacherId = await generateId("teacher");
-        const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password!);
+        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, data.email, data.password!);
         const uid = userCredential.user.uid;
 
         await setDoc(doc(db, "users", uid), {

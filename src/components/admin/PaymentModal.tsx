@@ -61,6 +61,8 @@ export default function PaymentModal({
 
   // Search Results
   const [studentsList, setStudentsList] = useState<Student[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showDropdown, setShowDropdown] = useState(false);
 
   // Load students for search if needed
   useEffect(() => {
@@ -215,6 +217,8 @@ export default function PaymentModal({
       setStudentId("");
       setSelectedStudent(null);
       setEnrolledClasses([]);
+      setSearchTerm("");
+      setShowDropdown(false);
     }
     setSelectedClassIds([]);
     setMonth(getPaymentCycleKey());
@@ -313,18 +317,63 @@ export default function PaymentModal({
                       {!initialStudentId ? (
                         <div className="relative group">
                           <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 group-focus-within:text-primary transition-colors" />
-                          <select
-                            value={studentId}
-                            onChange={(e) => setStudentId(e.target.value)}
-                            className="w-full pl-11 pr-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-medium text-slate-700 appearance-none"
-                          >
-                            <option value="">Search Student...</option>
-                            {studentsList.map((s) => (
-                              <option key={s.id} value={s.id}>
-                                {s.name} ({s.studentId})
-                              </option>
-                            ))}
-                          </select>
+                          <input
+                            type="text"
+                            placeholder="Type student name or ID..."
+                            value={searchTerm}
+                            onFocus={() => setShowDropdown(true)}
+                            onChange={(e) => {
+                              setSearchTerm(e.target.value);
+                              setShowDropdown(true);
+                              if (studentId) setStudentId(""); // Reset selection if typing starts
+                            }}
+                            className="w-full pl-11 pr-5 py-3.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all font-medium text-slate-700 shadow-sm"
+                          />
+                          
+                          {showDropdown && searchTerm && (
+                            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-100 rounded-2xl shadow-2xl z-[150] overflow-hidden max-h-[300px] overflow-y-auto divide-y divide-slate-50 animate-in fade-in slide-in-from-top-2 duration-300">
+                              {studentsList
+                                .filter(s => 
+                                  s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                  s.studentId?.toLowerCase().includes(searchTerm.toLowerCase())
+                                )
+                                .map((s) => (
+                                  <button
+                                    key={s.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setStudentId(s.id);
+                                      setSearchTerm(s.name);
+                                      setShowDropdown(false);
+                                    }}
+                                    className="w-full px-5 py-4 flex items-center justify-between hover:bg-slate-50 transition-colors text-left group/res"
+                                  >
+                                    <div className="flex items-center gap-4">
+                                      <div className="w-8 h-8 rounded-lg bg-primary/5 text-primary flex items-center justify-center text-[10px] font-black uppercase tracking-tighter group-hover/res:bg-primary group-hover/res:text-white transition-all">
+                                        {s.name.charAt(0)}
+                                      </div>
+                                      <div>
+                                        <p className="text-[11px] font-black text-slate-900 uppercase tracking-tight leading-none">
+                                          {s.name}
+                                        </p>
+                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                                          ID: {s.studentId}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <ArrowRight className="w-3.5 h-3.5 text-slate-300 group-hover/res:text-primary transition-all group-hover/res:translate-x-1" />
+                                  </button>
+                                ))}
+                              {studentsList.filter(s => 
+                                s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                                s.studentId?.toLowerCase().includes(searchTerm.toLowerCase())
+                              ).length === 0 && (
+                                <div className="p-8 text-center bg-slate-50/30">
+                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em]">No matches found</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div className="px-5 py-4 bg-primary/5 border border-primary/10 rounded-xl flex items-center justify-between">

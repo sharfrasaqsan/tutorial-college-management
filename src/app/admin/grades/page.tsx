@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import {
   collection,
   query,
+  onSnapshot,
   getDocs,
   orderBy,
   doc,
@@ -24,12 +25,7 @@ import {
   Ban,
   CheckCircle,
   Users,
-  CreditCard,
-  Briefcase,
   ArrowRight,
-  Projector,
-  AlertTriangle,
-  History,
   Download,
   Loader2
 } from "lucide-react";
@@ -39,11 +35,9 @@ import GradeModal from "@/components/admin/GradeModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import toast from "react-hot-toast";
 import { useDashboard } from "@/hooks/useDashboard";
-import { format } from "date-fns";
 import { generateGradeListPDF } from "@/lib/pdf-generator";
 
 export default function GradesPage() {
-  const { stats, isLoading: statsLoading } = useDashboard();
   const [grades, setGrades] = useState<Grade[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -56,23 +50,20 @@ export default function GradesPage() {
   const [gradeToDelete, setGradeToDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const loadGrades = async () => {
+  useEffect(() => {
     setLoading(true);
-    try {
-      const q = query(collection(db, "grades"), orderBy("name", "asc"));
-      const snap = await getDocs(q);
+    const q = query(collection(db, "grades"), orderBy("name", "asc"));
+    const unsubscribe = onSnapshot(q, (snap) => {
       setGrades(
         snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Grade),
       );
-    } catch (error) {
-      console.error("Error loading grades", error);
-    } finally {
       setLoading(false);
-    }
-  };
+    }, (error) => {
+      console.error("Error listening to grades:", error);
+      setLoading(false);
+    });
 
-  useEffect(() => {
-    loadGrades();
+    return () => unsubscribe();
   }, []);
 
   const toggleStatus = async (item: Grade) => {
@@ -84,7 +75,6 @@ export default function GradesPage() {
           ? "Grade parameters restored."
           : "Grade parameters suspended.",
       );
-      loadGrades();
     } catch {
       toast.error("Process failed.");
     }
@@ -127,7 +117,6 @@ export default function GradesPage() {
       toast.success("Grade parameter removed. Related classes suspended.");
       setIsDeleteOpen(false);
       setGradeToDelete(null);
-      loadGrades();
     } catch (error) {
       console.error("Error deleting grade:", error);
       toast.error("Process failed.");
@@ -225,7 +214,7 @@ export default function GradesPage() {
           setIsModalOpen(false);
           setSelectedGrade(null);
         }}
-        onSuccess={loadGrades}
+        onSuccess={() => {}}
         initialData={selectedGrade}
       />
 

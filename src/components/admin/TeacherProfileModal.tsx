@@ -9,7 +9,9 @@ import {
   ArrowUpRight, Loader2, Briefcase, Award, Hash
 } from "lucide-react";
 import { Teacher, Class, Salary } from "@/types/models";
+import { formatTime } from "@/lib/formatters";
 import Skeleton from "@/components/ui/Skeleton";
+import ClassProfileModal from "@/components/admin/ClassProfileModal";
 
 interface TeacherProfileModalProps {
   teacherId: string;
@@ -23,6 +25,10 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
   const [recentSalaries, setRecentSalaries] = useState<Salary[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'classes' | 'financials' | 'administration'>('overview');
+  
+  // Class Profile View State
+  const [isClassViewOpen, setIsClassViewOpen] = useState(false);
+  const [selectedClassId, setSelectedClassId] = useState<string | null>(null);
 
   const loadTeacherData = useCallback(async () => {
     setLoading(true);
@@ -224,12 +230,52 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
                                                 <div className="w-10 h-10 rounded-xl bg-slate-50 text-slate-400 group-hover:bg-primary/5 group-hover:text-primary transition-all flex items-center justify-center">
                                                     <BookOpen className="w-5 h-5" />
                                                 </div>
-                                                <ArrowUpRight className="w-4 h-4 text-slate-200 group-hover:text-primary transition-colors" />
+                                                <button 
+                                                    onClick={() => {
+                                                        setSelectedClassId(cls.id);
+                                                        setIsClassViewOpen(true);
+                                                    }}
+                                                    className="p-2 rounded-lg hover:bg-slate-50 text-slate-300 hover:text-primary transition-colors"
+                                                >
+                                                    <ArrowUpRight className="w-4 h-4" />
+                                                </button>
                                             </div>
-                                            <div>
-                                                <h5 className="font-bold text-slate-800 text-lg group-hover:text-primary transition-colors">{cls.name}</h5>
+                                            <div 
+                                                className="cursor-pointer"
+                                                onClick={() => {
+                                                    setSelectedClassId(cls.id);
+                                                    setIsClassViewOpen(true);
+                                                }}
+                                            >
+                                                <h5 className="font-bold text-slate-800 text-lg group-hover:text-primary transition-colors">{cls.name.split(' (')[0]}</h5>
                                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1.5">{cls.subject} • {cls.grade}</p>
                                             </div>
+
+                                            {cls.schedules && cls.schedules.length > 0 && (
+                                                <div className="mt-4 pt-4 border-t border-slate-50 space-y-2">
+                                                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mb-2">Class Timetable</p>
+                                                    {cls.schedules.map((sched, idx) => (
+                                                        <div key={idx} className="flex items-center justify-between bg-slate-50/50 rounded-lg px-3 py-2 border border-slate-100/50">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-1.5 h-1.5 rounded-full bg-primary/40"></div>
+                                                                <span className="text-[10px] font-bold text-slate-600 capitalize">{sched.dayOfWeek}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+                                                                    <Clock className="w-3 h-3" />
+                                                                    {formatTime(sched.startTime)} - {formatTime(sched.endTime)}
+                                                                </div>
+                                                                {sched.room && (
+                                                                    <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 border-l border-slate-200 pl-3">
+                                                                        <MapPin className="w-3 h-3" />
+                                                                        {sched.room}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )) : (
@@ -341,6 +387,15 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
             </div>
         </div>
       </div>
+
+      <ClassProfileModal 
+        isOpen={isClassViewOpen}
+        onClose={() => {
+            setIsClassViewOpen(false);
+            setSelectedClassId(null);
+        }}
+        classId={selectedClassId || ""}
+      />
     </div>
   );
 }

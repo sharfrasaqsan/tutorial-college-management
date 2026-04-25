@@ -8,6 +8,7 @@ import { Class, Grade, Subject } from "@/types/models";
 import { useAuth } from "@/context/AuthContext";
 import Link from "next/link";
 import ClassModal from "@/components/admin/ClassModal";
+import ClassProfileModal from "@/components/admin/ClassProfileModal";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import Skeleton from "@/components/ui/Skeleton";
 import toast from "react-hot-toast";
@@ -21,6 +22,10 @@ export default function MyClassesPage() {
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [grades, setGrades] = useState<Record<string, Grade>>({});
   const [subjects, setSubjects] = useState<Record<string, Subject>>({});
+  
+  // View Modal State
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [viewClassId, setViewClassId] = useState<string | null>(null);
 
   // Search & Filters
   const [searchTerm, setSearchTerm] = useState("");
@@ -75,6 +80,11 @@ export default function MyClassesPage() {
   const handleEdit = (item: Class) => {
     setSelectedClass(item);
     setIsModalOpen(true);
+  };
+
+  const handleView = (id: string) => {
+    setViewClassId(id);
+    setIsViewOpen(true);
   };
 
   const toggleStatus = async (item: Class) => {
@@ -229,6 +239,16 @@ export default function MyClassesPage() {
         message="Terminating this class will permanently remove its weekly schedule and enrollment data. This action cannot be undone."
       />
 
+      <ClassProfileModal 
+        isOpen={isViewOpen} 
+        onClose={() => {
+            setIsViewOpen(false);
+            setViewClassId(null);
+        }}
+        classId={viewClassId || ""}
+        isTeacherView={true}
+      />
+
       {/* Control Bar */}
       <div className="bg-white/70 backdrop-blur-xl p-6 rounded-[2.5rem] border border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center shadow-xl shadow-slate-100/30">
         <div className="relative w-full sm:max-w-md group">
@@ -336,7 +356,7 @@ export default function MyClassesPage() {
         ) : filteredClasses.length > 0 ? filteredClasses.map((item) => {
           const isClassInactive = item.status === 'inactive';
           const sessionsGoal = item.sessionsPerCycle || 8;
-          const sessionsPending = item.sessionsSinceLastPayment || 0;
+          const sessionsPending = Math.max(0, item.sessionsSinceLastPayment || 0);
           const progressPercent = Math.min((sessionsPending / sessionsGoal) * 100, 100);
 
           return (
@@ -350,7 +370,9 @@ export default function MyClassesPage() {
                             </div>
                             <div>
                                 <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">{item.subject || '---'}</p>
-                                <h3 className="text-sm font-bold text-slate-900 tracking-tight leading-none group-hover:text-indigo-600 transition-colors">{item.name}</h3>
+                                <h3 className="text-sm font-bold text-slate-900 tracking-tight leading-none group-hover:text-indigo-600 transition-colors">
+                                    {item.name.replace(/\s*\([^)]*\)$/, "").trim()}
+                                </h3>
                             </div>
                         </div>
                         <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${isClassInactive ? 'bg-slate-50 text-slate-400' : 'bg-emerald-50 text-emerald-600'}`}>
@@ -398,6 +420,14 @@ export default function MyClassesPage() {
                 </div>
 
                 <div className="mt-auto p-4 bg-slate-50/30 border-t border-slate-100 flex gap-2">
+                    <button 
+                        onClick={() => handleView(item.id)}
+                        title="View detailed sessions"
+                        className="flex-1 flex items-center justify-center py-2 bg-white border border-slate-200 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 rounded-lg transition-all group/btn"
+                    >
+                        <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover/btn:translate-x-1" />
+                    </button>
+                    <div className="w-[1px] h-10 bg-slate-100 mx-1"></div>
                     <button 
                         onClick={() => toggleStatus(item)}
                         title={isClassInactive ? 'Restore session' : 'Suspend session'}

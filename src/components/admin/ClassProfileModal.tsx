@@ -1,34 +1,85 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { doc, getDoc, collection, query, where, getDocs, Timestamp, orderBy, limit } from "firebase/firestore";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { doc, getDoc, collection, query, where, getDocs, Timestamp, orderBy, limit, updateDoc, serverTimestamp } from "firebase/firestore";
+import toast from "react-hot-toast";
 import { db } from "@/lib/firebase";
 import { 
-  X, Mail, Phone, MapPin, 
-  BookOpen, Clock, Calendar, Activity,
-  ArrowUpRight, Loader2, Users, GraduationCap, CreditCard, Layers, History, Hash
+  X, Mail, Phone, MapPin, BookOpen, Clock, Calendar, Activity,
+  ArrowUpRight, Loader2, Users, GraduationCap, CreditCard, Layers, History, Hash, Edit,
+  ChevronDown, ChevronRight, CheckCircle2 as CheckIcon
 } from "lucide-react";
 import { Class, Teacher, Student, Subject, Grade } from "@/types/models";
 import Skeleton from "@/components/ui/Skeleton";
 import { formatTime } from "@/lib/formatters";
 import StudentProfileModal from "@/components/admin/StudentProfileModal";
+import ClassModal from "@/components/admin/ClassModal";
 
 interface ClassProfileModalProps {
   classId: string;
   isOpen: boolean;
   onClose: () => void;
+  isTeacherView?: boolean;
 }
 
-export default function ClassProfileModal({ classId, isOpen, onClose }: ClassProfileModalProps) {
+export default function ClassProfileModal({ classId, isOpen, onClose, isTeacherView }: ClassProfileModalProps) {
   const [classData, setClassData] = useState<Class | null>(null);
   const [teacher, setTeacher] = useState<Teacher | null>(null);
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'students' | 'schedule' | 'financials'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'sessions' | 'students' | 'schedule' | 'financials'>('overview');
+  const [sessions, setSessions] = useState<any[]>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
 
   // Student Profile View State
   const [isStudentViewOpen, setIsStudentViewOpen] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  
+  // Edit Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [expandedCycles, setExpandedCycles] = useState<Set<number>>(new Set([1]));
+
+  const groupedSessions = useMemo(() => {
+    if (!sessions.length) return [];
+    const cycleSize = classData?.sessionsPerCycle || 8;
+    
+    // Sort oldest to newest for consistent cycle numbering
+    const sortedOldest = [...sessions].sort((a, b) => {
+        const dateA = new Date(a.date).getTime();
+        const dateB = new Date(b.date).getTime();
+        return dateA - dateB;
+    });
+
+    const cycles: any[] = [];
+    for (let i = 0; i < sortedOldest.length; i += cycleSize) {
+        const cycleSessions = sortedOldest.slice(i, i + cycleSize);
+        const cycleNumber = Math.floor(i / cycleSize) + 1;
+        
+        cycles.push({
+            number: cycleNumber,
+            sessions: [...cycleSessions].reverse(), // Show newest sessions first within the cycle
+            startDate: cycleSessions[0].date,
+            endDate: cycleSessions[cycleSessions.length - 1].date,
+            isSettled: cycleSessions.every(s => s.isPaid),
+            isFull: cycleSessions.length === cycleSize,
+            totalStudents: cycleSessions.reduce((acc, curr) => acc + (curr.studentCount || 0), 0) / cycleSessions.length
+        });
+    }
+
+    return cycles.reverse(); // Show newest cycles at the top
+  }, [sessions, classData?.sessionsPerCycle]);
+
+  const toggleCycle = (num: number) => {
+    const next = new Set(expandedCycles);
+    if (next.has(num)) next.delete(num);
+    else next.add(num);
+    setExpandedCycles(next);
+  };
+
+  const cleanName = useCallback((name: string) => {
+    if (!isTeacherView || !name) return name || "Unnamed Class";
+    return name.replace(/\s*\([^)]*\)$/, "").trim();
+  }, [isTeacherView]);
 
   const loadData = useCallback(async () => {
     if (!classId) return;
@@ -66,16 +117,64 @@ export default function ClassProfileModal({ classId, isOpen, onClose }: ClassPro
     }
   }, [classId]);
 
+  const loadSessions = useCallback(async () => {
+    if (!classId) return;
+    setSessionsLoading(true);
+    try {
+      const q = query(
+        collection(db, "session_completions"),
+        where("classId", "==", classId),
+        limit(50)
+      );
+      const snap = await getDocs(q);
+      const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      
+      // Sort locally to avoid index requirements
+      docs.sort((a: any, b: any) => {
+        const t1 = a.timestamp?.seconds || 0;
+        const t2 = b.timestamp?.seconds || 0;
+        return t2 - t1; // Descending
+      });
+      
+      setSessions(docs);
+    } catch (error) {
+      console.error("Error loading sessions:", error);
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, [classId]);
+
   const handleStudentView = (id: string) => {
     setSelectedStudentId(id);
     setIsStudentViewOpen(true);
   };
 
+  const handleFinishSyllabus = async () => {
+    if (!classData || !classId) return;
+    if (!confirm(`Are you sure you want to finish the syllabus for ${classData.name}? This will archive the class for your yearly focus.`)) return;
+    
+    try {
+      const classRef = doc(db, "classes", classId);
+      await updateDoc(classRef, {
+        status: "inactive",
+        syllabusCompleted: true,
+        completedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      toast.success("Syllabus marked as completed. Class archived.");
+      onClose();
+    } catch (error) {
+       console.error("Archive error:", error);
+       toast.error("Process failed.");
+    }
+  };
+
   useEffect(() => {
     if (isOpen && classId) {
       loadData();
+      loadSessions();
     }
-  }, [isOpen, classId, loadData]);
+  }, [isOpen, classId, loadData, loadSessions]);
 
   if (!isOpen) return null;
 
@@ -100,7 +199,7 @@ export default function ClassProfileModal({ classId, isOpen, onClose }: ClassPro
                 </div>
                 <div>
                     <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-3 leading-none">
-                        {loading ? <Skeleton variant="text" width="180px" height="24px" /> : classData?.name}
+                        {loading ? <Skeleton variant="text" width="180px" height="24px" /> : cleanName(classData?.name || "")}
                     </h2>
                     <div className="flex items-center gap-3 mt-1.5">
                          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
@@ -113,23 +212,33 @@ export default function ClassProfileModal({ classId, isOpen, onClose }: ClassPro
                     </div>
                 </div>
             </div>
-            <button 
-                onClick={onClose}
-                className="p-2.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all group"
-            >
-                <X className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-3">
+                {!isTeacherView && (
+                    <button 
+                        onClick={() => setIsEditModalOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-[11px] font-bold hover:bg-black transition-all shadow-sm active:scale-95"
+                    >
+                        <Edit className="w-3.5 h-3.5" /> Edit Class
+                    </button>
+                )}
+                <button 
+                    onClick={onClose}
+                    className="p-2.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all group"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+            </div>
         </div>
 
         {/* Professional Navigation Bar */}
-        <div className="px-8 bg-slate-50/50 border-b border-slate-100 flex items-center gap-1 shrink-0">
-            {(['overview', 'students', 'schedule', 'financials'] as const).map((tab) => (
+        <div className="px-8 bg-slate-50/50 border-b border-slate-100 flex items-center gap-1 shrink-0 overflow-x-auto scrollbar-hide">
+            {(['overview', 'sessions', 'students', 'schedule', 'financials'] as const).map((tab) => (
                 <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-5 py-4 text-sm font-medium transition-all relative capitalize ${activeTab === tab ? 'text-primary' : 'text-slate-500 hover:text-slate-800'}`}
+                    className={`px-5 py-4 text-sm font-medium transition-all relative capitalize whitespace-nowrap ${activeTab === tab ? 'text-primary' : 'text-slate-500 hover:text-slate-800'}`}
                 >
-                    {tab === 'overview' ? 'Overview' : tab === 'students' ? 'Students' : tab === 'schedule' ? 'Times' : 'Stats'}
+                    {tab === 'overview' ? 'Overview' : tab === 'sessions' ? 'Completed Sessions' : tab === 'students' ? 'Students' : tab === 'schedule' ? 'Schedule' : 'Insights'}
                     {activeTab === tab && (
                         <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
                     )}
@@ -207,7 +316,9 @@ export default function ClassProfileModal({ classId, isOpen, onClose }: ClassPro
                                             </div>
                                             <div className="flex justify-between items-center py-2 border-b border-slate-200/50">
                                                 <span className="text-xs font-semibold text-slate-500">Current Cycle Progress</span>
-                                                <span className="text-xs font-black text-primary px-2 bg-primary/5 rounded">{classData.sessionsSinceLastPayment || 0} / 8 Pending</span>
+                                                <span className={`text-[11px] font-black px-2.5 py-1 rounded-lg ${Math.max(0, classData.sessionsSinceLastPayment || 0) >= (classData.sessionsPerCycle || 8) ? 'bg-primary text-white' : 'bg-primary/5 text-primary'}`}>
+                                                    {Math.max(0, classData.sessionsSinceLastPayment || 0)} / {classData.sessionsPerCycle || 8} Logged
+                                                </span>
                                             </div>
                                             <div className="flex justify-between items-center py-2 border-b border-slate-200/50">
                                                 <span className="text-xs font-semibold text-slate-500">Total Completed</span>
@@ -217,6 +328,113 @@ export default function ClassProfileModal({ classId, isOpen, onClose }: ClassPro
                                    </div>
                                 </div>
                             </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'sessions' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-right-10 duration-500">
+                             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                                <div className="flex items-center gap-3">
+                                    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Academic Cycles</h4>
+                                    <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100 uppercase tracking-widest">{groupedSessions.length} Cycles Logged</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 rounded-lg border border-emerald-100">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                                        <span className="text-[9px] font-black text-emerald-600 uppercase tracking-tighter">Settled</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-50 rounded-lg border border-amber-100">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-500"></div>
+                                        <span className="text-[9px] font-black text-amber-600 uppercase tracking-tighter">Accruing</span>
+                                    </div>
+                                </div>
+                             </div>
+                             
+                             {sessionsLoading ? (
+                                <div className="space-y-4">
+                                    {[1, 2, 3].map(i => <Skeleton key={i} variant="rect" width="100%" height="80px" className="rounded-2xl" />)}
+                                </div>
+                             ) : groupedSessions.length > 0 ? (
+                                <div className="space-y-4">
+                                    {groupedSessions.map((cycle) => (
+                                        <div key={cycle.number} className="rounded-2xl border border-slate-100 overflow-hidden bg-white shadow-sm transition-all hover:border-slate-200">
+                                            {/* Cycle Header */}
+                                            <button 
+                                                onClick={() => toggleCycle(cycle.number)}
+                                                className={`w-full px-6 py-4 flex items-center justify-between transition-colors ${expandedCycles.has(cycle.number) ? 'bg-slate-50/50' : 'bg-white'}`}
+                                            >
+                                                <div className="flex items-center gap-5">
+                                                    <div className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center border ${cycle.isSettled ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-indigo-50 border-indigo-100 text-indigo-600'}`}>
+                                                        <span className="text-[8px] font-black uppercase leading-none mb-0.5">Cycle</span>
+                                                        <span className="text-base font-black leading-none">{cycle.number}</span>
+                                                    </div>
+                                                    <div className="text-left">
+                                                        <p className="text-sm font-bold text-slate-800 tracking-tight">
+                                                            {new Date(cycle.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} 
+                                                            <span className="mx-2 text-slate-300">→</span>
+                                                            {new Date(cycle.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                                        </p>
+                                                        <div className="flex items-center gap-3 mt-1">
+                                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{cycle.sessions.length} Sessions</span>
+                                                            <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Avg. {Math.round(cycle.totalStudents)} Students</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-4">
+                                                    {cycle.isSettled ? (
+                                                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 text-[9px] font-black uppercase tracking-widest border border-emerald-500/20">
+                                                            <CheckIcon className="w-3 h-3" />
+                                                            Fully Settled
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 text-amber-600 text-[9px] font-black uppercase tracking-widest border border-amber-500/20">
+                                                            <Clock className="w-3 h-3" />
+                                                            {cycle.isFull ? 'Awaiting Payout' : 'In Progress'}
+                                                        </div>
+                                                    )}
+                                                    {expandedCycles.has(cycle.number) ? <ChevronDown className="w-4 h-4 text-slate-300" /> : <ChevronRight className="w-4 h-4 text-slate-300" />}
+                                                </div>
+                                            </button>
+
+                                            {/* Sessions List (Collapsible) */}
+                                            {expandedCycles.has(cycle.number) && (
+                                                <div className="border-t border-slate-100 bg-white p-2 divide-y divide-slate-50">
+                                                    {cycle.sessions.map((session: any) => (
+                                                        <div key={session.id} className="p-3 flex items-center justify-between hover:bg-slate-50/50 transition-colors rounded-lg group/item">
+                                                            <div className="flex items-center gap-4">
+                                                                <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 border border-slate-100 group-hover/item:text-primary transition-colors">
+                                                                    <Calendar className="w-3.5 h-3.5" />
+                                                                </div>
+                                                                <div>
+                                                                    <p className="text-xs font-bold text-slate-700">
+                                                                        {new Date(session.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                                                                    </p>
+                                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                                        <span className="text-[9px] font-bold text-slate-400 uppercase">{formatTime(session.startTime)}</span>
+                                                                        <span className="w-1 h-1 bg-slate-200 rounded-full"></span>
+                                                                        <span className="text-[9px] font-bold text-slate-400 uppercase">{session.studentCount || 0} Present</span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <div className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-tighter ${session.isPaid ? 'bg-emerald-50 text-emerald-500 border border-emerald-100' : 'bg-amber-50 text-amber-500 border border-amber-100'}`}>
+                                                                {session.isPaid ? 'Settled' : 'Unpaid'}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                             ) : (
+                                <div className="py-20 text-center border-2 border-dashed border-slate-100 rounded-[2.5rem] bg-slate-50/30">
+                                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto text-slate-200 mb-4 shadow-sm">
+                                        <History className="w-8 h-8" />
+                                    </div>
+                                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">No sessions recorded yet</p>
+                                </div>
+                             )}
                         </div>
                     )}
 
@@ -341,6 +559,14 @@ export default function ClassProfileModal({ classId, isOpen, onClose }: ClassPro
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pt-0.5 leading-none">Note: Details verified</p>
             </div>
             <div className="flex gap-3">
+                {isTeacherView && classData && !classData.syllabusCompleted && (
+                    <button 
+                        onClick={handleFinishSyllabus}
+                        className="px-6 py-2.5 bg-rose-50 text-rose-600 text-[10px] font-black uppercase tracking-widest rounded-lg border border-rose-100 hover:bg-rose-100 transition-all shadow-sm active:scale-95 flex items-center gap-2"
+                    >
+                        <Activity className="w-3.5 h-3.5" /> Finish Syllabus
+                    </button>
+                )}
                 <button 
                     onClick={onClose}
                     className="px-8 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest rounded-lg border border-slate-200 hover:bg-white transition-all shadow-sm active:scale-95"
@@ -358,6 +584,16 @@ export default function ClassProfileModal({ classId, isOpen, onClose }: ClassPro
             setSelectedStudentId(null);
         }}
         studentId={selectedStudentId || ""}
+      />
+
+      <ClassModal 
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        onSuccess={() => {
+            loadData();
+            setIsEditModalOpen(false);
+        }}
+        initialData={classData}
       />
     </div>
   );

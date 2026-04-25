@@ -6,7 +6,7 @@ import { db } from "@/lib/firebase";
 import { 
   X, Phone, MapPin, 
   BookOpen, Calendar, Activity,
-  Loader2, Award, Hash, 
+  Loader2, Award, Hash, Clock,
   Trash2, Download, ShieldCheck, GraduationCap,
   CreditCard, Users, QrCode
 } from "lucide-react";
@@ -17,6 +17,7 @@ import PaymentModal from "@/components/admin/PaymentModal";
 import toast from "react-hot-toast";
 import { generateStudentPaymentPDF, generateStudentIDCardPDF, generateStudentPaymentHistoryPDF } from "@/lib/pdf-generator";
 import { format } from "date-fns";
+import { formatTime } from "@/lib/formatters";
 import QRCode from "qrcode";
 
 interface StudentProfileModalProps {
@@ -269,8 +270,11 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
                                             <div className="flex items-start gap-4">
                                                 <div className="w-9 h-9 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400"><Phone className="w-4 h-4" /></div>
                                                 <div>
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 leading-none">Parent Phone</p>
-                                                    <p className="text-sm font-semibold text-slate-800 tracking-tight">{student.parentPhone || student.phone || 'N/A'}</p>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 leading-none">Parent / Emergency</p>
+                                                    <p className="text-sm font-semibold text-slate-800 tracking-tight">{student.parentPhone || 'N/A'}</p>
+                                                    {student.phone && (
+                                                        <p className="text-[9px] font-bold text-slate-400 mt-1">Student: {student.phone}</p>
+                                                    )}
                                                 </div>
                                             </div>
                                             <div className="flex items-start gap-4">
@@ -349,6 +353,32 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
                                                 <h5 className="font-bold text-slate-800 text-lg group-hover:text-primary transition-colors">{cls.name}</h5>
                                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1.5">{cls.subject} • {cls.grade}</p>
                                             </div>
+
+                                            {cls.schedules && cls.schedules.length > 0 && (
+                                                <div className="mt-4 pt-4 border-t border-slate-50 space-y-2">
+                                                    <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mb-2">Class Timetable</p>
+                                                    {cls.schedules.map((sched, idx) => (
+                                                        <div key={idx} className="flex items-center justify-between bg-slate-50/50 rounded-lg px-3 py-2 border border-slate-100/50">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-1.5 h-1.5 rounded-full bg-primary/40"></div>
+                                                                <span className="text-[10px] font-bold text-slate-600 capitalize">{sched.dayOfWeek}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+                                                                    <Clock className="w-3 h-3" />
+                                                                    {formatTime(sched.startTime)} - {formatTime(sched.endTime)}
+                                                                </div>
+                                                                {sched.room && (
+                                                                    <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 border-l border-slate-200 pl-3">
+                                                                        <MapPin className="w-3 h-3" />
+                                                                        {sched.room}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 )) : (

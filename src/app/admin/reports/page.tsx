@@ -588,7 +588,7 @@ export default function ReportsHubPage() {
                         </div>
                     </div>
                 </div>
-            ) )}
+            )}
 
             {activeTab === 'financials' && (
                 <div className="animate-in slide-in-from-bottom-2 duration-500">

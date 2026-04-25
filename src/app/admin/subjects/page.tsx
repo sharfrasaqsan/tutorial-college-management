@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy, doc, updateDoc, writeBatch, where } from "firebase/firestore";
+import { collection, query, onSnapshot, getDocs, orderBy, doc, updateDoc, writeBatch, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Plus, BookType, Hash, Search, Filter, BookOpen, Edit, Trash2, Ban, CheckCircle, Users, CreditCard, Briefcase, ArrowRight, Projector, AlertTriangle, History } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
@@ -25,21 +25,18 @@ export default function SubjectsPage() {
   const [subjectToDelete, setSubjectToDelete] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const loadSubjects = async () => {
-    setLoading(true);
-    try {
-      const q = query(collection(db, "subjects"), orderBy("name", "asc"));
-      const snap = await getDocs(q);
-      setSubjects(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)));
-    } catch (error) {
-      console.error("Error loading subjects", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    loadSubjects();
+    setLoading(true);
+    const q = query(collection(db, "subjects"), orderBy("name", "asc"));
+    const unsubscribe = onSnapshot(q, (snap) => {
+      setSubjects(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject)));
+      setLoading(false);
+    }, (error) => {
+      console.error("Error listening to subjects:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const toggleStatus = async (item: Subject) => {
@@ -47,7 +44,6 @@ export default function SubjectsPage() {
         const newStatus = item.status === 'active' ? 'inactive' : 'active';
         await updateDoc(doc(db, "subjects", item.id), { status: newStatus });
         toast.success(newStatus === 'active' ? "Subject Reactivated: Curriculum definition is now active." : "Subject Suspended: Curriculum definition has been successfully archived.");
-        loadSubjects();
     } catch {
         toast.error("System Error: Failed to synchronize subject status updates.");
     }
@@ -87,7 +83,6 @@ export default function SubjectsPage() {
         toast.success("Purge Successful: Subject definition removed and related instructional classes suspended.");
         setIsDeleteOpen(false);
         setSubjectToDelete(null);
-        loadSubjects();
     } catch (error) {
         console.error("Error deleting subject:", error);
         toast.error("Process Aborted: Failed to purge subject record from the registry.");
@@ -159,7 +154,7 @@ export default function SubjectsPage() {
             setIsModalOpen(false);
             setSelectedSubject(null);
         }} 
-        onSuccess={loadSubjects}
+        onSuccess={() => {}}
         initialData={selectedSubject}
       />
 

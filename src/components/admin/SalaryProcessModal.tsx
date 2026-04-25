@@ -34,9 +34,11 @@ interface ClassEarnings {
   studentCount: number;
   totalMonthlyRevenue: number;
   sessionsConducted: number;
+  sessionsSinceLastPayment: number;
   sessionsPerCycle: number;
   perSessionRate: number;
   finalPayout: number;
+  completedCycles: number;
 }
 
 export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: SalaryProcessModalProps) {
@@ -99,9 +101,11 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
           studentCount,
           totalMonthlyRevenue,
           sessionsConducted,
+          sessionsSinceLastPayment: sessionsConducted,
           sessionsPerCycle: cycleValue,
           perSessionRate,
-          finalPayout: Math.round(finalPayout)
+          finalPayout: Math.round(finalPayout),
+          completedCycles: cls.completedCycles || 0
         };
       });
 
@@ -119,6 +123,7 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
   const updateSessionCount = (classId: string, count: number) => {
     const updatedDetails = earningsDetails.map(item => {
       if (item.classId === classId) {
+        // Find existing record to know the max logged sessions
         const safeCount = Math.max(0, count);
         const finalPayout = item.perSessionRate * safeCount;
         return { ...item, sessionsConducted: safeCount, finalPayout: Math.round(finalPayout) };
@@ -163,24 +168,39 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
         createdAt: serverTimestamp(),
         processedAt: serverTimestamp(),
         paymentMethod: "Bank Transfer",
+        cycleNumber: (item.completedCycles || 0) + 1
       };
 
       batch.set(salaryRef, salaryDoc);
+      
+      // Safety check: ensure we don't go below zero if possible, 
+      // though increment() is atomic, we should avoid triggering it if data is stale.
       batch.update(doc(db, "classes", item.classId), {
-        sessionsSinceLastPayment: increment(-(item.sessionsConducted))
+        sessionsSinceLastPayment: increment(-(item.sessionsConducted)),
+        completedCycles: increment(1)
       });
 
+      batch.update(doc(db, "teachers", selectedTeacherId), {
+        completedCycles: increment(1)
+      });
+
+      // 3. Tag only sessions that are NOT already assigned to a salary
       const completionsQ = query(
         collection(db, "session_completions"),
         where("classId", "==", item.classId),
-        where("teacherId", "==", selectedTeacherId)
+        where("teacherId", "==", selectedTeacherId),
+        where("isPaid", "==", false)
       );
       const completionsSnap = await getDocs(completionsQ);
+      
       completionsSnap.docs.forEach(compDoc => {
-          batch.update(doc(db, "session_completions", compDoc.id), {
-            isPaid: false,
-            salaryId: salaryId
-          });
+          const compData = compDoc.data();
+          // Only tag if it doesn't have a salaryId or if the salaryId is this one
+          if (!compData.salaryId) {
+            batch.update(doc(db, "session_completions", compDoc.id), {
+              salaryId: salaryId
+            });
+          }
       });
 
       await batch.commit();
@@ -355,9 +375,9 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
                                     min="0" 
                                     value={item.sessionsConducted}
                                     onChange={(e) => updateSessionCount(item.classId, parseInt(e.target.value) || 0)}
-                                    className="w-14 h-9 bg-slate-50 border border-slate-100 rounded-xl text-center font-black text-primary focus:ring-4 focus:ring-primary/5 outline-none transition-all text-sm"
+                                    className={`w-14 h-9 ${item.sessionsConducted > item.sessionsSinceLastPayment ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-slate-50 border-slate-100 text-primary'} border rounded-xl text-center font-black focus:ring-4 focus:ring-primary/5 outline-none transition-all text-sm`}
                                   />
-                                  <span className="text-xs font-black text-slate-300">/ {item.sessionsPerCycle}</span>
+                                  <span className="text-xs font-black text-slate-300">/ {item.sessionsSinceLastPayment} Logged</span>
                                 </div>
                              </div>
                              

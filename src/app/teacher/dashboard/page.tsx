@@ -51,6 +51,7 @@ import toast from "react-hot-toast";
 import { processTeacherPayroll } from "@/lib/payroll";
 import { formatTime } from "@/lib/formatters";
 import ExtraSessionModal from "@/components/teacher/ExtraSessionModal";
+import ClassProfileModal from "@/components/admin/ClassProfileModal";
 
 interface SessionCompletion {
   id: string;
@@ -117,6 +118,8 @@ export default function TeacherDashboard() {
   const [loading, setLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isExtraModalOpen, setIsExtraModalOpen] = useState(false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+  const [viewClassId, setViewClassId] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -161,9 +164,9 @@ export default function TeacherDashboard() {
     });
 
     const unsubscribeClasses = onSnapshot(qClasses, (snap) => {
-      const classesList = snap.docs.map(
-        (d) => ({ ...d.data(), id: d.id }) as Class,
-      );
+      const classesList = snap.docs
+        .map((d) => ({ ...d.data(), id: d.id }) as Class)
+        .filter(c => c.status === 'active');
       setAllClasses(classesList);
       setLoading(false);
     });
@@ -293,7 +296,7 @@ export default function TeacherDashboard() {
 
   const stats = useMemo(() => {
     const totalPending = allClasses.reduce(
-      (acc, curr) => acc + (curr.sessionsSinceLastPayment || 0),
+      (acc, curr) => acc + Math.max(0, curr.sessionsSinceLastPayment || 0),
       0,
     );
     const totalSessions = allClasses.reduce(
@@ -461,6 +464,12 @@ export default function TeacherDashboard() {
     }
   };
 
+  const handleView = (id: string) => {
+    setViewClassId(id);
+    setIsViewOpen(true);
+  };
+
+
   const getGreeting = () => {
     const hour = currentTime.getHours();
     if (hour < 12) return "Good Morning";
@@ -611,10 +620,10 @@ export default function TeacherDashboard() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* 📊 My Classes Registry (Left - 7 cols) */}
-        <div className="lg:col-span-7 bg-white rounded-[4rem] border border-slate-100 shadow-2xl shadow-slate-100/50 overflow-hidden flex flex-col group/table hover:border-indigo-100 transition-all duration-700">
-          <div className="px-10 py-10 border-b border-slate-50 flex items-center justify-between bg-white relative">
+        <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-100 shadow-2xl shadow-slate-100/50 overflow-hidden flex flex-col group/table hover:border-indigo-100 transition-all duration-700">
+          <div className="px-6 py-6 border-b border-slate-50 flex items-center justify-between bg-white relative">
             <div className="flex items-center gap-5">
               <div className="w-1.5 h-10 bg-indigo-600 rounded-full group-hover/table:scale-y-110 transition-transform shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
               <div>
@@ -638,14 +647,15 @@ export default function TeacherDashboard() {
             <table className="w-full text-xs text-left whitespace-nowrap border-collapse">
               <thead className="bg-slate-50/50 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-100">
                 <tr>
-                  <th className="px-8 py-5">Class Name</th>
-                  <th className="px-8 py-5">Monthly Progress</th>
-                  <th className="px-8 py-5 text-right">Students</th>
+                  <th className="px-6 py-4">Class Name</th>
+                  <th className="px-6 py-4">Monthly Progress</th>
+                  <th className="px-6 py-4 text-right">Students</th>
+                  <th className="px-6 py-4 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {allClasses.map((cls) => {
-                  const cycleProgress = cls.sessionsSinceLastPayment || 0;
+                  const cycleProgress = Math.max(0, cls.sessionsSinceLastPayment || 0);
                   const cycleBenchmark = cls.sessionsPerCycle || 8;
                   const progressPct = Math.min(
                     100,
@@ -657,14 +667,14 @@ export default function TeacherDashboard() {
                       key={cls.id}
                       className="hover:bg-indigo-50/30 transition-all duration-500 group/row"
                     >
-                      <td className="px-8 py-6">
+                      <td className="px-6 py-4">
                         <div className="flex items-center gap-4">
                           <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-[10px] font-black text-indigo-600 group-hover/row:bg-indigo-600 group-hover/row:text-white transition-all shadow-inner border border-slate-100">
                             {cls.grade.charAt(0)}
                           </div>
                           <div className="space-y-0.5">
                             <p className="text-sm font-black text-slate-800 tracking-tight">
-                              {cls.name}
+                              {cls.name.replace(/\s*\([^)]*\)$/, "").trim()}
                             </p>
                             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
                               {cls.subject}
@@ -672,7 +682,7 @@ export default function TeacherDashboard() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-8 py-6">
+                      <td className="px-6 py-4">
                         <div className="space-y-2 w-32">
                           <div className="flex justify-between items-center text-[10px] font-black uppercase text-slate-400">
                             <span>
@@ -690,13 +700,24 @@ export default function TeacherDashboard() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-8 py-6 text-right">
+                      <td className="px-6 py-4 text-right">
                         <p className="text-slate-800 font-black text-sm">
                           {cls.studentCount || 0}
                         </p>
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-0.5">
                           STUDENTS
                         </p>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                         <div className="flex items-center justify-end gap-2">
+                            <button 
+                              onClick={() => handleView(cls.id)}
+                              className="w-10 h-10 flex items-center justify-center bg-white border border-slate-100 text-slate-400 hover:text-indigo-600 hover:border-indigo-100 rounded-xl transition-all shadow-sm group/btn"
+                              title="View session logs"
+                            >
+                               <History className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
+                            </button>
+                         </div>
                       </td>
                     </tr>
                   );
@@ -707,8 +728,8 @@ export default function TeacherDashboard() {
         </div>
 
         {/* 📟 Today's Timeline (Right - 5 cols) */}
-        <div className="lg:col-span-5 bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col hover:border-indigo-100/5 transition-all duration-500">
-          <div className="px-8 py-8 border-b border-slate-50 bg-white flex items-center justify-between relative group/timeline">
+        <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden flex flex-col hover:border-indigo-100/5 transition-all duration-500">
+          <div className="px-6 py-6 border-b border-slate-50 bg-white flex items-center justify-between relative group/timeline">
             <div className="flex items-center gap-5">
               <div className="w-1.5 h-10 bg-indigo-600 rounded-full group-hover/timeline:scale-y-110 transition-transform shadow-[0_0_10px_rgba(79,70,229,0.5)]"></div>
               <div>
@@ -728,8 +749,8 @@ export default function TeacherDashboard() {
             </Link>
           </div>
 
-          <div className="p-8 flex-1">
-            <div className="space-y-6 relative">
+          <div className="p-6 flex-1">
+            <div className="space-y-4 relative">
               {todayClasses.length > 0 ? (
                 todayClasses.map((item, idx) => {
                   const active = isOngoing(
@@ -778,11 +799,11 @@ export default function TeacherDashboard() {
                       </div>
 
                       <div
-                        className={`flex-1 p-5 rounded-3xl border transition-all duration-500 ${item.isCompleted ? "bg-slate-50/80 border-slate-100 opacity-60 grayscale-[0.8]" : active ? "bg-white border-indigo-400 shadow-2xl shadow-indigo-100 ring-4 ring-indigo-50" : "bg-white border-slate-100 hover:border-indigo-100 hover:shadow-lg"}`}
+                        className={`flex-1 p-4 rounded-2xl border transition-all duration-500 ${item.isCompleted ? "bg-slate-50/80 border-slate-100 opacity-60 grayscale-[0.8]" : active ? "bg-white border-indigo-400 shadow-2xl shadow-indigo-100 ring-4 ring-indigo-50" : "bg-white border-slate-100 hover:border-indigo-100 hover:shadow-lg"}`}
                       >
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center justify-between mb-1.5">
                           <h4 className="font-black text-slate-900 text-sm truncate tracking-tight">
-                            {item.name}
+                            {item.name.replace(/\s*\([^)]*\)$/, "").trim()}
                           </h4>
                           {active && !item.isCompleted && (
                             <div className="flex items-center gap-1.5 text-[8px] font-black text-rose-500 uppercase animate-pulse tracking-widest">
@@ -805,7 +826,7 @@ export default function TeacherDashboard() {
                         <button
                           onClick={() => toggleClassCompletion(item)}
                           disabled={item.isPaid}
-                          className={`w-full py-3 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${item.isPaid ? "bg-amber-50 text-amber-500 border border-amber-100" : item.isCompleted ? "bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 hover:border-rose-200" : "bg-slate-900 text-white hover:bg-indigo-600 shadow-lg shadow-slate-100 hover:shadow-indigo-100"}`}
+                          className={`w-full py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${item.isPaid ? "bg-amber-50 text-amber-500 border border-amber-100" : item.isCompleted ? "bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 hover:border-rose-200" : "bg-slate-900 text-white hover:bg-indigo-600 shadow-lg shadow-slate-100 hover:shadow-indigo-100"}`}
                         >
                           {item.isPaid ? (
                             <Lock className="w-3 h-3" />
@@ -837,7 +858,6 @@ export default function TeacherDashboard() {
         </div>
       </div>
 
-      {/* 🔮 Teacher Status Radar */}
       <div className="bg-slate-900 rounded-[3.5rem] p-10 text-white flex flex-col md:flex-row items-center justify-between gap-10 relative overflow-hidden shadow-2xl group/hud">
         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[120px] -mr-80 -mt-80 group-hover/hud:scale-110 transition-transform duration-[2000ms]"></div>
         <div className="flex flex-col sm:flex-row items-center gap-10 relative z-10 text-center sm:text-left">
@@ -902,6 +922,16 @@ export default function TeacherDashboard() {
               Verified Node: Colombo Hub
             </p>
           </div>
+          <div className="w-px h-16 bg-white/10 hidden xl:block"></div>
+          <div className="text-center group-hover/hud:translate-y-[-4px] transition-transform duration-500 delay-150">
+             <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.3em] mb-2 leading-none">System Architect</p>
+             <p className="text-[10px] font-black text-white uppercase tracking-[0.1em] leading-none">
+                AM. Sharfras Aqsan
+             </p>
+             <p className="text-[8px] font-bold text-white/20 mt-2.5 uppercase tracking-widest leading-none">
+                Certified Cloud Developer
+             </p>
+          </div>
         </div>
       </div>
 
@@ -911,6 +941,16 @@ export default function TeacherDashboard() {
         onSuccess={() => {}}
         classes={allClasses}
         preselectedDate={currentTime}
+      />
+
+      <ClassProfileModal 
+        isOpen={isViewOpen} 
+        onClose={() => {
+            setIsViewOpen(false);
+            setViewClassId(null);
+        }}
+        classId={viewClassId || ""}
+        isTeacherView={true}
       />
     </div>
   );
