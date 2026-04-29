@@ -66,6 +66,7 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
 
   useEffect(() => {
     if (isOpen && teacherId) {
+      setActiveTab('overview');
       loadTeacherData();
     }
   }, [isOpen, teacherId, loadTeacherData]);

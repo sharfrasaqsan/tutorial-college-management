@@ -39,9 +39,7 @@ interface TeacherModalProps {
 
 export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }: TeacherModalProps) {
   const [loading, setLoading] = useState(false);
-  const [metaLoading, setMetaLoading] = useState(false);
-  const [dbSubjects, setDbSubjects] = useState<Subject[]>([]);
-  const [dbGrades, setDbGrades] = useState<Grade[]>([]);
+  const [activeTab, setActiveTab] = useState<'overview' | 'expertise' | 'security'>('overview');
 
   useEffect(() => {
     const loadMetadata = async () => {
@@ -83,6 +81,9 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
   });
 
   useEffect(() => {
+    if (isOpen) {
+      setActiveTab('overview');
+    }
     if (initialData) {
       reset({
         name: initialData.name,
@@ -220,8 +221,6 @@ export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }
       setLoading(false);
     }
   };
-  const [activeTab, setActiveTab] = useState<'overview' | 'expertise' | 'security'>('overview');
-
   const teacherName = watch("name") || (initialData?.name || "New Teacher");
   const teacherInitials = teacherName.charAt(0).toUpperCase();
 

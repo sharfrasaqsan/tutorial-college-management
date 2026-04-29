@@ -55,6 +55,7 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
   useEffect(() => {
     async function loadTeachers() {
       if (!isOpen) return;
+      setActiveTab('configuration');
       try {
         const q = query(collection(db, "teachers"), where("status", "==", "active"), orderBy("name", "asc"));
         const snap = await getDocs(q);
@@ -223,6 +224,8 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
 
   const selectedTeacher = teachers.find(t => t.id === selectedTeacherId);
 
+  const cleanClassName = (name: string) => name?.replace(/\s*\([^)]*\)$/, "").trim() || "N/A";
+
   if (!isOpen) return null;
 
   return (
@@ -362,7 +365,7 @@ export default function SalaryProcessModal({ isOpen, onClose, onSuccess }: Salar
                                 <TrendingUp className="w-6 h-6" />
                              </div>
                              <div>
-                                <p className="text-sm font-black text-slate-800">{item.className}</p>
+                                <p className="text-sm font-black text-slate-800">{cleanClassName(item.className)}</p>
                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Fee: LKR {item.monthlyFee} × {item.studentCount} Students</p>
                              </div>
                           </div>

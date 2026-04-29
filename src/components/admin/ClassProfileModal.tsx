@@ -7,7 +7,7 @@ import { db } from "@/lib/firebase";
 import { 
   X, Mail, Phone, MapPin, BookOpen, Clock, Calendar, Activity,
   ArrowUpRight, Loader2, Users, GraduationCap, CreditCard, Layers, History, Hash, Edit,
-  ChevronDown, ChevronRight, CheckCircle2 as CheckIcon
+  ChevronDown, ChevronRight, CheckCircle2 as CheckIcon, RefreshCcw
 } from "lucide-react";
 import { Class, Teacher, Student, Subject, Grade } from "@/types/models";
 import Skeleton from "@/components/ui/Skeleton";
@@ -29,7 +29,9 @@ export default function ClassProfileModal({ classId, isOpen, onClose, isTeacherV
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'sessions' | 'students' | 'schedule' | 'financials'>('overview');
   const [sessions, setSessions] = useState<any[]>([]);
+  const [salaries, setSalaries] = useState<any[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Student Profile View State
   const [isStudentViewOpen, setIsStudentViewOpen] = useState(false);
@@ -37,42 +39,76 @@ export default function ClassProfileModal({ classId, isOpen, onClose, isTeacherV
   
   // Edit Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [expandedCycles, setExpandedCycles] = useState<Set<number>>(new Set([1]));
+  const [expandedCycles, setExpandedCycles] = useState<Set<string>>(new Set(['pending']));
 
   const groupedSessions = useMemo(() => {
     if (!sessions.length) return [];
-    const cycleSize = classData?.sessionsPerCycle || 8;
     
-    // Sort oldest to newest for consistent cycle numbering
-    const sortedOldest = [...sessions].sort((a, b) => {
-        const dateA = new Date(a.date).getTime();
-        const dateB = new Date(b.date).getTime();
-        return dateA - dateB;
+    // Group 1: Sessions already processed (have a salaryId)
+    // Group 2: Sessions not yet processed (no salaryId)
+    
+    const groups: Record<string, any[]> = {};
+    const pendingSessions: any[] = [];
+    
+    sessions.forEach(s => {
+        if (s.salaryId) {
+            if (!groups[s.salaryId]) groups[s.salaryId] = [];
+            groups[s.salaryId].push(s);
+        } else {
+            pendingSessions.push(s);
+        }
     });
 
     const cycles: any[] = [];
-    for (let i = 0; i < sortedOldest.length; i += cycleSize) {
-        const cycleSessions = sortedOldest.slice(i, i + cycleSize);
-        const cycleNumber = Math.floor(i / cycleSize) + 1;
+
+    // Map salaries to their sessions
+    salaries.forEach(sal => {
+        const cycleSessions = groups[sal.id] || [];
+        if (cycleSessions.length > 0) {
+            // Sort sessions within cycle by date (oldest first for start/end)
+            cycleSessions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            
+            cycles.push({
+                id: sal.id,
+                number: sal.cycleNumber || 'Audit',
+                sessions: [...cycleSessions].reverse(),
+                startDate: cycleSessions[0].date,
+                endDate: cycleSessions[cycleSessions.length - 1].date,
+                isSettled: sal.status === 'paid',
+                isFull: true,
+                totalStudents: cycleSessions.reduce((acc, curr) => acc + (curr.studentCount || 0), 0) / cycleSessions.length
+            });
+        }
+    });
+
+    // Handle Pending Sessions (Current Accruing Cycle)
+    if (pendingSessions.length > 0) {
+        pendingSessions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        const lastCycleNumber = salaries.length > 0 ? Math.max(...salaries.map(s => s.cycleNumber || 0)) : 0;
         
         cycles.push({
-            number: cycleNumber,
-            sessions: [...cycleSessions].reverse(), // Show newest sessions first within the cycle
-            startDate: cycleSessions[0].date,
-            endDate: cycleSessions[cycleSessions.length - 1].date,
-            isSettled: cycleSessions.every(s => s.isPaid),
-            isFull: cycleSessions.length === cycleSize,
-            totalStudents: cycleSessions.reduce((acc, curr) => acc + (curr.studentCount || 0), 0) / cycleSessions.length
+            id: 'pending',
+            number: lastCycleNumber + 1,
+            sessions: [...pendingSessions].reverse(),
+            startDate: pendingSessions[0].date,
+            endDate: pendingSessions[pendingSessions.length - 1].date,
+            isSettled: false,
+            isFull: pendingSessions.length >= (classData?.sessionsPerCycle || 8),
+            totalStudents: pendingSessions.reduce((acc, curr) => acc + (curr.studentCount || 0), 0) / pendingSessions.length
         });
     }
 
-    return cycles.reverse(); // Show newest cycles at the top
-  }, [sessions, classData?.sessionsPerCycle]);
+    // Return descending by cycle number
+    return cycles.sort((a, b) => {
+        if (typeof a.number === 'number' && typeof b.number === 'number') return b.number - a.number;
+        return 0;
+    });
+  }, [sessions, salaries, classData?.sessionsPerCycle]);
 
-  const toggleCycle = (num: number) => {
+  const toggleCycle = (id: string) => {
     const next = new Set(expandedCycles);
-    if (next.has(num)) next.delete(num);
-    else next.add(num);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
     setExpandedCycles(next);
   };
 
@@ -121,15 +157,26 @@ export default function ClassProfileModal({ classId, isOpen, onClose, isTeacherV
     if (!classId) return;
     setSessionsLoading(true);
     try {
+      // 1. Fetch Salaries (to define cycles)
+      const salQ = query(
+        collection(db, "salaries"),
+        where("classId", "==", classId),
+        orderBy("createdAt", "asc")
+      );
+      const salSnap = await getDocs(salQ);
+      const salDocs = salSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setSalaries(salDocs);
+
+      // 2. Fetch Sessions
       const q = query(
         collection(db, "session_completions"),
         where("classId", "==", classId),
-        limit(50)
+        limit(200)
       );
       const snap = await getDocs(q);
       const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       
-      // Sort locally to avoid index requirements
+      // Sort locally
       docs.sort((a: any, b: any) => {
         const t1 = a.timestamp?.seconds || 0;
         const t2 = b.timestamp?.seconds || 0;
@@ -149,28 +196,60 @@ export default function ClassProfileModal({ classId, isOpen, onClose, isTeacherV
     setIsStudentViewOpen(true);
   };
 
-  const handleFinishSyllabus = async () => {
-    if (!classData || !classId) return;
-    if (!confirm(`Are you sure you want to finish the syllabus for ${classData.name}? This will archive the class for your yearly focus.`)) return;
+  const handleSyncStats = async () => {
+    if (!classId || !classData) return;
+    setIsSyncing(true);
+    const toastId = toast.loading("Auditing institutional ledger...");
     
     try {
-      const classRef = doc(db, "classes", classId);
-      await updateDoc(classRef, {
-        status: "inactive",
-        syllabusCompleted: true,
-        completedAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+      // 1. Fetch ALL sessions for this class to get true counts
+      const q = query(collection(db, "session_completions"), where("classId", "==", classId));
+      const snap = await getDocs(q);
+      const allSessions = snap.docs.map(d => d.data());
+      
+      const actualTotal = allSessions.length;
+      const actualPending = allSessions.filter(s => !s.isPaid).length;
+      
+      // 2. Fetch Salaries for true cycle count
+      const salQ = query(collection(db, "salaries"), where("classId", "==", classId));
+      const salSnap = await getDocs(salQ);
+      const actualCycles = salSnap.docs.length;
+      
+      // 3. Update the Class document
+      await updateDoc(doc(db, "classes", classId), {
+        completedSessions: actualTotal,
+        sessionsSinceLastPayment: actualPending,
+        completedCycles: actualCycles,
+        updatedAt: serverTimestamp()
       });
-      toast.success("Syllabus marked as completed. Class archived.");
-      onClose();
+      
+      // 4. Refresh local state
+      setClassData(prev => prev ? { 
+        ...prev, 
+        completedSessions: actualTotal, 
+        sessionsSinceLastPayment: actualPending,
+        completedCycles: actualCycles 
+      } : null);
+      
+      await loadSessions();
+      
+      toast.success("Academic integrity restored!", { id: toastId });
     } catch (error) {
-       console.error("Archive error:", error);
-       toast.error("Process failed.");
+      console.error("Sync error:", error);
+      toast.error("Failed to synchronize stats.", { id: toastId });
+    } finally {
+      setIsSyncing(false);
     }
+  };
+
+  const handleFinishSyllabus = async () => {
+    // Feature disabled: will implement later
+    toast.error("This feature is currently being optimized for the next academic release.");
   };
 
   useEffect(() => {
     if (isOpen && classId) {
+      setActiveTab('overview');
       loadData();
       loadSessions();
     }
@@ -213,6 +292,14 @@ export default function ClassProfileModal({ classId, isOpen, onClose, isTeacherV
                 </div>
             </div>
             <div className="flex items-center gap-3">
+                <button 
+                    onClick={handleSyncStats}
+                    disabled={isSyncing}
+                    className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-indigo-600 transition-all border border-slate-100 hover:border-indigo-100 flex items-center justify-center disabled:opacity-50"
+                    title="Synchronize Stats"
+                >
+                    <RefreshCcw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                </button>
                 {!isTeacherView && (
                     <button 
                         onClick={() => setIsEditModalOpen(true)}
@@ -360,8 +447,8 @@ export default function ClassProfileModal({ classId, isOpen, onClose, isTeacherV
                                         <div key={cycle.number} className="rounded-2xl border border-slate-100 overflow-hidden bg-white shadow-sm transition-all hover:border-slate-200">
                                             {/* Cycle Header */}
                                             <button 
-                                                onClick={() => toggleCycle(cycle.number)}
-                                                className={`w-full px-6 py-4 flex items-center justify-between transition-colors ${expandedCycles.has(cycle.number) ? 'bg-slate-50/50' : 'bg-white'}`}
+                                                onClick={() => toggleCycle(cycle.id)}
+                                                className={`w-full px-6 py-4 flex items-center justify-between transition-colors ${expandedCycles.has(cycle.id) ? 'bg-slate-50/50' : 'bg-white'}`}
                                             >
                                                 <div className="flex items-center gap-5">
                                                     <div className={`w-10 h-10 rounded-xl flex flex-col items-center justify-center border ${cycle.isSettled ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-indigo-50 border-indigo-100 text-indigo-600'}`}>
@@ -398,7 +485,7 @@ export default function ClassProfileModal({ classId, isOpen, onClose, isTeacherV
                                             </button>
 
                                             {/* Sessions List (Collapsible) */}
-                                            {expandedCycles.has(cycle.number) && (
+                                            {expandedCycles.has(cycle.id) && (
                                                 <div className="border-t border-slate-100 bg-white p-2 divide-y divide-slate-50">
                                                     {cycle.sessions.map((session: any) => (
                                                         <div key={session.id} className="p-3 flex items-center justify-between hover:bg-slate-50/50 transition-colors rounded-lg group/item">
@@ -559,14 +646,6 @@ export default function ClassProfileModal({ classId, isOpen, onClose, isTeacherV
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pt-0.5 leading-none">Note: Details verified</p>
             </div>
             <div className="flex gap-3">
-                {isTeacherView && classData && !classData.syllabusCompleted && (
-                    <button 
-                        onClick={handleFinishSyllabus}
-                        className="px-6 py-2.5 bg-rose-50 text-rose-600 text-[10px] font-black uppercase tracking-widest rounded-lg border border-rose-100 hover:bg-rose-100 transition-all shadow-sm active:scale-95 flex items-center gap-2"
-                    >
-                        <Activity className="w-3.5 h-3.5" /> Finish Syllabus
-                    </button>
-                )}
                 <button 
                     onClick={onClose}
                     className="px-8 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest rounded-lg border border-slate-200 hover:bg-white transition-all shadow-sm active:scale-95"

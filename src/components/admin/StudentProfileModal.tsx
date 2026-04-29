@@ -90,6 +90,7 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
 
   useEffect(() => {
     if (isOpen && studentId) {
+      setActiveTab('overview');
       loadStudentData();
     }
   }, [isOpen, studentId, loadStudentData]);

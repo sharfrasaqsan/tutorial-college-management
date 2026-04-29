@@ -115,15 +115,22 @@ export interface Salary {
   netAmount: number;   // final payout
   status: string;      // 'paid' | 'pending'
   createdAt: FirestoreTimestamp;
+  paidAt?: FirestoreTimestamp;
   cycleNumber?: number;
 }
 
 export interface AttendanceRecord {
   id: string;
   classId: string;
-  className?: string;
-  date: string;
-  records: Record<string, boolean>;
+  className: string;
+  teacherId: string;
+  teacherName: string;
+  grade: string;
+  subject: string;
+  date: string; // YYYY-MM-DD
+  records: { studentId: string, studentName: string, isPresent: boolean }[];
+  totalPresent: number;
+  totalAbsent: number;
   createdAt: FirestoreTimestamp;
 }
 

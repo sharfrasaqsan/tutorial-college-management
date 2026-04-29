@@ -33,7 +33,6 @@ const navItems = [
     { name: "Grades", href: "/admin/grades", icon: Layers },
     { name: "Classes", href: "/admin/classes", icon: Layers },
     { name: "Attendance", href: "/admin/attendance", icon: ClipboardCheck },
-    { name: "Academic Promotion", href: "/admin/promotion", icon: TrendingUp },
   ]},
   { label: "Money", items: [
     { name: "Finance Analytics", href: "/admin/finance", icon: Wallet },

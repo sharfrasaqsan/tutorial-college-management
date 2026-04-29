@@ -121,7 +121,7 @@ export default function MyStudentsPage() {
                 {[...classes]
                   .sort((a, b) => (a.grade || "").localeCompare(b.grade || "", undefined, { numeric: true }))
                   .map(cls => (
-                    <option key={cls.id} value={cls.id}>{cls.name}</option>
+                    <option key={cls.id} value={cls.id}>{cls.name?.replace(/\s*\([^)]*\)$/, "").trim()}</option>
                 ))}
                 {classes.length === 0 && <option value="">No Classes Assigned</option>}
             </select>
@@ -206,7 +206,7 @@ export default function MyStudentsPage() {
                                 <td colSpan={4} className="px-8 py-20 text-center flex flex-col items-center justify-center">
                                     <Users className="w-12 h-12 text-slate-100 mb-4" />
                                     <p className="text-slate-500 font-bold tracking-tight">No students found.</p>
-                                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Class: {currentClass.name}</p>
+                                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Class: {currentClass.name?.replace(/\s*\([^)]*\)$/, "").trim()}</p>
                                 </td>
                             </tr>
                         )}

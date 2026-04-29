@@ -125,8 +125,8 @@ export default function TimetablePage() {
     end: calendarEnd,
   });
 
-  const handlePrevMonth = () => setSelectedDate(subMonths(selectedDate, 1));
-  const handleNextMonth = () => setSelectedDate(addMonths(selectedDate, 1));
+  const handlePrevDay = () => setSelectedDate(prev => new Date(new Date(prev).setDate(prev.getDate() - 1)));
+  const handleNextDay = () => setSelectedDate(prev => new Date(new Date(prev).setDate(prev.getDate() + 1)));
   const handleJumpToToday = () => setSelectedDate(new Date());
 
   const isSlotLive = (startTime: string, endTime?: string) => {
@@ -165,15 +165,15 @@ export default function TimetablePage() {
 
           <div className="flex items-center gap-3">
             <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm">
-              <button onClick={handlePrevMonth} className="p-2 hover:bg-slate-50 rounded-lg transition-all text-slate-400 hover:text-primary"><ChevronLeft className="w-4 h-4" /></button>
+              <button onClick={handlePrevDay} className="p-2 hover:bg-slate-50 rounded-lg transition-all text-slate-400 hover:text-primary"><ChevronLeft className="w-4 h-4" /></button>
               <button 
                 onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
                 className="px-4 py-2 text-[10px] font-black uppercase tracking-wider text-slate-700 hover:text-primary transition-all flex items-center gap-2"
               >
-                {format(selectedDate, "MMMM yyyy")}
+                {format(selectedDate, "dd MMM yyyy")}
                 {isCalendarExpanded ? <ChevronUp className="w-3.5 h-3.5 text-primary" /> : <ChevronDown className="w-3.5 h-3.5 text-primary" />}
               </button>
-              <button onClick={handleNextMonth} className="p-2 hover:bg-white rounded-lg transition-all text-slate-400 hover:text-primary"><ChevronRight className="w-4 h-4" /></button>
+              <button onClick={handleNextDay} className="p-2 hover:bg-white rounded-lg transition-all text-slate-400 hover:text-primary"><ChevronRight className="w-4 h-4" /></button>
             </div>
             {!isToday(selectedDate) && (
               <button 

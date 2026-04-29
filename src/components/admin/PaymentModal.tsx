@@ -66,6 +66,9 @@ export default function PaymentModal({
 
   // Load students for search if needed
   useEffect(() => {
+    if (isOpen) {
+      setActiveTab("info");
+    }
     if (isOpen && !initialStudentId) {
       loadStudents();
     }

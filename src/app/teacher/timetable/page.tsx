@@ -27,6 +27,7 @@ import { formatTime } from "@/lib/formatters";
 import toast from "react-hot-toast";
 import { processTeacherPayroll } from "@/lib/payroll";
 import ExtraSessionModal from "@/components/teacher/ExtraSessionModal";
+import AttendanceModal from "@/components/teacher/AttendanceModal";
 
 interface SessionCompletion {
   classId: string;
@@ -64,6 +65,8 @@ export default function TimetablePage() {
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [isCalendarExpanded, setIsCalendarExpanded] = useState(false);
   const [isExtraModalOpen, setIsExtraModalOpen] = useState(false);
+  const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
+  const [selectedClassForAttendance, setSelectedClassForAttendance] = useState<any>(null);
 
   const selectedDayName = format(selectedDate, "eeee").toLowerCase();
 
@@ -183,6 +186,26 @@ export default function TimetablePage() {
         return;
     }
 
+    if (!isCurrentlyCompleted) {
+        setSelectedClassForAttendance({
+            ...slot,
+            id: slot.classId,
+            name: slot.className,
+            date: format(selectedDate, "yyyy-MM-dd"),
+            dayOfWeek: selectedDayName,
+            day: selectedDate.getDate(),
+            month: selectedDate.getMonth() + 1,
+            year: selectedDate.getFullYear(),
+            uniqueSlotId: slot.uniqueSlotId,
+            currentSlot: {
+                startTime: slot.startTime,
+                endTime: slot.endTime
+            }
+        });
+        setIsAttendanceModalOpen(true);
+        return;
+    }
+
     try {
       const completionRef = doc(db, "session_completions", completionId);
       const classRef = doc(db, "classes", slot.classId);
@@ -215,6 +238,21 @@ export default function TimetablePage() {
                 });
             }
         }
+        
+        // Find and delete the associated attendance record(s)
+        const dateStr = format(selectedDate, "yyyy-MM-dd");
+        const attendanceQ = query(collection(db, "attendance"), 
+            where("classId", "==", slot.classId),
+            where("date", "==", dateStr)
+        );
+        const attendanceSnap = await getDocs(attendanceQ);
+        attendanceSnap.docs.forEach(d => {
+            // Only delete if it matches completionId, or if completionId doesn't exist (legacy fallback)
+            const data = d.data();
+            if (!data.completionId || data.completionId === completionId) {
+                batch.delete(doc(db, "attendance", d.id));
+            }
+        });
         
         batch.delete(completionRef);
         batch.update(classRef, {
@@ -273,8 +311,8 @@ export default function TimetablePage() {
   const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
-  const handlePrevMonth = () => setSelectedDate(subMonths(selectedDate, 1));
-  const handleNextMonth = () => setSelectedDate(addMonths(selectedDate, 1));
+  const handlePrevDay = () => setSelectedDate(prev => new Date(new Date(prev).setDate(prev.getDate() - 1)));
+  const handleNextDay = () => setSelectedDate(prev => new Date(new Date(prev).setDate(prev.getDate() + 1)));
   const handleJumpToToday = () => setSelectedDate(new Date());
 
   const isSlotLive = (startTime: string, endTime?: string) => {
@@ -316,15 +354,15 @@ export default function TimetablePage() {
 
           <div className="flex items-center gap-3">
             <div className="flex bg-white p-1 rounded-xl border border-slate-200 shadow-sm transition-all hover:border-indigo-200">
-              <button onClick={handlePrevMonth} className="p-2 hover:bg-slate-50 rounded-lg transition-all text-slate-400 hover:text-indigo-600"><ChevronLeft className="w-4 h-4" /></button>
+              <button onClick={handlePrevDay} className="p-2 hover:bg-slate-50 rounded-lg transition-all text-slate-400 hover:text-indigo-600"><ChevronLeft className="w-4 h-4" /></button>
               <button 
                 onClick={() => setIsCalendarExpanded(!isCalendarExpanded)}
                 className="px-4 py-2 text-[10px] font-black uppercase tracking-wider text-slate-700 hover:text-indigo-600 transition-all flex items-center gap-2"
               >
-                {format(selectedDate, "MMMM yyyy")}
+                {format(selectedDate, "dd MMM yyyy")}
                 {isCalendarExpanded ? <ChevronUp className="w-3.5 h-3.5 text-indigo-600" /> : <ChevronDown className="w-3.5 h-3.5 text-indigo-600" />}
               </button>
-              <button onClick={handleNextMonth} className="p-2 hover:bg-slate-50 rounded-lg transition-all text-slate-400 hover:text-indigo-600"><ChevronRight className="w-4 h-4" /></button>
+              <button onClick={handleNextDay} className="p-2 hover:bg-slate-50 rounded-lg transition-all text-slate-400 hover:text-indigo-600"><ChevronRight className="w-4 h-4" /></button>
             </div>
             <div className="flex items-center gap-2">
               {!isToday(selectedDate) && (
@@ -555,6 +593,21 @@ export default function TimetablePage() {
         classes={classes}
         preselectedDate={selectedDate}
       />
+
+      {selectedClassForAttendance && (
+        <AttendanceModal
+          isOpen={isAttendanceModalOpen}
+          onClose={() => {
+            setIsAttendanceModalOpen(false);
+            setSelectedClassForAttendance(null);
+          }}
+          classItem={selectedClassForAttendance}
+          teacherData={teacherData}
+          onSuccess={() => {
+            // Stats will refresh via onSnapshot
+          }}
+        />
+      )}
     </div>
   );
 }

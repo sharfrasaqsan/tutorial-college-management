@@ -52,6 +52,8 @@ import { processTeacherPayroll } from "@/lib/payroll";
 import { formatTime } from "@/lib/formatters";
 import ExtraSessionModal from "@/components/teacher/ExtraSessionModal";
 import ClassProfileModal from "@/components/admin/ClassProfileModal";
+import Footer from "@/components/common/Footer";
+import AttendanceModal from "@/components/teacher/AttendanceModal";
 
 interface SessionCompletion {
   id: string;
@@ -120,6 +122,8 @@ export default function TeacherDashboard() {
   const [isExtraModalOpen, setIsExtraModalOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [viewClassId, setViewClassId] = useState<string | null>(null);
+  const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
+  const [selectedClassForAttendance, setSelectedClassForAttendance] = useState<TodayClass | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
@@ -244,6 +248,14 @@ export default function TeacherDashboard() {
     return now >= start && now <= end;
   };
 
+  const isUpcoming = (startTime: string) => {
+    const now = currentTime;
+    const [h, m] = startTime.split(":").map(Number);
+    const start = new Date(now);
+    start.setHours(h, m, 0);
+    return now < start;
+  };
+
   const todayClasses = useMemo(() => {
     const todayStr = format(currentTime, "yyyy-MM-dd");
     const currentDay = format(currentTime, "EEEE").toLowerCase();
@@ -336,17 +348,13 @@ export default function TeacherDashboard() {
     }
 
     const todayStr = format(new Date(), "yyyy-MM-dd");
-    const startTimeSafe = (classItem.currentSlot?.startTime || "00-00").replace(
-      /:/g,
-      "-",
-    );
+    const startTimeSafe = (classItem.currentSlot?.startTime || "00-00").replace(/:/g, "-");
     const completionId = `${classItem.id}_${todayStr}_${startTimeSafe}`;
     const isCurrentlyCompleted = classItem.isCompleted;
 
+    // 1. Block early completion
     const now = new Date();
-    const [startH, startM] = (classItem.currentSlot?.startTime || "00:00")
-      .split(":")
-      .map(Number);
+    const [startH, startM] = (classItem.currentSlot?.startTime || "00:00").split(":").map(Number);
     const slotDT = new Date();
     slotDT.setHours(startH, startM, 0, 0);
 
@@ -355,6 +363,14 @@ export default function TeacherDashboard() {
       return;
     }
 
+    // 2. If not completed, open Attendance Modal
+    if (!isCurrentlyCompleted) {
+      setSelectedClassForAttendance(classItem);
+      setIsAttendanceModalOpen(true);
+      return;
+    }
+
+    // 3. Handle Undo (Deletion)
     try {
       const currentDay = format(new Date(), "EEEE").toLowerCase();
       const completionRef = doc(db, "session_completions", completionId);
@@ -825,8 +841,8 @@ export default function TeacherDashboard() {
 
                         <button
                           onClick={() => toggleClassCompletion(item)}
-                          disabled={item.isPaid}
-                          className={`w-full py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${item.isPaid ? "bg-amber-50 text-amber-500 border border-amber-100" : item.isCompleted ? "bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 hover:border-rose-200" : "bg-slate-900 text-white hover:bg-indigo-600 shadow-lg shadow-slate-100 hover:shadow-indigo-100"}`}
+                          disabled={item.isPaid || (!item.isCompleted && isUpcoming(item.currentSlot.startTime))}
+                          className={`w-full py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${item.isPaid ? "bg-amber-50 text-amber-500 border border-amber-100" : (!item.isCompleted && isUpcoming(item.currentSlot.startTime)) ? "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed" : item.isCompleted ? "bg-white border border-slate-200 text-rose-500 hover:bg-rose-50 hover:border-rose-200" : "bg-slate-900 text-white hover:bg-indigo-600 shadow-lg shadow-slate-100 hover:shadow-indigo-100"}`}
                         >
                           {item.isPaid ? (
                             <Lock className="w-3 h-3" />
@@ -839,7 +855,9 @@ export default function TeacherDashboard() {
                             ? "Settled"
                             : item.isCompleted
                               ? "Undo"
-                              : "Complete Class"}
+                              : isUpcoming(item.currentSlot.startTime)
+                                ? "Upcoming"
+                                : "Complete Class"}
                         </button>
                       </div>
                     </div>
@@ -858,82 +876,7 @@ export default function TeacherDashboard() {
         </div>
       </div>
 
-      <div className="bg-slate-900 rounded-[3.5rem] p-10 text-white flex flex-col md:flex-row items-center justify-between gap-10 relative overflow-hidden shadow-2xl group/hud">
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-600/20 rounded-full blur-[120px] -mr-80 -mt-80 group-hover/hud:scale-110 transition-transform duration-[2000ms]"></div>
-        <div className="flex flex-col sm:flex-row items-center gap-10 relative z-10 text-center sm:text-left">
-          <div className="w-20 h-20 bg-white/10 rounded-[2.5rem] border border-white/5 flex items-center justify-center text-indigo-400 shadow-2xl backdrop-blur-xl">
-            <Activity className="w-10 h-10 animate-pulse" />
-          </div>
-          <div>
-            <p className="text-[11px] font-black text-white/40 uppercase tracking-[0.4em] mb-3">
-              Teacher Status
-            </p>
-            <h4 className="text-2xl font-black flex flex-wrap items-center justify-center sm:justify-start gap-4">
-              Everything Synced:{" "}
-              <span className="text-emerald-400 uppercase">
-                {teacherData?.status || "ACTIVE"}
-              </span>
-              <div className="flex gap-1.5 h-6">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div
-                    key={i}
-                    className="w-1.5 bg-indigo-400/30 rounded-full animate-bounce"
-                    style={{
-                      height: `${i * 20 + 20}%`,
-                      animationDelay: `${i * 100}ms`,
-                      animationDuration: "1000ms",
-                    }}
-                  ></div>
-                ))}
-              </div>
-            </h4>
-            <p className="text-[10px] font-medium text-white/30 mt-3 uppercase tracking-widest leading-none">
-              Institutional standard compliance: 100% • Verified Since:{" "}
-              {teacherData?.createdAt
-                ? format(teacherData.createdAt.toDate(), "yyyy")
-                : "Loading..."}
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center justify-center gap-12 relative z-10 border-t md:border-t-0 md:border-l border-white/10 pt-10 md:pt-0 md:pl-12">
-          <div className="text-center group-hover/hud:translate-y-[-4px] transition-transform duration-500">
-            <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.3em] mb-2 leading-none">
-              Total Finished
-            </p>
-            <p className="text-3xl font-black tracking-tighter tabular-nums leading-none">
-              {stats.totalSessions}
-              <span className="text-sm ml-1 opacity-40">logs</span>
-            </p>
-            <p className="text-[8px] font-bold text-emerald-400 mt-2.5 uppercase tracking-widest opacity-80 flex items-center justify-center gap-1.5">
-              <span className="w-1 h-1 rounded-full bg-emerald-400"></span>
-              TOTAL CLASSES COMPLETED
-            </p>
-          </div>
-          <div className="w-px h-16 bg-white/10 hidden xl:block"></div>
-          <div className="text-center group-hover/hud:translate-y-[-4px] transition-transform duration-500 delay-75">
-            <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.3em] mb-2 leading-none">
-              System Latency
-            </p>
-            <p className="text-[11px] font-black text-indigo-400 flex items-center gap-3 uppercase tracking-[0.2em] leading-none">
-              <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-pulse shadow-[0_0_15px_rgba(129,140,248,0.8)]"></span>
-              Matrix Online
-            </p>
-            <p className="text-[8px] font-bold text-white/20 mt-1.5 uppercase tracking-tighter">
-              Verified Node: Colombo Hub
-            </p>
-          </div>
-          <div className="w-px h-16 bg-white/10 hidden xl:block"></div>
-          <div className="text-center group-hover/hud:translate-y-[-4px] transition-transform duration-500 delay-150">
-             <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.3em] mb-2 leading-none">System Architect</p>
-             <p className="text-[10px] font-black text-white uppercase tracking-[0.1em] leading-none">
-                AM. Sharfras Aqsan
-             </p>
-             <p className="text-[8px] font-bold text-white/20 mt-2.5 uppercase tracking-widest leading-none">
-                Certified Cloud Developer
-             </p>
-          </div>
-        </div>
-      </div>
+      <Footer />
 
       <ExtraSessionModal
         isOpen={isExtraModalOpen}
@@ -952,6 +895,21 @@ export default function TeacherDashboard() {
         classId={viewClassId || ""}
         isTeacherView={true}
       />
+
+      {selectedClassForAttendance && (
+        <AttendanceModal
+          isOpen={isAttendanceModalOpen}
+          onClose={() => {
+            setIsAttendanceModalOpen(false);
+            setSelectedClassForAttendance(null);
+          }}
+          classItem={selectedClassForAttendance}
+          teacherData={teacherData}
+          onSuccess={() => {
+            // Stats will refresh via onSnapshot
+          }}
+        />
+      )}
     </div>
   );
 }

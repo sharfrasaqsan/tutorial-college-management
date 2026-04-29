@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { collection, query, getDocs, orderBy, where, doc, updateDoc, deleteDoc, writeBatch, increment } from "firebase/firestore";
+import { collection, query, getDocs, orderBy, where, doc, updateDoc, deleteDoc, writeBatch, increment, serverTimestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, DollarSign, Search, Filter, Download, CreditCard, AlertCircle, CheckCircle, Printer, Share2, Trash2, Eye, History as HistoryIcon, FileText, Send, MessageCircle, ArrowRight, Clock, Users } from "lucide-react";
+import { Plus, DollarSign, Search, Filter, Download, CreditCard, AlertCircle, CheckCircle, Printer, Share2, Trash2, Eye, History as HistoryIcon, FileText, Send, MessageCircle, ArrowRight, Clock, Users, Hash, X, Calendar, TrendingUp, Calculator, ShieldCheck, Activity, BookOpen } from "lucide-react";
 import { generateSalaryPDF } from "@/lib/pdf-generator";
 import { Teacher } from "@/types/models";
 import Skeleton from "@/components/ui/Skeleton";
@@ -35,6 +35,7 @@ export default function SalariesPage() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [salaryToDelete, setSalaryToDelete] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+  const [activeModalTab, setActiveModalTab] = useState<'overview' | 'history'>('overview');
 
   const loadData = async () => {
     try {
@@ -70,7 +71,10 @@ export default function SalariesPage() {
       const batch = writeBatch(db);
       
       // 1. Update salary status
-      batch.update(doc(db, "salaries", item.id), { status: newStatus });
+      batch.update(doc(db, "salaries", item.id), { 
+        status: newStatus,
+        paidAt: newStatus === 'paid' ? serverTimestamp() : null 
+      });
       
       // 2. Lock or unlock session completions based on new status
       const completionsQ = query(
@@ -197,7 +201,8 @@ export default function SalariesPage() {
   };
 
   const filteredSalaries = salaries.filter(s => {
-    const matchesSearch = s.teacherName?.toLowerCase().includes(searchTerm.toLowerCase());
+    const currentTeacherName = teachersData[s.teacherId]?.name || s.teacherName || "";
+    const matchesSearch = currentTeacherName.toLowerCase().includes(searchTerm.toLowerCase());
     const [sYear, sMonth] = s.month.split('-');
     const matchesYear = filterYear === "" || sYear === filterYear;
     const matchesMonth = filterMonth === "" || sMonth === filterMonth;
@@ -212,6 +217,8 @@ export default function SalariesPage() {
     currentYear,
     ...salaries.map(s => s.month.split('-')[0])
   ])).sort((a, b) => b.localeCompare(a));
+  
+  const cleanClassName = (name: string) => name?.replace(/\s*\([^)]*\)$/, "").trim() || "N/A";
 
   const statCards = [
     { title: "Total Paid", value: `LKR ${totalPayout.toLocaleString()}`, icon: DollarSign, color: "text-indigo-500" },
@@ -272,61 +279,227 @@ export default function SalariesPage() {
         onConfirm={handleDelete} 
         loading={actionLoading} 
         title="Warning: Clear Record" 
-        message={`Warning: Deleting this record for ${selectedSalary?.teacherName} will clear the ${selectedSalary?.sessionsConducted} session logs. The teacher will need to mark them again. This cannot be undone.`}
+        message={`Warning: Deleting this record for ${teachersData[selectedSalary?.teacherId || '']?.name || selectedSalary?.teacherName || 'this faculty member'} will clear the ${selectedSalary?.sessionsConducted} session logs. The teacher will need to mark them again. This cannot be undone.`}
       />
 
-      {/* Payment Details Modal */}
-      <Modal isOpen={isViewOpen} onClose={() => setIsViewOpen(false)} title={`Payment Details: ${selectedSalary?.teacherName}`}>
-        <div className="space-y-5 p-2">
-           <div className="grid grid-cols-2 gap-4">
-             <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Month</p>
-                <p className="text-sm font-bold text-slate-800 tabular-nums">{selectedSalary?.month}</p>
-             </div>
-             <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl text-right">
-                <p className="text-[9px] font-black uppercase text-indigo-400 tracking-widest">Final Amount</p>
-                <p className="text-lg font-black text-indigo-600 tabular-nums">LKR {selectedSalary?.netAmount?.toLocaleString()}</p>
-             </div>
-           </div>
-           <div className="space-y-4">
-              <div className="p-5 bg-slate-50 rounded-[2rem] border border-slate-100 flex items-center justify-between">
-                <div>
-                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-loose">Class Name</p>
-                    <p className="text-sm font-black text-slate-800">{selectedSalary?.className}</p>
-                </div>
-                <div className="text-right">
-                    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-loose">Payment ID</p>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">#${selectedSalary?.id?.slice(-8).toUpperCase()}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                 {[
-                    { label: 'Fee per Student', value: `LKR ${selectedSalary?.monthlyFee?.toLocaleString()}` },
-                    { label: 'Students', value: `${selectedSalary?.studentCount} Students` },
-                    { label: 'Total Fee', value: `LKR ${selectedSalary?.totalMonthlyRevenue?.toLocaleString()}` },
-                 ].map((stat, i) => (
-                    <div key={i} className="p-4 bg-white border border-slate-100 rounded-2xl shadow-sm">
-                        <p className="text-[8px] font-black uppercase text-slate-400 tracking-widest mb-1">{stat.label}</p>
-                        <p className="text-[11px] font-black text-slate-700">{stat.value}</p>
+      {/* 🚀 Institutional Payroll Record Modal - Premium Layout */}
+      <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8 transition-all duration-300 ${isViewOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
+        <div className={`fixed inset-0 bg-slate-900/40 transition-all duration-300 ${isViewOpen ? "backdrop-blur-sm" : ""}`} onClick={() => setIsViewOpen(false)}></div>
+        
+        <div className={`relative w-full max-w-5xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all duration-300 ease-out flex flex-col h-[85vh] ${isViewOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
+            
+            {/* Header Segment */}
+            <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white z-10 shrink-0">
+                <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-primary text-xl font-bold overflow-hidden shadow-sm">
+                        {teachersData[selectedSalary?.teacherId || '']?.photoURL ? (
+                           <img src={teachersData[selectedSalary?.teacherId || '']?.photoURL} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                           (teachersData[selectedSalary?.teacherId || '']?.name || selectedSalary?.teacherName || "?").charAt(0)
+                        )}
                     </div>
-                 ))}
-              </div>
+                    <div>
+                        <h2 className="text-xl font-bold text-slate-900 flex items-center gap-3 leading-none">
+                            {teachersData[selectedSalary?.teacherId || '']?.name || selectedSalary?.teacherName}
+                        </h2>
+                        <div className="flex items-center gap-3 mt-2">
+                             <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
+                                <Hash className="w-3.5 h-3.5" /> ID: {teachersData[selectedSalary?.teacherId || '']?.teacherId || "N/A"}
+                             </span>
+                             <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                             <span className={`text-[10px] font-bold uppercase tracking-wider ${selectedSalary?.status === 'paid' ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                {selectedSalary?.status}
+                             </span>
+                        </div>
+                    </div>
+                </div>
+                <div className="flex items-center gap-3">
+                    <button 
+                        onClick={() => selectedSalary && handlePrint(selectedSalary)}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg active:scale-95"
+                    >
+                        <Printer className="w-3.5 h-3.5" />
+                        PDF Slip
+                    </button>
+                    <button 
+                        onClick={() => selectedSalary && handleWhatsAppShare(selectedSalary)}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-[#25D366]/10 text-[#25D366] rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-[#25D366] hover:text-white transition-all border border-[#25D366]/20 active:scale-95"
+                    >
+                        <MessageCircle className="w-3.5 h-3.5" />
+                        WhatsApp
+                    </button>
+                    <button 
+                        onClick={() => selectedSalary && handleShare(selectedSalary)}
+                        className="p-2.5 rounded-xl bg-slate-50 text-slate-400 hover:text-primary transition-all border border-slate-100"
+                        title="Share Reference"
+                    >
+                        <Share2 className="w-4 h-4" />
+                    </button>
+                    <div className="w-[1px] h-6 bg-slate-100 mx-1"></div>
+                    <button 
+                        onClick={() => setIsViewOpen(false)}
+                        className="p-2.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all group"
+                    >
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
+            </div>
 
-              <div className="p-6 bg-primary/5 rounded-[2rem] border border-primary/10 flex items-center justify-between">
-                 <div>
-                    <p className="text-[9px] font-black uppercase text-primary/60 tracking-widest">Sessions Finished</p>
-                    <h4 className="text-2xl font-black text-primary tabular-nums">{selectedSalary?.sessionsConducted} <span className="text-sm text-primary/40 font-bold">/ {selectedSalary?.sessionsPerCycle}</span></h4>
-                 </div>
-                 <div className="text-right">
-                    <p className="text-[9px] font-black uppercase text-primary/60 tracking-widest">Pay per Session</p>
-                    <p className="text-sm font-black text-primary tabular-nums">LKR {selectedSalary?.perSessionRate?.toFixed(2)}</p>
-                 </div>
-              </div>
-           </div>
-           <button onClick={() => setIsViewOpen(false)} className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-primary transition-all shadow-xl shadow-slate-200">Close</button>
+            {/* Navigation Bar */}
+            <div className="px-8 bg-slate-50/50 border-b border-slate-100 flex items-center gap-1 shrink-0">
+                {(['overview', 'history'] as const).map((tab) => (
+                    <button
+                        key={tab}
+                        onClick={() => setActiveModalTab(tab)}
+                        className={`px-5 py-4 text-sm font-medium transition-all relative capitalize ${activeModalTab === tab ? 'text-primary' : 'text-slate-500 hover:text-slate-800'}`}
+                    >
+                        {tab === 'overview' ? 'Overview' : 'Faculty History'}
+                        {activeModalTab === tab && (
+                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full transition-all" />
+                        )}
+                    </button>
+                ))}
+            </div>
+
+            {/* Content Area */}
+            <div className="flex-1 overflow-y-auto p-8 scrollbar-hide bg-white">
+                {selectedSalary && (
+                    <div className="animate-in fade-in duration-500">
+                        {activeModalTab === 'overview' && (
+                            <div className="space-y-10">
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    {[
+                                        { label: 'Settlement Month', value: selectedSalary.month, icon: Calendar, color: 'bg-primary/5 text-primary border-primary/10' },
+                                        { label: 'Sessions Conducted', value: `${selectedSalary.sessionsConducted} Units`, icon: Activity, color: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
+                                        { label: 'Final Payout', value: `LKR ${selectedSalary.netAmount?.toLocaleString()}`, icon: DollarSign, color: 'bg-indigo-50 text-indigo-500 border-indigo-100' },
+                                        { label: 'Authorization', value: selectedSalary.status.toUpperCase(), icon: ShieldCheck, color: 'bg-slate-50 text-slate-500 border-slate-200' },
+                                    ].map((stat, i) => (
+                                        <div key={i} className={`p-4 rounded-xl border flex flex-col gap-2 ${stat.color}`}>
+                                            <stat.icon className="w-4 h-4" />
+                                            <div>
+                                                <p className="text-[10px] font-bold uppercase tracking-wider opacity-60 mb-0.5">{stat.label}</p>
+                                                <p className="text-base font-bold tracking-tight">{stat.value}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                                    <div className="space-y-8">
+                                        <div>
+                                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Class Assignment</h4>
+                                            <div className="p-6 rounded-[2rem] border border-slate-100 bg-slate-50/50 group hover:border-primary/20 transition-all">
+                                                <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-primary mb-4 shadow-sm group-hover:scale-110 transition-transform">
+                                                   <BookOpen className="w-5 h-5" />
+                                                </div>
+                                                <h5 className="font-bold text-slate-800 text-lg leading-tight mb-1">{cleanClassName(selectedSalary.className)}</h5>
+                                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-loose">Institutional Academic Unit</p>
+                                                
+                                                <div className="mt-6 pt-6 border-t border-slate-200/50 space-y-3">
+                                                    <div className="flex justify-between items-center text-xs">
+                                                        <span className="font-semibold text-slate-400">Class ID</span>
+                                                        <span className="font-mono text-[10px] text-slate-600 font-bold">{selectedSalary.classId.substring(0, 10).toUpperCase()}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="lg:col-span-2 space-y-8">
+                                        <div>
+                                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Settlement Metrics</h4>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="p-6 bg-white border border-slate-100 rounded-3xl shadow-sm space-y-4">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-500"><Users className="w-4 h-4" /></div>
+                                                        <div>
+                                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Census Data</p>
+                                                            <p className="text-sm font-bold text-slate-800">{selectedSalary.studentCount} Registered Students</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-500"><CreditCard className="w-4 h-4" /></div>
+                                                        <div>
+                                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Unit Revenue</p>
+                                                            <p className="text-sm font-bold text-slate-800">LKR {selectedSalary.monthlyFee?.toLocaleString()} / Student</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="p-6 bg-slate-900 text-white rounded-3xl shadow-xl shadow-slate-200 relative overflow-hidden group">
+                                                    <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl"></div>
+                                                    <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-4">Total Unit Value</p>
+                                                    <p className="text-2xl font-black tabular-nums mb-1">LKR {selectedSalary.totalMonthlyRevenue?.toLocaleString()}</p>
+                                                    <p className="text-[9px] font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-2">
+                                                       <TrendingUp className="w-3 h-3" /> Fully Leveraged
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeModalTab === 'history' && (
+                            <div className="space-y-6">
+                                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                                    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Historical Settlement Records</h4>
+                                    <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100 uppercase tracking-widest">
+                                        {salaries.filter(s => s.teacherId === selectedSalary.teacherId).length} Records Found
+                                    </span>
+                                </div>
+                                <div className="overflow-hidden border border-slate-100 rounded-2xl shadow-sm">
+                                    <table className="w-full text-sm text-left">
+                                        <thead className="bg-slate-50/80 text-slate-400 font-bold uppercase text-[10px] tracking-widest border-b border-slate-100">
+                                            <tr>
+                                                <th className="px-6 py-4">Settlement Cycle</th>
+                                                <th className="px-6 py-4">Class Unit</th>
+                                                <th className="px-6 py-4 text-right">Amount</th>
+                                                <th className="px-6 py-4 text-center">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {salaries.filter(s => s.teacherId === selectedSalary.teacherId).map((prev) => (
+                                                <tr key={prev.id} className={`hover:bg-slate-50/50 transition-colors ${prev.id === selectedSalary.id ? 'bg-primary/5' : ''}`}>
+                                                    <td className="px-6 py-5">
+                                                        <p className="font-bold text-slate-700 tabular-nums leading-none">{prev.month}</p>
+                                                        <p className="text-[10px] text-slate-400 mt-1.5 font-medium">{formatDate(prev.createdAt)}</p>
+                                                    </td>
+                                                    <td className="px-6 py-5">
+                                                        <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded uppercase">{cleanClassName(prev.className)}</span>
+                                                    </td>
+                                                    <td className="px-6 py-5 text-right font-black text-slate-900 tabular-nums">LKR {prev.netAmount?.toLocaleString()}</td>
+                                                    <td className="px-6 py-5 text-center">
+                                                        <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${prev.status === 'paid' ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                                                            {prev.status}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* Footer Segment */}
+            <div className="px-8 py-5 border-t border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
+                <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-slate-300" />
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pt-0.5">Reference Index: #{selectedSalary?.id.slice(-12).toUpperCase()}</p>
+                </div>
+                <button 
+                    onClick={() => setIsViewOpen(false)}
+                    className="px-8 py-2.5 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-black transition-all shadow-xl active:scale-95"
+                >
+                    Close Record
+                </button>
+            </div>
         </div>
-      </Modal>
+      </div>
 
 
       {/* Main Workspace */}
@@ -393,7 +566,8 @@ export default function SalariesPage() {
                 <thead className="bg-slate-50/50 text-slate-500 font-medium border-b border-slate-100 uppercase text-[10px] tracking-wider">
                   <tr>
                     <th className="px-6 py-4">Teacher</th>
-                    <th className="px-6 py-4">Month</th>
+                    <th className="px-6 py-4 text-center">Month</th>
+                    <th className="px-6 py-4">Requested Date</th>
                     <th className="px-6 py-4">Paid Date</th>
                     <th className="px-6 py-4 text-right">Amount</th>
                     <th className="px-6 py-4 text-center">Status</th>
@@ -404,7 +578,7 @@ export default function SalariesPage() {
                   {loading ? (
                     [1, 2, 3, 4, 5].map((i) => (
                       <tr key={i} className="animate-pulse">
-                        <td colSpan={6} className="px-6 py-6">
+                        <td colSpan={7} className="px-6 py-6">
                            <div className="h-10 bg-slate-50 rounded-lg w-full"></div>
                         </td>
                       </tr>
@@ -414,12 +588,20 @@ export default function SalariesPage() {
                       <tr key={item.id} className="hover:bg-slate-50/50 transition-colors group/row">
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-sm border border-slate-200 relative group-hover/row:border-primary/30 transition-all">
-                              {item.teacherName?.charAt(0)}
+                            <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center font-bold text-sm border border-slate-200 relative group-hover/row:border-primary/30 transition-all overflow-hidden">
+                              {teachersData[item.teacherId]?.photoURL ? (
+                                <img src={teachersData[item.teacherId]?.photoURL} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                (teachersData[item.teacherId]?.name || item.teacherName || "?").charAt(0)
+                              )}
                             </div>
                             <div>
-                                <p className="font-semibold text-slate-800 hover:text-primary transition-colors leading-none">{item.teacherName}</p>
-                                <p className="text-[10px] text-slate-500 mt-1">ID: {item.id.slice(-6).toUpperCase()}</p>
+                                <p className="font-semibold text-slate-800 hover:text-primary transition-colors leading-none">
+                                  {teachersData[item.teacherId]?.name || item.teacherName || "Unknown Faculty"}
+                                </p>
+                                <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-tight font-medium">
+                                  {teachersData[item.teacherId]?.teacherId || "N/A"} • {cleanClassName(item.className)}
+                                </p>
                             </div>
                           </div>
                         </td>
@@ -430,6 +612,9 @@ export default function SalariesPage() {
                         </td>
                         <td className="px-6 py-4 text-xs font-medium text-slate-500">
                             {formatDate(item.createdAt)}
+                        </td>
+                        <td className="px-6 py-4 text-xs font-medium text-slate-500">
+                            {item.status === 'paid' ? formatDate(item.paidAt) : <span className="text-slate-300 italic">Pending...</span>}
                         </td>
                         <td className="px-6 py-4 text-right">
                             <p className="font-bold text-slate-900 tabular-nums">LKR {item.netAmount?.toLocaleString()}</p>
