@@ -143,7 +143,7 @@ export default function SalariesPage() {
       loadData();
     } catch (error) {
       console.error("Deletion error:", error);
-      toast.error("Critical Integrity Failure: Fiscal rollback process failed. Please contact system architect.");
+      toast.error("Failed to delete record. Please try again.");
     } finally {
       setActionLoading(false);
     }
@@ -241,7 +241,7 @@ export default function SalariesPage() {
           onClick={() => setIsModalOpen(true)}
           className="px-5 py-2.5 bg-slate-900 text-white rounded-xl text-[11px] font-bold hover:bg-black transition-all flex items-center gap-2 shadow-sm"
         >
-          <CreditCard className="w-3.5 h-3.5" /> Send Payment
+          <CreditCard className="w-3.5 h-3.5" /> Process Salary
         </button>
       </div>
 

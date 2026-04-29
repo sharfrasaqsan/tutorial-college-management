@@ -1,30 +1,31 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { doc, getDoc, collection, query, where, getDocs, Timestamp, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { 
-  X, Mail, Phone, MapPin, 
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Mail, Phone, MapPin, 
   BookOpen, Clock, Calendar, Activity,
-  ArrowUpRight, Loader2, Briefcase, Award, Hash
+  ArrowUpRight, Loader2, Briefcase, Award, Hash, Download
 } from "lucide-react";
-import { Teacher, Class, Salary } from "@/types/models";
+import { Teacher, Class, Salary, AttendanceRecord } from "@/types/models";
 import { formatTime } from "@/lib/formatters";
 import Skeleton from "@/components/ui/Skeleton";
 import ClassProfileModal from "@/components/admin/ClassProfileModal";
 
-interface TeacherProfileModalProps {
+interface TeacherProfileViewProps {
   teacherId: string;
-  isOpen: boolean;
-  onClose: () => void;
 }
 
-export default function TeacherProfileModal({ teacherId, isOpen, onClose }: TeacherProfileModalProps) {
+export default function TeacherProfileView({ teacherId }: TeacherProfileViewProps) {
+  const router = useRouter();
   const [teacher, setTeacher] = useState<Teacher | null>(null);
   const [assignedClasses, setAssignedClasses] = useState<Class[]>([]);
   const [recentSalaries, setRecentSalaries] = useState<Salary[]>([]);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'classes' | 'financials' | 'administration'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'classes' | 'attendance' | 'financials' | 'administration'>('overview');
+  const [selectedMonth, setSelectedMonth] = useState("all");
   
   // Class Profile View State
   const [isClassViewOpen, setIsClassViewOpen] = useState(false);
@@ -57,6 +58,16 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
       const salarySnap = await getDocs(salaryQuery);
       setRecentSalaries(salarySnap.docs.map(d => ({ id: d.id, ...d.data() } as Salary)));
 
+      // 4. Fetch Recent Attendance (Session Completions)
+      const attendanceQuery = query(
+        collection(db, "attendance"),
+        where("teacherId", "==", teacherId),
+        orderBy("createdAt", "desc"),
+        limit(50)
+      );
+      const attendanceSnap = await getDocs(attendanceQuery);
+      setAttendanceRecords(attendanceSnap.docs.map(d => ({ id: d.id, ...d.data() } as AttendanceRecord)));
+
     } catch (error) {
       console.error("Error loading teacher profile:", error);
     } finally {
@@ -64,14 +75,24 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
     }
   }, [teacherId]);
 
+  const filteredAttendance = useMemo(() => {
+    return attendanceRecords.filter(r => {
+      if (selectedMonth === "all") return true;
+      return r.date.startsWith(selectedMonth);
+    });
+  }, [attendanceRecords, selectedMonth]);
+
+  const availableMonths = useMemo(() => {
+    const months = new Set(attendanceRecords.map(r => r.date.substring(0, 7)));
+    return Array.from(months).sort().reverse();
+  }, [attendanceRecords]);
+
   useEffect(() => {
-    if (isOpen && teacherId) {
+    if (teacherId) {
       setActiveTab('overview');
       loadTeacherData();
     }
-  }, [isOpen, teacherId, loadTeacherData]);
-
-  if (!isOpen) return null;
+  }, [teacherId, loadTeacherData]);
 
   const formatDate = (date: any) => {
     if (!date) return 'N/A';
@@ -80,14 +101,19 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
   };
 
   return (
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8 transition-all duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
-      {/* Backdrop */}
-      <div className={`fixed inset-0 bg-slate-900/40 transition-all duration-300 ${isOpen ? "backdrop-blur-sm" : ""}`} onClick={onClose}></div>
-
-      <div className={`relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all duration-300 ease-out flex flex-col h-[85vh] ${isOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
+    <div className="flex flex-col pb-20">
+        <div className="flex items-center justify-between mb-6">
+            <button 
+                onClick={() => router.back()} 
+                className="flex items-center gap-2 px-4 py-2 bg-white text-slate-600 rounded-xl text-[11px] font-bold hover:bg-slate-50 transition-all shadow-sm border border-slate-200"
+            >
+                <ArrowLeft className="w-3.5 h-3.5" /> Back
+            </button>
+        </div>
+      <div className="w-full flex flex-col gap-6">
         
-        {/* Header - Exact parity with StudentProfileModal */}
-        <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white z-10 shrink-0">
+        {/* Header */}
+        <div className="px-8 py-6 bg-white rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between z-10 shrink-0">
             <div className="flex items-center gap-5">
                 <div className="w-14 h-14 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-primary text-xl font-bold">
                     {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : teacher?.name.charAt(0).toUpperCase()}
@@ -107,32 +133,26 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
                     </div>
                 </div>
             </div>
-            <button 
-                onClick={onClose}
-                className="p-2.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all group"
-            >
-                <X className="w-5 h-5" />
-            </button>
         </div>
 
-        {/* Professional Navigation Bar - Exact parity with StudentProfileModal */}
-        <div className="px-8 bg-slate-50/50 border-b border-slate-100 flex items-center gap-1 shrink-0">
-            {(['overview', 'classes', 'financials', 'administration'] as const).map((tab) => (
+        {/* Navigation Bar */}
+        <div className="flex items-center gap-2 shrink-0 scrollbar-hide overflow-x-auto">
+            {(['overview', 'classes', 'attendance', 'financials', 'administration'] as const).map((tab) => (
                 <button
                     key={tab}
-                    onClick={() => setActiveTab(tab)}
-                    className={`px-5 py-4 text-sm font-medium transition-all relative capitalize ${activeTab === tab ? 'text-primary' : 'text-slate-500 hover:text-slate-800'}`}
+                    onClick={() => {
+                        setActiveTab(tab);
+                        setSelectedMonth("all");
+                    }}
+                    className={`px-5 py-2.5 text-sm font-semibold transition-all rounded-xl capitalize shrink-0 ${activeTab === tab ? 'bg-primary text-white shadow-md' : 'bg-white text-slate-500 hover:text-slate-800 border border-slate-200 shadow-sm'}`}
                 >
-                    {tab === 'overview' ? 'Overview' : tab === 'classes' ? 'Classes' : tab === 'financials' ? 'Payments' : 'Profile'}
-                    {activeTab === tab && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
-                    )}
+                    {tab === 'overview' ? 'Overview' : tab === 'classes' ? 'Classes' : tab === 'attendance' ? 'Attendance' : tab === 'financials' ? 'Payments' : 'Profile'}
                 </button>
             ))}
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-8 scrollbar-hide bg-white">
+        <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
             {loading ? (
                 <div className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -142,7 +162,7 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
                     </div>
                 </div>
             ) : teacher && (
-                <div className="space-y-10 animate-in fade-in duration-500">
+                <div className="min-h-[400px] animate-in fade-in duration-500">
                     
                     {activeTab === 'overview' && (
                         <div className="space-y-10">
@@ -220,7 +240,15 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
                     {activeTab === 'classes' && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-right-10 duration-500">
                              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Assigned Classes</h4>
+                                <div className="flex items-center gap-3">
+                                    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Assigned Classes</h4>
+                                    <button 
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-400 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-slate-100 opacity-50 cursor-not-allowed"
+                                    >
+                                        <Download className="w-3 h-3" />
+                                        Export List
+                                    </button>
+                                </div>
                                 <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100 uppercase tracking-widest">{assignedClasses.length} Classes</span>
                              </div>
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -255,24 +283,10 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
                                             {cls.schedules && cls.schedules.length > 0 && (
                                                 <div className="mt-4 pt-4 border-t border-slate-50 space-y-2">
                                                     <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.2em] mb-2">Class Timetable</p>
-                                                    {cls.schedules.map((sched, idx) => (
-                                                        <div key={idx} className="flex items-center justify-between bg-slate-50/50 rounded-lg px-3 py-2 border border-slate-100/50">
-                                                            <div className="flex items-center gap-2">
-                                                                <div className="w-1.5 h-1.5 rounded-full bg-primary/40"></div>
-                                                                <span className="text-[10px] font-bold text-slate-600 capitalize">{sched.dayOfWeek}</span>
-                                                            </div>
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-500">
-                                                                    <Clock className="w-3 h-3" />
-                                                                    {formatTime(sched.startTime)} - {formatTime(sched.endTime)}
-                                                                </div>
-                                                                {sched.room && (
-                                                                    <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 border-l border-slate-200 pl-3">
-                                                                        <MapPin className="w-3 h-3" />
-                                                                        {sched.room}
-                                                                    </div>
-                                                                )}
-                                                            </div>
+                                                    {cls.schedules.map((s, idx) => (
+                                                        <div key={idx} className="flex items-center gap-2 text-[10px] font-bold text-slate-500">
+                                                            <Clock className="w-3 h-3 text-primary/40" />
+                                                            <span>{s.dayOfWeek} • {formatTime(s.startTime)} - {formatTime(s.endTime)}</span>
                                                         </div>
                                                     ))}
                                                 </div>
@@ -288,10 +302,95 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
                         </div>
                     )}
 
+                    {activeTab === 'attendance' && (
+                        <div className="space-y-6 animate-in fade-in slide-in-from-right-10 duration-500">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                                <div className="flex items-center gap-3">
+                                    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Session Completions</h4>
+                                    <button 
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors text-[10px] font-bold uppercase tracking-widest border border-slate-200"
+                                    >
+                                        <Download className="w-3 h-3" />
+                                        Export History
+                                    </button>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <select
+                                        value={selectedMonth}
+                                        onChange={(e) => setSelectedMonth(e.target.value)}
+                                        className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+                                    >
+                                        <option value="all">All Sessions</option>
+                                        {availableMonths.map(m => (
+                                            <option key={m} value={m}>{new Date(m + "-01").toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</option>
+                                        ))}
+                                    </select>
+                                    <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100 uppercase tracking-widest">{filteredAttendance.length} Sessions</span>
+                                </div>
+                            </div>
+
+                            <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-slate-50/50 text-slate-500 border-b border-slate-100">
+                                        <tr>
+                                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Date & Time</th>
+                                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Academic Unit</th>
+                                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Headcount</th>
+                                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-right">Rate</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {filteredAttendance.length > 0 ? filteredAttendance.map((record) => (
+                                            <tr key={record.id} className="hover:bg-slate-50/30 transition-colors">
+                                                <td className="px-6 py-3">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-500">
+                                                            <Calendar className="w-4 h-4" />
+                                                        </div>
+                                                        <span className="font-semibold text-slate-700">{formatDate(record.date)}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-3">
+                                                    <p className="font-bold text-slate-800">{record.className}</p>
+                                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-0.5">{record.grade} • {record.subject}</p>
+                                                </td>
+                                                <td className="px-6 py-3 font-semibold text-slate-600">
+                                                    {record.totalPresent} Present / {record.totalPresent + record.totalAbsent} Total
+                                                </td>
+                                                <td className="px-6 py-3 text-right">
+                                                    <span className={`px-2 py-1 rounded text-[10px] font-black ${
+                                                        (record.totalPresent / (record.totalPresent + record.totalAbsent)) >= 0.8 
+                                                        ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
+                                                    }`}>
+                                                        {Math.round((record.totalPresent / (record.totalPresent + record.totalAbsent)) * 100)}%
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        )) : (
+                                            <tr>
+                                                <td colSpan={4} className="px-6 py-12 text-center text-slate-400 font-medium italic">
+                                                    No session records found for this period
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
                     {activeTab === 'financials' && (
                         <div className="space-y-6 animate-in fade-in slide-in-from-left-10 duration-500">
                              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Payment History</h4>
+                                <div className="flex items-center gap-3">
+                                    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Payment History</h4>
+                                    <button 
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all border border-indigo-100 text-[10px] font-bold uppercase tracking-widest"
+                                    >
+                                        <Download className="w-3 h-3" />
+                                        Download Ledger
+                                    </button>
+                                </div>
                                 <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100 uppercase tracking-widest">{recentSalaries.length} Records</span>
                              </div>
                              <div className="overflow-hidden border border-slate-100 rounded-2xl">
@@ -372,21 +471,6 @@ export default function TeacherProfileModal({ teacherId, isOpen, onClose }: Teac
             )}
         </div>
 
-        {/* Global Footer */}
-        <div className="px-8 py-5 border-t border-slate-100 flex justify-between items-center bg-slate-50/50">
-            <div className="flex items-center gap-2">
-                <Activity className="w-4 h-4 text-slate-300" />
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pt-0.5">Note: Details verified</p>
-            </div>
-            <div className="flex gap-3">
-                <button 
-                    onClick={onClose}
-                    className="px-8 py-2.5 bg-slate-100 text-slate-600 text-[10px] font-black uppercase tracking-widest rounded-lg border border-slate-200 hover:bg-white transition-all shadow-sm active:scale-95"
-                >
-                    Close
-                </button>
-            </div>
-        </div>
       </div>
 
       <ClassProfileModal 

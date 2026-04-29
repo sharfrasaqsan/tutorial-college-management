@@ -47,7 +47,7 @@ export default function AdminNotificationsPage() {
       {/* 🏛️ Header Segment */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 py-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">System Activity Log</h1>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Activity Log</h1>
           <p className="text-xs font-bold text-slate-400 mt-1 uppercase tracking-widest flex items-center gap-2">
             <History className="w-3.5 h-3.5" /> Centralized Institutional Event Feed • {unreadCount} Pending
           </p>

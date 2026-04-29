@@ -62,6 +62,7 @@ export interface UnpaidDetail {
 export interface SalaryRequestDetail {
     id: string;
     teacherName: string;
+    className: string;
     amount: number;
     requestDate: string;
 }

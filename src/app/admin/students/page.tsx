@@ -70,6 +70,10 @@ export default function StudentsPage() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [calculatingArrears, setCalculatingArrears] = useState(false);
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
   // Payment Modal State
   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
   const [paymentStudentId, setPaymentStudentId] = useState<string | null>(null);
@@ -413,7 +417,7 @@ export default function StudentsPage() {
       {!selectedGradeId && !forceShowAll && (
         <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
           <div className="p-10 rounded-[2.5rem] border-2 border-dashed border-slate-100 bg-slate-50/50 flex flex-col items-center justify-center text-center">
-            <div className="w-20 h-20 rounded-full bg-white shadow-xl flex items-center justify-center text-primary mb-6 animate-bounce transition-all duration-1000">
+            <div className="w-20 h-20 rounded-full bg-white shadow-xl flex items-center justify-center text-primary mb-6 animate-float">
               <GraduationCap className="w-10 h-10" />
             </div>
             <h3 className="text-xl font-bold text-slate-800">
@@ -755,7 +759,7 @@ export default function StudentsPage() {
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {filteredStudents.length > 0 ? (
-                    filteredStudents.map((student) => (
+                    filteredStudents.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((student) => (
                       <tr
                         key={student.id}
                         className={`hover:bg-slate-50/50 transition-colors ${student.status === "inactive" ? "opacity-60 bg-slate-50/30" : ""}`}
@@ -893,7 +897,47 @@ export default function StudentsPage() {
             )}
           </div>
 
-          <div className="p-4 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500 bg-slate-50"></div>
+          {/* Pagination */}
+          {filteredStudents.length > itemsPerPage && (
+            <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/30">
+              <p className="text-xs text-slate-500 font-medium">
+                Showing <span className="font-bold text-slate-800">{(currentPage - 1) * itemsPerPage + 1}</span> to{" "}
+                <span className="font-bold text-slate-800">{Math.min(currentPage * itemsPerPage, filteredStudents.length)}</span> of{" "}
+                <span className="font-bold text-slate-800">{filteredStudents.length}</span> students
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(p => p - 1)}
+                  className="p-2 border border-slate-200 rounded-lg hover:bg-white text-slate-400 disabled:opacity-30 transition-all"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                {Array.from({ length: Math.ceil(filteredStudents.length / itemsPerPage) }, (_, i) => i + 1)
+                  .filter(p => Math.abs(p - currentPage) <= 1 || p === 1 || p === Math.ceil(filteredStudents.length / itemsPerPage))
+                  .map((p, idx, arr) => (
+                    <div key={p} className="flex items-center gap-1">
+                      {idx > 0 && arr[idx - 1] !== p - 1 && <span className="text-slate-300 mx-1">...</span>}
+                      <button
+                        onClick={() => setCurrentPage(p)}
+                        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                          currentPage === p ? "bg-primary text-white shadow-md" : "bg-white border border-slate-200 text-slate-600 hover:border-primary/30"
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    </div>
+                  ))}
+                <button
+                  disabled={currentPage === Math.ceil(filteredStudents.length / itemsPerPage)}
+                  onClick={() => setCurrentPage(p => p + 1)}
+                  className="p-2 border border-slate-200 rounded-lg hover:bg-white text-slate-400 disabled:opacity-30 transition-all"
+                >
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

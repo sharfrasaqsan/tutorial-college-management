@@ -12,8 +12,8 @@ import {
 import { Class, Teacher, Student, Subject, Grade } from "@/types/models";
 import Skeleton from "@/components/ui/Skeleton";
 import { formatTime } from "@/lib/formatters";
-import StudentProfileModal from "@/components/admin/StudentProfileModal";
 import ClassModal from "@/components/admin/ClassModal";
+import { useStudentProfile } from "@/context/StudentProfileContext";
 
 interface ClassProfileModalProps {
   classId: string;
@@ -33,9 +33,7 @@ export default function ClassProfileModal({ classId, isOpen, onClose, isTeacherV
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Student Profile View State
-  const [isStudentViewOpen, setIsStudentViewOpen] = useState(false);
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const { openStudentProfile } = useStudentProfile();
   
   // Edit Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -192,8 +190,7 @@ export default function ClassProfileModal({ classId, isOpen, onClose, isTeacherV
   }, [classId]);
 
   const handleStudentView = (id: string) => {
-    setSelectedStudentId(id);
-    setIsStudentViewOpen(true);
+    openStudentProfile(id);
   };
 
   const handleSyncStats = async () => {
@@ -656,14 +653,7 @@ export default function ClassProfileModal({ classId, isOpen, onClose, isTeacherV
         </div>
       </div>
 
-      <StudentProfileModal 
-        isOpen={isStudentViewOpen}
-        onClose={() => {
-            setIsStudentViewOpen(false);
-            setSelectedStudentId(null);
-        }}
-        studentId={selectedStudentId || ""}
-      />
+
 
       <ClassModal 
         isOpen={isEditModalOpen}

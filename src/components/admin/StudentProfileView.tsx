@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { doc, getDoc, collection, query, where, getDocs, Timestamp, orderBy, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { 
-  X, Phone, MapPin, 
+  Phone, MapPin, 
   BookOpen, Calendar, Activity,
   Loader2, Award, Hash, Clock,
   Trash2, Download, ShieldCheck, GraduationCap,
@@ -15,29 +15,34 @@ import Skeleton from "@/components/ui/Skeleton";
 import ConfirmModal from "@/components/ui/ConfirmModal";
 import PaymentModal from "@/components/admin/PaymentModal";
 import toast from "react-hot-toast";
-import { generateStudentPaymentPDF, generateStudentIDCardPDF, generateStudentPaymentHistoryPDF } from "@/lib/pdf-generator";
+import { generateStudentPaymentPDF, generateStudentIDCardPDF, generateStudentPaymentHistoryPDF, generateStudentAttendanceHistoryPDF } from "@/lib/pdf-generator";
 import { format } from "date-fns";
 import { formatTime } from "@/lib/formatters";
 import QRCode from "qrcode";
 
-interface StudentProfileModalProps {
+import { useRouter } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
+
+interface StudentProfileViewProps {
   studentId: string;
-  isOpen: boolean;
-  onClose: () => void;
 }
 
-export default function StudentProfileModal({ studentId, isOpen, onClose }: StudentProfileModalProps) {
+export default function StudentProfileView({ studentId }: StudentProfileViewProps) {
+  const router = useRouter();
   const [student, setStudent] = useState<Student | null>(null);
   const [enrolledClasses, setEnrolledClasses] = useState<Class[]>([]);
   const [paymentHistory, setPaymentHistory] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'overview' | 'classes' | 'financials' | 'administration'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'classes' | 'financials' | 'attendance' | 'administration'>('overview');
   const [deletingPayment, setDeletingPayment] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [paymentToDeleteId, setPaymentToDeleteId] = useState<string | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>("");
   const [generatingId, setGeneratingId] = useState(false);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [attendanceHistory, setAttendanceHistory] = useState<any[]>([]);
+  const [attendanceFilter, setAttendanceFilter] = useState<string>('all');
+  const [attendanceMonthFilter, setAttendanceMonthFilter] = useState<string>('all');
 
   const loadStudentData = useCallback(async () => {
     setLoading(true);
@@ -67,7 +72,47 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
       const paySnap = await getDocs(payQuery);
       setPaymentHistory(paySnap.docs.map(d => ({ id: d.id, ...d.data() } as any)));
 
-      // 4. Generate QR Code
+      // 4. Fetch Attendance History
+      if (sData.enrolledClasses && sData.enrolledClasses.length > 0) {
+        const chunks = [];
+        for (let i = 0; i < sData.enrolledClasses.length; i += 10) {
+          chunks.push(sData.enrolledClasses.slice(i, i + 10));
+        }
+
+        const attendancePromises = chunks.map(chunk => 
+          getDocs(query(
+            collection(db, "attendance"),
+            where("classId", "in", chunk)
+          ))
+        );
+
+        const attendanceSnaps = await Promise.all(attendancePromises);
+        let allAtt: any[] = [];
+        attendanceSnaps.forEach(snap => {
+            snap.docs.forEach(d => {
+                const data = d.data();
+                const studentRecord = data.records?.find((r: any) => r.studentId === studentId);
+                if (studentRecord) {
+                    allAtt.push({
+                        id: d.id,
+                        classId: data.classId,
+                        className: data.className,
+                        date: data.date,
+                        startTime: data.startTime,
+                        teacherName: data.teacherName,
+                        subject: data.subject,
+                        isPresent: studentRecord.isPresent,
+                        createdAt: data.createdAt
+                    });
+                }
+            });
+        });
+        
+        allAtt.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setAttendanceHistory(allAtt);
+      }
+
+      // 5. Generate QR Code
       try {
         const qrData = await QRCode.toDataURL(sData.id, {
           margin: 1,
@@ -89,11 +134,11 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
   }, [studentId]);
 
   useEffect(() => {
-    if (isOpen && studentId) {
+    if (studentId) {
       setActiveTab('overview');
       loadStudentData();
     }
-  }, [isOpen, studentId, loadStudentData]);
+  }, [studentId, loadStudentData]);
 
   const openDeleteConfirm = (payId: string) => {
     setPaymentToDeleteId(payId);
@@ -154,7 +199,15 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
     }
   };
 
-  if (!isOpen) return null;
+  const handleDownloadAttendance = async () => {
+    if (!student || attendanceHistory.length === 0) return;
+    try {
+      await generateStudentAttendanceHistoryPDF(attendanceHistory, student);
+      toast.success("Attendance report generated.");
+    } catch (error) {
+      toast.error("Failed to generate report.");
+    }
+  };
 
   const formatDate = (date: any) => {
     if (!date) return 'N/A';
@@ -162,15 +215,46 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
     return format(d, "MMM dd, yyyy");
   };
 
-  return (
-    <div className={`fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-8 transition-all duration-300 ${isOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
-      {/* Backdrop */}
-      <div className={`fixed inset-0 bg-slate-900/40 transition-all duration-300 ${isOpen ? "backdrop-blur-sm" : ""}`} onClick={onClose}></div>
+  const getMonthValue = (date: any) => {
+    if (!date) return '';
+    const d = date instanceof Timestamp ? date.toDate() : new Date(date);
+    return format(d, "yyyy-MM");
+  };
 
-      <div className={`relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all duration-300 ease-out flex flex-col h-[85vh] ${isOpen ? "scale-100 opacity-100" : "scale-95 opacity-0"}`}>
+  const formatMonthLabel = (val: string) => {
+    if (!val) return '';
+    const [year, month] = val.split('-');
+    return format(new Date(parseInt(year), parseInt(month) - 1), "MMMM yyyy");
+  };
+
+  const uniqueClasses = Array.from(new Set(attendanceHistory.map(a => a.className)));
+  const uniqueMonths = Array.from(new Set(attendanceHistory.map(a => getMonthValue(a.date)))).filter(Boolean).sort().reverse();
+  
+  const filteredAttendance = attendanceHistory.filter(a => {
+    const matchClass = attendanceFilter === 'all' || a.className === attendanceFilter;
+    const matchMonth = attendanceMonthFilter === 'all' || getMonthValue(a.date) === attendanceMonthFilter;
+    return matchClass && matchMonth;
+  });
+
+  const totalAtt = filteredAttendance.length;
+  const presentAtt = filteredAttendance.filter(a => a.isPresent).length;
+  const absentAtt = totalAtt - presentAtt;
+  const attRate = totalAtt > 0 ? Math.round((presentAtt / totalAtt) * 100) : 0;
+
+  return (
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20">
+      <div className="flex items-center justify-between">
+          <button 
+            onClick={() => router.back()} 
+            className="flex items-center gap-2 px-4 py-2 bg-white text-slate-600 rounded-xl text-[11px] font-bold hover:bg-slate-50 transition-all shadow-sm border border-slate-200"
+          >
+              <ArrowLeft className="w-3.5 h-3.5" /> Back
+          </button>
+      </div>
+      <div className="w-full flex flex-col gap-6">
         
         {/* Header Segment */}
-        <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white z-10 shrink-0">
+        <div className="px-8 py-6 bg-white rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between z-10 shrink-0">
             <div className="flex items-center gap-5">
                 <div className="w-14 h-14 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-primary text-xl font-bold">
                     {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : student?.name.charAt(0).toUpperCase()}
@@ -207,33 +291,24 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
                     {generatingId ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <QrCode className="w-3.5 h-3.5" />}
                     Download ID
                 </button>
-                <button 
-                    onClick={onClose}
-                    className="p-2.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all group"
-                >
-                    <X className="w-5 h-5" />
-                </button>
             </div>
         </div>
 
         {/* Navigation Bar */}
-        <div className="px-8 bg-slate-50/50 border-b border-slate-100 flex items-center gap-1 shrink-0 scrollbar-hide overflow-x-auto">
-            {(['overview', 'classes', 'financials', 'administration'] as const).map((tab) => (
+        <div className="flex items-center gap-2 shrink-0 scrollbar-hide overflow-x-auto">
+            {(['overview', 'classes', 'financials', 'attendance', 'administration'] as const).map((tab) => (
                 <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
-                    className={`px-5 py-4 text-sm font-medium transition-all relative capitalize shrink-0 ${activeTab === tab ? 'text-primary' : 'text-slate-500 hover:text-slate-800'}`}
+                    className={`px-5 py-2.5 text-sm font-semibold transition-all rounded-xl capitalize shrink-0 ${activeTab === tab ? 'bg-primary text-white shadow-md' : 'bg-white text-slate-500 hover:text-slate-800 border border-slate-200 shadow-sm'}`}
                 >
-                    {tab === 'overview' ? 'Overview' : tab === 'classes' ? 'Enrollment' : tab === 'financials' ? 'Payments' : 'Profile'}
-                    {activeTab === tab && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full transition-all" />
-                    )}
+                    {tab === 'overview' ? 'Overview' : tab === 'classes' ? 'Enrollment' : tab === 'financials' ? 'Payments' : tab === 'attendance' ? 'Attendance' : 'Profile'}
                 </button>
             ))}
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-8 scrollbar-hide bg-white">
+        <div className="flex-1 bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
             {loading ? (
                 <div className="space-y-6">
                     <Skeleton variant="rect" width="100%" height="150px" className="rounded-2xl" />
@@ -243,7 +318,7 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
                     </div>
                 </div>
             ) : student && (
-                <div className="animate-in fade-in duration-500">
+                <div className="min-h-[400px] animate-in fade-in duration-500">
                     {activeTab === 'overview' && (
                         <div className="space-y-10">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -337,7 +412,15 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
                     {activeTab === 'classes' && (
                         <div className="space-y-6 animate-in slide-in-from-right-10 duration-500">
                              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                                <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Course Enrollment</h4>
+                                <div className="flex items-center gap-3">
+                                    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Course Enrollment</h4>
+                                    <button 
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-400 rounded-lg text-[10px] font-bold uppercase tracking-widest border border-slate-100 opacity-50 cursor-not-allowed"
+                                    >
+                                        <Download className="w-3 h-3" />
+                                        Export List
+                                    </button>
+                                </div>
                                 <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100 uppercase tracking-widest">{enrolledClasses.length} Active Units</span>
                              </div>
                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -398,7 +481,7 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
                                     <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Fee Collection History</h4>
                                     <button 
                                         onClick={handleDownloadHistory}
-                                        className="flex items-center gap-2 px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-indigo-600 hover:text-white transition-all border border-indigo-100"
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-all border border-indigo-100 text-[10px] font-bold uppercase tracking-widest"
                                     >
                                         <Download className="w-3 h-3" />
                                         Download History
@@ -457,6 +540,107 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
                              </div>
                         </div>
                     )}
+                    {activeTab === 'attendance' && (
+                        <div className="space-y-6 animate-in slide-in-from-left-10 duration-500">
+                             <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                                <div className="flex items-center gap-3">
+                                    <h4 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Attendance Tracking</h4>
+                                    <button 
+                                        onClick={handleDownloadAttendance}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors text-[10px] font-bold uppercase tracking-widest"
+                                    >
+                                        <Download className="w-3 h-3" />
+                                        Export Log
+                                    </button>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    {uniqueMonths.length > 0 && (
+                                        <select 
+                                            value={attendanceMonthFilter}
+                                            onChange={(e) => setAttendanceMonthFilter(e.target.value)}
+                                            className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 uppercase tracking-widest outline-none focus:border-primary"
+                                        >
+                                            <option value="all">All Months</option>
+                                            {uniqueMonths.map(month => (
+                                                <option key={month} value={month}>{formatMonthLabel(month)}</option>
+                                            ))}
+                                        </select>
+                                    )}
+                                    {uniqueClasses.length > 0 && (
+                                        <select 
+                                            value={attendanceFilter}
+                                            onChange={(e) => setAttendanceFilter(e.target.value)}
+                                            className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-[11px] font-bold text-slate-600 uppercase tracking-widest outline-none focus:border-primary"
+                                        >
+                                            <option value="all">All Classes</option>
+                                            {uniqueClasses.map(cls => (
+                                                <option key={cls} value={cls}>{cls}</option>
+                                            ))}
+                                        </select>
+                                    )}
+                                    <span className="text-[10px] font-bold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-100 uppercase tracking-widest">{filteredAttendance.length} Sessions Logged</span>
+                                </div>
+                             </div>
+
+                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-2">
+                                <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 flex flex-col justify-center">
+                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Total Classes</span>
+                                    <span className="text-xl font-bold text-slate-800">{totalAtt}</span>
+                                </div>
+                                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 flex flex-col justify-center">
+                                    <span className="text-[9px] font-black text-emerald-600/70 uppercase tracking-widest mb-0.5">Present</span>
+                                    <span className="text-xl font-bold text-emerald-600">{presentAtt}</span>
+                                </div>
+                                <div className="bg-rose-50 border border-rose-100 rounded-xl p-3 flex flex-col justify-center">
+                                    <span className="text-[9px] font-black text-rose-600/70 uppercase tracking-widest mb-0.5">Absent</span>
+                                    <span className="text-xl font-bold text-rose-600">{absentAtt}</span>
+                                </div>
+                                <div className={`border rounded-xl p-3 flex flex-col justify-center ${attRate >= 80 ? 'bg-primary/5 border-primary/20' : attRate >= 50 ? 'bg-amber-50 border-amber-200' : 'bg-rose-50 border-rose-200'}`}>
+                                    <span className={`text-[9px] font-black uppercase tracking-widest mb-0.5 ${attRate >= 80 ? 'text-primary/70' : attRate >= 50 ? 'text-amber-600/70' : 'text-rose-600/70'}`}>Attendance Rate</span>
+                                    <span className={`text-xl font-bold ${attRate >= 80 ? 'text-primary' : attRate >= 50 ? 'text-amber-600' : 'text-rose-600'}`}>{attRate}%</span>
+                                </div>
+                             </div>
+
+                             <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+                                <table className="w-full text-left border-collapse">
+                                    <thead>
+                                        <tr className="bg-slate-50/80 border-b border-slate-100">
+                                            <th className="px-4 py-2.5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Date</th>
+                                            <th className="px-4 py-2.5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Class</th>
+                                            <th className="px-4 py-2.5 text-[9px] font-black text-slate-400 uppercase tracking-widest">Teacher</th>
+                                            <th className="px-4 py-2.5 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {filteredAttendance.length > 0 ? filteredAttendance.map((att) => (
+                                            <tr key={att.id} className="hover:bg-slate-50/50 transition-colors group">
+                                                <td className="px-4 py-2.5">
+                                                    <p className="text-xs font-bold text-slate-800">{formatDate(att.date)}</p>
+                                                    <p className="text-[9px] font-semibold text-slate-400 mt-0.5 uppercase tracking-widest">{formatTime(att.startTime)}</p>
+                                                </td>
+                                                <td className="px-4 py-2.5">
+                                                    <p className="text-xs font-bold text-slate-700">{att.className}</p>
+                                                    <p className="text-[9px] font-semibold text-slate-400 mt-0.5 uppercase tracking-widest">{att.subject}</p>
+                                                </td>
+                                                <td className="px-4 py-2.5">
+                                                    <p className="text-xs font-semibold text-slate-700">{att.teacherName}</p>
+                                                </td>
+                                                <td className="px-4 py-2.5 text-right">
+                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-widest ${att.isPresent ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                                        {att.isPresent ? 'Present' : 'Absent'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        )) : (
+                                            <tr>
+                                                <td colSpan={4} className="px-6 py-20 text-center text-slate-400 font-medium italic">No attendance records found for enrolled classes.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                             </div>
+                        </div>
+                    )}
 
                     {activeTab === 'administration' && (
                         <div className="space-y-10 animate-in fade-in duration-500">
@@ -504,17 +688,11 @@ export default function StudentProfileModal({ studentId, isOpen, onClose }: Stud
             )}
         </div>
 
-        <div className="px-8 py-5 border-t border-slate-100 flex justify-between items-center bg-slate-50/50">
+        <div className="px-8 py-5 border-t border-slate-100 flex justify-between items-center bg-white">
             <div className="flex items-center gap-2">
                 <ShieldCheck className="w-4 h-4 text-slate-300" />
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest pt-0.5">Note: Secure archive record</p>
             </div>
-            <button 
-                onClick={onClose}
-                className="px-8 py-2.5 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-black transition-all shadow-xl active:scale-95"
-            >
-                Close Profile
-            </button>
         </div>
       </div>
 

@@ -15,9 +15,9 @@ export const generateSalaryPDF = async (salary: Salary) => {
 
   try {
     const doc = new jsPDF();
-    const primaryColor = [79, 70, 229]; // Institutional Indigo
-    const secondaryColor = [30, 41, 59]; // Slate 800
-    const accentColor = [99, 102, 241]; // Light Indigo
+    const primaryColor = [29, 158, 117]; // SmartAcademy Emerald
+    const secondaryColor = [15, 23, 42]; // Slate 900
+    const accentColor = [52, 211, 153]; // Emerald 400
     const mutedColor = [148, 163, 184]; // Slate 400
 
     // Fetch linked sessions for detailed log
@@ -58,28 +58,28 @@ export const generateSalaryPDF = async (salary: Salary) => {
     const generationDate = formatDate(new Date());
 
     // --- Elegant Header Background ---
-    doc.setFillColor(30, 41, 59); // Dark Slate
+    doc.setFillColor(15, 23, 42); // Deep Slate
     doc.rect(0, 0, 210, 50, "F");
 
     // --- Institutional Branding ---
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(28);
+    doc.setFontSize(24);
     doc.setTextColor(255, 255, 255);
-    doc.text("SMART ACADEMY", 15, 25);
+    doc.text("SMART ACADEMY", 15, 24);
     
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(148, 163, 184);
-    doc.text("PREMIUM INSTITUTIONAL MANAGEMENT SYSTEM", 16, 33);
+    doc.text("INSTITUTIONAL MANAGEMENT SYSTEM", 16, 32);
 
     // --- Receipt Badge ---
-    doc.setFillColor(79, 70, 229); // Indigo
+    doc.setFillColor(29, 158, 117); // Emerald
     doc.roundedRect(150, 15, 45, 25, 3, 3, "F");
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(8);
+    doc.setFontSize(7);
     doc.setFont("helvetica", "bold");
     doc.text("REMITTANCE ADVICE", 155, 23);
-    doc.setFontSize(12);
+    doc.setFontSize(11);
     doc.text(`#SLY-${invoiceId}`, 155, 32);
 
     // --- Entity Info Section ---
@@ -91,11 +91,11 @@ export const generateSalaryPDF = async (salary: Salary) => {
     doc.text("ISSUED BY", 15, currentY);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-    doc.text("SMART ACADEMY ADMIN TERMINAL", 15, currentY + 6);
+    doc.text("SMART ACADEMY ADMINISTRATION", 15, currentY + 6);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100, 116, 139);
-    doc.text("Academic District 04, Colombo", 15, currentY + 11);
-    doc.text("Contact: +94 11 234 5678", 15, currentY + 16);
+    doc.text("Official Financial Division", 15, currentY + 11);
+    doc.text("Verified Institutional Document", 15, currentY + 16);
 
     // Teacher Info (Right)
     doc.setFontSize(9);
@@ -237,9 +237,9 @@ export const generateSalaryPDF = async (salary: Salary) => {
     doc.setFontSize(7);
     doc.text(`System Generated on ${generationDate} • Verification Code: ${invoiceId}`, 15, 290);
     
-    // Developer Credit
-    doc.setFont("helvetica", "bold");
-    doc.text("DEVELOPED BY: AM. SHARFRAS AQSAN (sharfrasaqsan@gmail.com • 0751230001)", 205, 290, { align: "right" });
+    // Footer Attribution
+    doc.setFont("helvetica", "normal");
+    doc.text("SmartAcademy Institutional Portal • Automated Financial Service", 205, 290, { align: "right" });
 
     // --- Save File ---
     const filename = `Salary_Slip_${teacherName.split(' ')[0]}_${salary.month}.pdf`;
@@ -280,7 +280,7 @@ export const generateStudentPaymentPDF = async (
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(148, 163, 184);
-    doc.text("OFFICIAL FEE COLLECTION TERMINAL", 16, 33);
+    doc.text("INSTITUTIONAL FEE COLLECTION", 16, 32);
 
     // --- Receipt Badge ---
     doc.setFillColor(16, 185, 129); // Emerald
@@ -304,8 +304,8 @@ export const generateStudentPaymentPDF = async (
     doc.text("SMART ACADEMY ACCOUNTS", 15, currentY + 6);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(100, 116, 139);
-    doc.text("Academic District 04, Colombo", 15, currentY + 11);
-    doc.text("Contact: +94 11 234 5678", 15, currentY + 16);
+    doc.text("Official Bursar's Office", 15, currentY + 11);
+    doc.text("Verified Payment Record", 15, currentY + 16);
 
     // Student Info (Right)
     doc.setFontSize(9);
@@ -408,8 +408,8 @@ export const generateStudentPaymentPDF = async (
     doc.setFontSize(7);
     doc.text(`System Verified on ${generationDate} • #ID-${invoiceId}`, 15, 290);
     
-    doc.setFont("helvetica", "bold");
-    doc.text("DEVELOPED BY: AM. SHARFRAS AQSAN (sharfrasaqsan@gmail.com • 0751230001)", 205, 290, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    doc.text("SmartAcademy Institutional Portal • Digital Receipt Service", 205, 290, { align: "right" });
 
     // --- Save File ---
     const filename = `Receipt_${studentName?.split(' ')[0]}_${monthName}.pdf`;
@@ -432,7 +432,7 @@ export const generateStudentListPDF = async (
     const generationDate = formatDate(new Date());
 
     // --- Elegant Header Background ---
-    doc.setFillColor(30, 41, 59); // Dark Slate
+    doc.setFillColor(15, 23, 42); // Deep Slate
     doc.rect(0, 0, 210, 40, "F");
 
     // --- Institutional Branding ---
@@ -490,8 +490,8 @@ export const generateStudentListPDF = async (
         doc.setFontSize(7);
         doc.text(`Page ${i} of ${pageCount} • Authentic Institutional Registry`, 15, 290);
         
-        doc.setFont("helvetica", "bold");
-        doc.text("DEVELOPED BY: AM. SHARFRAS AQSAN (sharfrasaqsan@gmail.com • 0751230001)", 205, 290, { align: "right" });
+        doc.setFont("helvetica", "normal");
+        doc.text("SmartAcademy Institutional Portal • Registry Division", 205, 290, { align: "right" });
     }
 
     doc.save(`${title.replace(/\s+/g, "_")}.pdf`);
@@ -512,7 +512,7 @@ export const generateClassListPDF = async (
     const generationDate = formatDate(new Date());
 
     // --- Elegant Header Background ---
-    doc.setFillColor(30, 41, 59); // Dark Slate
+    doc.setFillColor(15, 23, 42); // Deep Slate
     doc.rect(0, 0, 210, 40, "F");
 
     // --- Institutional Branding ---
@@ -601,7 +601,7 @@ export const generateMasterRosterPDF = async (
     const generationDate = formatDate(new Date());
 
     // --- Elegant Header Background ---
-    doc.setFillColor(30, 41, 59); // Dark Slate
+    doc.setFillColor(15, 23, 42); // Deep Slate
     doc.rect(0, 0, 210, 40, "F");
 
     // --- Institutional Branding ---
@@ -729,7 +729,7 @@ export const generateMasterClassRegistryPDF = async (
     const generationDate = formatDate(new Date());
 
     // --- Elegant Header Background ---
-    doc.setFillColor(30, 41, 59); // Dark Slate
+    doc.setFillColor(15, 23, 42); // Deep Slate
     doc.rect(0, 0, 210, 40, "F");
 
     // --- Institutional Branding ---
@@ -824,13 +824,394 @@ export const generateMasterClassRegistryPDF = async (
         doc.setFontSize(7);
         doc.text(`Page ${i} of ${pageCount} • Official Institutional Roster Directory`, 15, 290);
         
-        doc.setFont("helvetica", "bold");
-        doc.text("DEVELOPED BY: AM. SHARFRAS AQSAN (sharfrasaqsan@gmail.com • 0751230001)", 205, 290, { align: "right" });
+        doc.setFont("helvetica", "normal");
+        doc.text("SmartAcademy Institutional Portal • Official Registry Archive", 205, 290, { align: "right" });
     }
 
     doc.save(`Master_Registry_${generationDate.replace(/\s+/g, "_")}.pdf`);
   } catch (error) {
-    console.error("Master Class PDF Error:", error);
+    console.error("Master Class Registry PDF Error:", error);
+  }
+};
+
+export const generateStudentAttendanceHistoryPDF = async (
+  attendanceHistory: any[],
+  student: any,
+) => {
+  if (!attendanceHistory || attendanceHistory.length === 0 || !student) return;
+
+  try {
+    const doc = new jsPDF();
+    const secondaryColor = [30, 41, 59]; // Slate 800
+    const mutedColor = [148, 163, 184]; // Slate 400
+    const generationDate = formatDate(new Date());
+
+    // Calculate Stats
+    const totalSessions = attendanceHistory.length;
+    const presentCount = attendanceHistory.filter(a => a.isPresent).length;
+    const absentCount = totalSessions - presentCount;
+    const attendanceRate = totalSessions > 0 ? Math.round((presentCount / totalSessions) * 100) : 0;
+
+    // --- Elegant Header Background ---
+    doc.setFillColor(15, 23, 42); // Deep Slate
+    doc.rect(0, 0, 210, 50, "F");
+
+    // --- Institutional Branding ---
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(28);
+    doc.setTextColor(255, 255, 255);
+    doc.text("SMART ACADEMY", 15, 25);
+    
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(148, 163, 184);
+    doc.text("ATTENDANCE TRACKING REPORT", 16, 33);
+
+    // --- Rate Badge ---
+    doc.setFillColor(attendanceRate >= 80 ? 16 : attendanceRate >= 50 ? 245 : 239, attendanceRate >= 80 ? 185 : 158, attendanceRate >= 80 ? 129 : 68);
+    doc.roundedRect(150, 15, 45, 25, 3, 3, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("ATTENDANCE RATE", 155, 23);
+    doc.setFontSize(16);
+    doc.text(`${attendanceRate}%`, 155, 34);
+
+    // --- Entity Info Section ---
+    let currentY = 65;
+    
+    // Student Info (Left)
+    doc.setFontSize(9);
+    doc.setTextColor(mutedColor[0], mutedColor[1], mutedColor[2]);
+    doc.text("STUDENT PROFILE", 15, currentY);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.text(student.name?.toUpperCase() || "STUDENT", 15, currentY + 6);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 116, 139);
+    doc.text(`ID: ${student.studentId || "STD-XXX"}`, 15, currentY + 11);
+    doc.text(`Grade: ${student.grade || "Standard"}`, 15, currentY + 16);
+
+    // Summary Info (Right)
+    doc.setFontSize(9);
+    doc.setTextColor(mutedColor[0], mutedColor[1], mutedColor[2]);
+    doc.text("REPORT SUMMARY", 135, currentY);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.text(`${totalSessions} Total Sessions`, 135, currentY + 6);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Present: ${presentCount} | Absent: ${absentCount}`, 135, currentY + 11);
+    doc.text(`Generated: ${generationDate}`, 135, currentY + 16);
+
+    // --- Items List ---
+    currentY += 30;
+    doc.setFontSize(10);
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.setFont("helvetica", "bold");
+    doc.text("ATTENDANCE LOG", 15, currentY);
+
+    const bodyData = attendanceHistory.map((att) => [
+      formatDate(att.date),
+      formatTime(att.startTime),
+      `${att.className || "---"} • ${att.subject || "---"}`,
+      att.teacherName || "---",
+      {
+        content: att.isPresent ? "PRESENT" : "ABSENT",
+        styles: { textColor: att.isPresent ? [16, 185, 129] : [239, 68, 68] },
+      },
+    ]);
+
+    autoTable(doc, {
+      startY: currentY + 5,
+      head: [["Date", "Time", "Class & Subject", "Instructor", "Status"]],
+      body: bodyData as any,
+      theme: "grid",
+      headStyles: {
+        fillColor: [248, 250, 252],
+        textColor: [30, 41, 59],
+        fontSize: 8,
+        fontStyle: "bold",
+        halign: "center",
+      },
+      columnStyles: {
+        0: { halign: "center", cellWidth: 25 },
+        1: { halign: "center", cellWidth: 20 },
+        2: { halign: "left" },
+        3: { halign: "left" },
+        4: { halign: "right", fontStyle: "bold" },
+      },
+      styles: { fontSize: 8, cellPadding: 6, lineColor: [241, 245, 249] },
+    });
+
+    // --- Footer Credits ---
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFillColor(248, 250, 252);
+        doc.rect(0, 282, 210, 15, "F");
+        doc.setTextColor(148, 163, 184);
+        doc.setFontSize(7);
+        doc.text(`Page ${i} of ${pageCount} • Official Attendance Report`, 15, 290);
+        
+        doc.setFont("helvetica", "normal");
+        doc.text("SmartAcademy Institutional Portal • Attendance Records", 205, 290, { align: "right" });
+    }
+
+    // --- Save File ---
+    const filename = `Attendance_${student.name?.split(' ')[0]}_${generationDate.replace(/[^a-zA-Z0-9]/g, '')}.pdf`;
+    doc.save(filename);
+  } catch (error) {
+    console.error("PDF Generation Error:", error);
+  }
+};
+
+export const generateGlobalAttendanceReportPDF = async (
+  records: any[],
+  className: string | null = null,
+  monthFilter: string | null = null
+) => {
+  if (!records || records.length === 0) return;
+
+  try {
+    const doc = new jsPDF();
+    const secondaryColor = [30, 41, 59];
+    const mutedColor = [148, 163, 184];
+    const generationDate = formatDate(new Date());
+
+    // Calculate Stats
+    const totalSessions = records.length;
+    const totalPresent = records.reduce((acc, r) => acc + r.totalPresent, 0);
+    const totalAbsent = records.reduce((acc, r) => acc + r.totalAbsent, 0);
+    const totalHeadcount = totalPresent + totalAbsent;
+    const attendanceRate = totalHeadcount > 0 ? Math.round((totalPresent / totalHeadcount) * 100) : 0;
+
+    // --- Elegant Header Background ---
+    doc.setFillColor(30, 41, 59); // Dark Slate
+    doc.rect(0, 0, 210, 50, "F");
+
+    // --- Institutional Branding ---
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(28);
+    doc.setTextColor(255, 255, 255);
+    doc.text("SMART ACADEMY", 15, 25);
+    
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(148, 163, 184);
+    doc.text("GLOBAL ATTENDANCE LEDGER", 16, 33);
+
+    // --- Rate Badge ---
+    doc.setFillColor(attendanceRate >= 80 ? 16 : attendanceRate >= 50 ? 245 : 239, attendanceRate >= 80 ? 185 : 158, attendanceRate >= 80 ? 129 : 68);
+    doc.roundedRect(150, 15, 45, 25, 3, 3, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("OVERALL PRESENCE", 153, 23);
+    doc.setFontSize(16);
+    doc.text(`${attendanceRate}%`, 155, 34);
+
+    // --- Entity Info Section ---
+    let currentY = 65;
+    
+    // Filters Info (Left)
+    doc.setFontSize(9);
+    doc.setTextColor(mutedColor[0], mutedColor[1], mutedColor[2]);
+    doc.text("FILTER CRITERIA", 15, currentY);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.text(className ? className.toUpperCase() : "ALL ACADEMIC UNITS", 15, currentY + 6);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Month: ${monthFilter || "All Time"}`, 15, currentY + 11);
+
+    // Summary Info (Right)
+    doc.setFontSize(9);
+    doc.setTextColor(mutedColor[0], mutedColor[1], mutedColor[2]);
+    doc.text("REPORT SUMMARY", 135, currentY);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.text(`${totalSessions} Total Sessions`, 135, currentY + 6);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Present: ${totalPresent} | Absent: ${totalAbsent}`, 135, currentY + 11);
+    doc.text(`Generated: ${generationDate}`, 135, currentY + 16);
+
+    // --- Items List ---
+    currentY += 30;
+    doc.setFontSize(10);
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.setFont("helvetica", "bold");
+    doc.text("SESSION ARCHIVE", 15, currentY);
+
+    const bodyData = records.map((att) => [
+      formatDate(att.date),
+      att.className || "---",
+      att.teacherName || "---",
+      `${att.totalPresent} Present, ${att.totalAbsent} Absent`,
+      `${Math.round((att.totalPresent / (att.totalPresent + att.totalAbsent)) * 100) || 0}%`,
+    ]);
+
+    autoTable(doc, {
+      startY: currentY + 5,
+      head: [["Date", "Class", "Instructor", "Headcount", "Rate"]],
+      body: bodyData as any,
+      theme: "grid",
+      headStyles: {
+        fillColor: [248, 250, 252],
+        textColor: [30, 41, 59],
+        fontSize: 8,
+        fontStyle: "bold",
+        halign: "left",
+      },
+      columnStyles: {
+        0: { cellWidth: 30 },
+        1: { cellWidth: 50 },
+        2: { cellWidth: 50 },
+        3: { cellWidth: 35 },
+        4: { halign: "right", fontStyle: "bold" },
+      },
+      styles: { fontSize: 8, cellPadding: 5, lineColor: [241, 245, 249] },
+    });
+
+    // --- Footer Credits ---
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFillColor(248, 250, 252);
+        doc.rect(0, 282, 210, 15, "F");
+        doc.setTextColor(148, 163, 184);
+        doc.setFontSize(7);
+        doc.text(`Page ${i} of ${pageCount} • Official Attendance Ledger`, 15, 290);
+        
+        doc.setFont("helvetica", "normal");
+        doc.text("SmartAcademy Institutional Portal • Global Ledger", 205, 290, { align: "right" });
+    }
+
+    // --- Save File ---
+    const filename = `Attendance_Ledger_${generationDate.replace(/[^a-zA-Z0-9]/g, '')}.pdf`;
+    doc.save(filename);
+  } catch (error) {
+    console.error("PDF Generation Error:", error);
+  }
+};
+
+export const generateSingleAttendanceSessionPDF = async (
+  record: any
+) => {
+  if (!record) return;
+
+  try {
+    const doc = new jsPDF();
+    const secondaryColor = [30, 41, 59];
+    const mutedColor = [148, 163, 184];
+    const generationDate = formatDate(new Date());
+
+    // --- Elegant Header Background ---
+    doc.setFillColor(15, 23, 42); // Deep Slate
+    doc.rect(0, 0, 210, 50, "F");
+
+    // --- Institutional Branding ---
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(28);
+    doc.setTextColor(255, 255, 255);
+    doc.text("SMART ACADEMY", 15, 25);
+    
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(148, 163, 184);
+    doc.text("SESSION ATTENDANCE VOUCHER", 16, 33);
+
+    // --- Stats Badge ---
+    const attendanceRate = Math.round((record.totalPresent / (record.totalPresent + record.totalAbsent)) * 100);
+    doc.setFillColor(attendanceRate >= 80 ? 16 : 239, attendanceRate >= 80 ? 185 : 68, attendanceRate >= 80 ? 129 : 68);
+    doc.roundedRect(150, 15, 45, 25, 3, 3, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("SESSION RATE", 155, 23);
+    doc.setFontSize(16);
+    doc.text(`${attendanceRate}%`, 155, 34);
+
+    // --- Entity Info Section ---
+    let currentY = 65;
+    
+    // Session Info (Left)
+    doc.setFontSize(9);
+    doc.setTextColor(mutedColor[0], mutedColor[1], mutedColor[2]);
+    doc.text("SESSION IDENTITY", 15, currentY);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.text(record.className?.toUpperCase() || "ACADEMIC UNIT", 15, currentY + 6);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Grade: ${record.grade || "N/A"}`, 15, currentY + 11);
+    doc.text(`Instructor: ${record.teacherName || "N/A"}`, 15, currentY + 16);
+
+    // Date Info (Right)
+    doc.setFontSize(9);
+    doc.setTextColor(mutedColor[0], mutedColor[1], mutedColor[2]);
+    doc.text("AUDIT TIMESTAMP", 135, currentY);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.text(record.date || "N/A", 135, currentY + 6);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Present: ${record.totalPresent}`, 135, currentY + 11);
+    doc.text(`Absent: ${record.totalAbsent}`, 135, currentY + 16);
+
+    // --- Student List ---
+    currentY += 30;
+    doc.setFontSize(10);
+    doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
+    doc.setFont("helvetica", "bold");
+    doc.text("STUDENT ATTENDANCE LIST", 15, currentY);
+
+    const bodyData = record.records.map((r: any) => [
+      r.studentName || "---",
+      {
+        content: r.isPresent ? "PRESENT" : "ABSENT",
+        styles: { textColor: r.isPresent ? [16, 185, 129] : [239, 68, 68] },
+      },
+    ]);
+
+    autoTable(doc, {
+      startY: currentY + 5,
+      head: [["Student Name", "Status"]],
+      body: bodyData as any,
+      theme: "grid",
+      headStyles: {
+        fillColor: [248, 250, 252],
+        textColor: [30, 41, 59],
+        fontSize: 8,
+        fontStyle: "bold",
+        halign: "left",
+      },
+      styles: { fontSize: 8, cellPadding: 4, lineColor: [241, 245, 249] },
+      columnStyles: {
+        1: { halign: "right", fontStyle: "bold" },
+      },
+    });
+
+    // --- Footer Credits ---
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFillColor(248, 250, 252);
+        doc.rect(0, 282, 210, 15, "F");
+        doc.setTextColor(148, 163, 184);
+        doc.setFontSize(7);
+        doc.text(`Page ${i} of ${pageCount} • Session Voucher`, 15, 290);
+        
+        doc.setFont("helvetica", "normal");
+        doc.text("SmartAcademy Institutional Portal • Session Voucher", 205, 290, { align: "right" });
+    }
+
+    // --- Save File ---
+    const filename = `Session_${record.className.replace(/\s+/g, '_')}_${record.date}.pdf`;
+    doc.save(filename);
+  } catch (error) {
+    console.error("PDF Generation Error:", error);
   }
 };
 
@@ -848,13 +1229,13 @@ export const generateMonthlyFinanceReportPDF = async (
 ) => {
   try {
     const doc = new jsPDF();
-    const primaryColor = [79, 70, 229]; // Indigo 600
+    const primaryColor = [29, 158, 117]; // Emerald 600
     const incomeColor = [16, 185, 129]; // Emerald 600
     const expenseColor = [244, 63, 94]; // Rose 500
     const generationDate = formatDate(new Date());
 
     // --- Elegant Header Background ---
-    doc.setFillColor(30, 41, 59); // Dark Slate
+    doc.setFillColor(15, 23, 42); // Deep Slate
     doc.rect(0, 0, 210, 45, "F");
 
     // --- Institutional Branding ---
@@ -972,8 +1353,8 @@ export const generateMonthlyFinanceReportPDF = async (
         doc.setFontSize(7);
         doc.text(`Institutional Audit • Page ${i} of ${pageCount} • Fiscal Authority Terminal`, 15, 290);
         
-        doc.setFont("helvetica", "bold");
-        doc.text("DEVELOPED BY: AM. SHARFRAS AQSAN (sharfrasaqsan@gmail.com • 0751230001)", 205, 290, { align: "right" });
+        doc.setFont("helvetica", "normal");
+        doc.text("SmartAcademy Institutional Portal • Finance Division", 205, 290, { align: "right" });
     }
 
     doc.save(`Financial_Audit_${month}.pdf`);
@@ -1064,7 +1445,7 @@ export const generateStudentIDCardPDF = async (
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(5);
     doc.setFont("helvetica", "italic");
-    doc.text("Verification Point: +94 11 234 5678", 8, 51.5);
+    doc.text("Verified Institutional Document", 8, 51.5);
     doc.setFont("helvetica", "bold");
     doc.text("SA ADMIN", 75, 51.5);
 
@@ -1086,7 +1467,7 @@ export const generateTeacherListPDF = async (
     const generationDate = formatDate(new Date());
 
     // --- Elegant Header Background ---
-    doc.setFillColor(30, 41, 59); // Dark Slate
+    doc.setFillColor(15, 23, 42); // Deep Slate
     doc.rect(0, 0, 210, 40, "F");
 
     // --- Institutional Branding ---
@@ -1148,8 +1529,8 @@ export const generateTeacherListPDF = async (
         doc.setFontSize(7);
         doc.text(`Page ${i} of ${pageCount} • Official Faculty Registry Archive`, 15, 290);
         
-        doc.setFont("helvetica", "bold");
-        doc.text("DEVELOPED BY: AM. SHARFRAS AQSAN (sharfrasaqsan@gmail.com • 0751230001)", 205, 290, { align: "right" });
+        doc.setFont("helvetica", "normal");
+        doc.text("SmartAcademy Institutional Portal • Faculty Records", 205, 290, { align: "right" });
     }
 
     doc.save(`${title.replace(/\s+/g, "_")}.pdf`);
@@ -1170,7 +1551,7 @@ export const generateGradeListPDF = async (
     const generationDate = formatDate(new Date());
 
     // --- Elegant Header Background ---
-    doc.setFillColor(30, 41, 59); // Dark Slate
+    doc.setFillColor(15, 23, 42); // Deep Slate
     doc.rect(0, 0, 210, 40, "F");
 
     // --- Institutional Branding ---
@@ -1231,8 +1612,8 @@ export const generateGradeListPDF = async (
         doc.setFontSize(7);
         doc.text(`Page ${i} of ${pageCount} • Grade Hierarchy Registry`, 15, 290);
         
-        doc.setFont("helvetica", "bold");
-        doc.text("DEVELOPED BY: AM. SHARFRAS AQSAN (sharfrasaqsan@gmail.com • 0751230001)", 205, 290, { align: "right" });
+        doc.setFont("helvetica", "normal");
+        doc.text("SmartAcademy Institutional Portal • Grade Registry Archive", 205, 290, { align: "right" });
     }
 
     doc.save(`${title.replace(/\s+/g, "_")}.pdf`);
@@ -1249,13 +1630,13 @@ export const generateStudentPaymentHistoryPDF = async (
 
   try {
     const doc = new jsPDF();
-    const primaryColor = [79, 70, 229]; // Indigo 600
+    const primaryColor = [29, 158, 117]; // Emerald 600
     const secondaryColor = [30, 41, 59]; // Slate 800
     const mutedColor = [148, 163, 184]; // Slate 400
     const generationDate = formatDate(new Date());
 
     // --- Elegant Header Background ---
-    doc.setFillColor(30, 41, 59); // Dark Slate
+    doc.setFillColor(15, 23, 42); // Deep Slate
     doc.rect(0, 0, 210, 45, "F");
 
     // --- Institutional Branding ---
@@ -1340,8 +1721,8 @@ export const generateStudentPaymentHistoryPDF = async (
         doc.setFontSize(7);
         doc.text(`Page ${i} of ${pageCount} • Authentic Fiscal Statement`, 15, 290);
         
-        doc.setFont("helvetica", "bold");
-        doc.text("DEVELOPED BY: AM. SHARFRAS AQSAN (sharfrasaqsan@gmail.com • 0751230001)", 205, 290, { align: "right" });
+        doc.setFont("helvetica", "normal");
+        doc.text("SmartAcademy Institutional Portal • Financial Statement Service", 205, 290, { align: "right" });
     }
 
     doc.save(`Financial_Statement_${student.name.replace(/\s+/g, "_")}.pdf`);
@@ -1361,7 +1742,7 @@ export const generatePaymentsReportPDF = (
     const generationDate = formatDate(new Date());
 
     // --- Elegant Header Background ---
-    doc.setFillColor(30, 41, 59); // Dark Slate
+    doc.setFillColor(15, 23, 42); // Deep Slate
     doc.rect(0, 0, 210, 40, "F");
 
     // --- Institutional Branding ---
@@ -1402,7 +1783,7 @@ export const generatePaymentsReportPDF = (
       body: bodyData as any,
       theme: "striped",
       headStyles: {
-        fillColor: [30, 41, 59],
+        fillColor: [29, 158, 117],
         fontSize: 7,
         fontStyle: "bold",
         halign: "center",
@@ -1429,8 +1810,8 @@ export const generatePaymentsReportPDF = (
         doc.setFontSize(7);
         doc.text(`Page ${i} of ${pageCount} • Consolidated Financial Transaction Report`, 15, 290);
         
-        doc.setFont("helvetica", "bold");
-        doc.text("DEVELOPED BY: AM. SHARFRAS AQSAN (sharfrasaqsan@gmail.com • 0751230001)", 205, 290, { align: "right" });
+        doc.setFont("helvetica", "normal");
+        doc.text("SmartAcademy Institutional Portal • Transaction Audit System", 205, 290, { align: "right" });
     }
 
     doc.save(`Transaction_Report_${generationDate.replace(/\s+/g, "_")}.pdf`);

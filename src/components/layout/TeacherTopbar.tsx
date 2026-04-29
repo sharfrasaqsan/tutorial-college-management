@@ -13,9 +13,42 @@ export default function TeacherTopbar() {
   const { user } = useAuth();
   const pathname = usePathname();
   const [teacherName, setTeacherName] = useState("Faculty User");
+  const [dynamicTitle, setDynamicTitle] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchTitle() {
+      const parts = pathname.split("/");
+      if (parts.includes("students") && parts.length > parts.indexOf("students") + 1) {
+        const id = parts[parts.indexOf("students") + 1];
+        if (id) {
+            try {
+                const snap = await getDoc(doc(db, "students", id));
+                if (snap.exists()) setDynamicTitle(snap.data().name);
+                else setDynamicTitle("Student Profile");
+            } catch {
+                setDynamicTitle("Student Profile");
+            }
+        }
+      } else if (parts.includes("teachers") && parts.length > parts.indexOf("teachers") + 1) {
+        const id = parts[parts.indexOf("teachers") + 1];
+        if (id) {
+            try {
+                const snap = await getDoc(doc(db, "teachers", id));
+                if (snap.exists()) setDynamicTitle(snap.data().name);
+                else setDynamicTitle("Teacher Profile");
+            } catch {
+                setDynamicTitle("Teacher Profile");
+            }
+        }
+      } else {
+         setDynamicTitle(null);
+      }
+    }
+    fetchTitle();
+  }, [pathname]);
   
   // Format pathname loosely for header
-  const rawTitle = pathname.split("/").pop()?.replace(/-/g, " ") || "Overview";
+  const rawTitle = dynamicTitle || pathname.split("/").pop()?.replace(/-/g, " ") || "Overview";
   const formattedTitle = rawTitle === "attendance" ? "Session History" : (rawTitle.charAt(0).toUpperCase() + rawTitle.slice(1));
 
   useEffect(() => {

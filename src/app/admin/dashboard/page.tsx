@@ -71,12 +71,12 @@ export default function AdminDashboard() {
   };
 
   const statCards = [
-    { title: "Total Students", value: stats?.totalStudents || 0, icon: Users, color: "text-blue-500", action: () => router.push('/admin/students'), clickable: true },
-    { title: "Total Teachers", value: stats?.totalTeachers || 0, icon: Briefcase, color: "text-violet-500", action: () => router.push('/admin/teachers'), clickable: true },
-    { title: "Active Classes", value: stats?.activeClassesCount || 0, icon: Projector, color: "text-emerald-500", action: () => router.push('/admin/classes'), clickable: true },
-    { title: `Collected Fees`, value: `LKR ${(stats?.feesCollected || 0).toLocaleString()}`, icon: CreditCard, color: "text-indigo-500", action: () => router.push('/admin/payments'), clickable: true },
-    { title: `Pending Fees`, value: stats?.unpaidFeesCount || 0, icon: AlertTriangle, color: "text-orange-500", action: () => router.push('/admin/payments'), clickable: true },
-    { title: `Unpaid Salary`, value: stats?.pendingSalariesCount || 0, icon: History, color: "text-rose-500", action: () => router.push('/admin/salaries'), clickable: true },
+    { title: "Total Students", value: stats?.totalStudents || 0, icon: Users, color: "text-blue-500", accent: "border-t-blue-400", bg: "from-white to-blue-50/30", action: () => router.push('/admin/students'), clickable: true },
+    { title: "Total Teachers", value: stats?.totalTeachers || 0, icon: Briefcase, color: "text-violet-500", accent: "border-t-violet-400", bg: "from-white to-violet-50/30", action: () => router.push('/admin/teachers'), clickable: true },
+    { title: "Active Classes", value: stats?.activeClassesCount || 0, icon: Projector, color: "text-emerald-500", accent: "border-t-emerald-400", bg: "from-white to-emerald-50/30", action: () => router.push('/admin/classes'), clickable: true },
+    { title: `Collected Fees`, value: `LKR ${(stats?.feesCollected || 0).toLocaleString()}`, icon: CreditCard, color: "text-indigo-500", accent: "border-t-indigo-400", bg: "from-white to-indigo-50/30", action: () => router.push('/admin/payments'), clickable: true },
+    { title: `Pending Fees`, value: stats?.unpaidFeesCount || 0, icon: AlertTriangle, color: "text-orange-500", accent: "border-t-orange-400", bg: "from-white to-orange-50/30", action: () => router.push('/admin/payments'), clickable: true },
+    { title: `Unpaid Salary`, value: stats?.pendingSalariesCount || 0, icon: History, color: "text-rose-500", accent: "border-t-rose-400", bg: "from-white to-rose-50/30", action: () => router.push('/admin/salaries'), clickable: true },
   ];
 
   return (
@@ -114,7 +114,7 @@ export default function AdminDashboard() {
           <div 
             key={idx} 
             onClick={card.action}
-            className={`bg-white p-5 rounded-2xl border border-slate-200/60 transition-all duration-200 hover:border-primary/30 group ${card.clickable ? 'cursor-pointer active:scale-[0.98]' : ''}`}
+            className={`bg-gradient-to-b ${card.bg} p-5 rounded-2xl border border-t-2 ${card.accent} border-slate-100 transition-all duration-200 hover:shadow-md hover:shadow-slate-200/60 group ${card.clickable ? 'cursor-pointer active:scale-[0.98]' : ''}`}
           >
             <div className="flex flex-col gap-3">
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${card.color.replace('text-', 'bg-').split('-').slice(0, 2).join('-')}-50 ${card.color} transition-all shadow-sm`}>
@@ -123,7 +123,7 @@ export default function AdminDashboard() {
               <div>
                 <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">{card.title}</p>
                 <div className="flex items-center gap-1">
-                  <p className="text-base font-bold text-slate-900 tracking-tight group-hover:text-primary leading-none transition-colors">{card.value}</p>
+                  <p className="text-base font-bold text-slate-900 tracking-tight group-hover:text-primary leading-none transition-colors tabular-nums">{card.value}</p>
                   {card.clickable && <ArrowRight className="w-2.5 h-2.5 text-primary opacity-0 group-hover:opacity-100 transition-all translate-x-[-4px] group-hover:translate-x-0" />}
                 </div>
               </div>
@@ -191,11 +191,14 @@ export default function AdminDashboard() {
                                {slot.isCompleted ? (
                                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500 text-white text-[9px] font-black uppercase tracking-wider shadow-lg shadow-emerald-500/20">
                                        <CheckCircle2 className="w-3.5 h-3.5" />
-                                       <span>Class done</span>
+                                       <span>Completed</span>
                                    </div>
                                ) : active && (
-                                   <div className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-500 uppercase animate-pulse">
-                                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                   <div className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-500 uppercase">
+                                       <span className="relative flex h-2 w-2">
+                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                                       </span>
                                        LIVE
                                    </div>
                                )}
@@ -260,7 +263,7 @@ export default function AdminDashboard() {
                       <tr key={unpaid.id} className="hover:bg-rose-50/30 transition-colors">
                         <td className="px-8 py-4 font-bold text-slate-700">{unpaid.studentName}</td>
                         <td className="px-8 py-4 text-slate-400 font-medium uppercase tracking-tighter text-[10px]">{unpaid.month}</td>
-                        <td className="px-8 py-4 text-right font-black text-rose-600">LKR {unpaid.amount.toLocaleString()}</td>
+                        <td className="px-8 py-4 text-right font-black text-rose-600 tabular-nums">LKR {unpaid.amount.toLocaleString()}</td>
                       </tr>
                     )) : (
                       <tr>
@@ -311,7 +314,7 @@ export default function AdminDashboard() {
                           <td className="px-8 py-4 font-bold text-slate-700">{extractedTeacher}</td>
                           <td className="px-8 py-4 text-[10px] font-bold text-slate-500 uppercase tracking-tight">{cleanClass}</td>
                           <td className="px-8 py-4 text-slate-400 font-medium uppercase tracking-tighter text-[10px]">{sal.requestDate ? format(new Date(sal.requestDate), 'MMM dd') : 'N/A'}</td>
-                          <td className="px-8 py-4 text-right font-black text-amber-600">LKR {sal.amount.toLocaleString()}</td>
+                          <td className="px-8 py-4 text-right font-black text-amber-600 tabular-nums">LKR {sal.amount.toLocaleString()}</td>
                         </tr>
                       );
                     }) : (

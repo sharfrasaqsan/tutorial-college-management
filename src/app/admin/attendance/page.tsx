@@ -8,12 +8,13 @@ import { db } from "@/lib/firebase";
 import { 
   History, Users, Calendar, Search, ArrowLeft, 
   ChevronRight, CheckCircle2, XCircle, Clock, BookOpen,
-  Filter, Download, ArrowUpRight, LayoutGrid, List
+  Filter, Download, ArrowUpRight, LayoutGrid, List, X, Hash
 } from "lucide-react";
 import Link from "next/link";
 import Skeleton from "@/components/ui/Skeleton";
 import { format } from "date-fns";
 import { AttendanceRecord, Class } from "@/types/models";
+import { generateGlobalAttendanceReportPDF, generateSingleAttendanceSessionPDF } from "@/lib/pdf-generator";
 
 export default function AttendancePage() {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
@@ -24,6 +25,8 @@ export default function AttendancePage() {
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [selectedMonth, setSelectedMonth] = useState("all");
+  const [modalTab, setModalTab] = useState<'info' | 'students'>('students');
 
   useEffect(() => {
     loadData();
@@ -58,9 +61,15 @@ export default function AttendancePage() {
       const matchesSearch = r.className.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           r.teacherName.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesClass = !selectedClassId || r.classId === selectedClassId;
-      return matchesSearch && matchesClass;
+      const matchesMonth = selectedMonth === "all" || r.date.startsWith(selectedMonth);
+      return matchesSearch && matchesClass && matchesMonth;
     });
-  }, [records, searchTerm, selectedClassId]);
+  }, [records, searchTerm, selectedClassId, selectedMonth]);
+
+  const availableMonths = useMemo(() => {
+    const months = new Set(records.map(r => r.date.substring(0, 7)));
+    return Array.from(months).sort().reverse();
+  }, [records]);
 
   const stats = useMemo(() => {
     const activeRecords = selectedClassId 
@@ -110,7 +119,10 @@ export default function AttendancePage() {
                 <List className="w-4 h-4" />
               </button>
            </div>
-          <button className="px-5 py-2.5 bg-white text-slate-600 border border-slate-200 rounded-xl text-[11px] font-bold hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
+          <button 
+            onClick={() => generateGlobalAttendanceReportPDF(filteredRecords, selectedClass?.name, selectedMonth !== 'all' ? selectedMonth : null)}
+            className="px-5 py-2.5 bg-white text-slate-600 border border-slate-200 rounded-xl text-[11px] font-bold hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2"
+          >
             <Download className="w-3.5 h-3.5" /> Export Data
           </button>
           <Link 
@@ -195,10 +207,10 @@ export default function AttendancePage() {
               )}
               <div>
                 <h2 className="text-lg font-bold text-slate-800">
-                  {selectedClassId ? `History: ${selectedClass?.name}` : "Global Presence Ledger"}
+                  {selectedClassId ? `Attendance: ${selectedClass?.name}` : "Attendance Register"}
                 </h2>
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                  Institutional Record Archive 2026
+                  Session Records • Academic Year 2026
                 </p>
               </div>
             </div>
@@ -206,7 +218,7 @@ export default function AttendancePage() {
 
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden flex flex-col">
             <div className="p-4 border-b border-slate-100 flex flex-col sm:flex-row gap-4 justify-between items-center bg-slate-50/50">
-              <div className="relative w-full sm:max-w-xs">
+              <div className="relative w-full sm:max-w-xs flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input 
                   type="text" 
@@ -216,8 +228,20 @@ export default function AttendancePage() {
                   className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                 />
               </div>
-              <div className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                {filteredRecords.length} Entries Logged
+              <div className="flex items-center gap-4 w-full sm:w-auto">
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all cursor-pointer w-full sm:w-auto"
+                >
+                  <option value="all">All Months</option>
+                  {availableMonths.map(m => (
+                     <option key={m} value={m}>{format(new Date(m + "-01"), "MMMM yyyy")}</option>
+                  ))}
+                </select>
+                <div className="px-3 py-1 bg-white border border-slate-200 rounded-lg text-[10px] font-black text-slate-400 uppercase tracking-widest hidden sm:block whitespace-nowrap">
+                  {filteredRecords.length} Entries
+                </div>
               </div>
             </div>
 
@@ -225,10 +249,10 @@ export default function AttendancePage() {
               <table className="w-full text-sm text-left">
                 <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-100">
                   <tr>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Session Identity</th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Faculty Authority</th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-center">Audit Result</th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-right">Actions</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Session</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest">Teacher</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-center">Attendance Rate</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-right">Details</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -253,12 +277,24 @@ export default function AttendancePage() {
                         </td>
                         <td className="px-6 py-5 font-semibold text-slate-600">{record.teacherName}</td>
                         <td className="px-6 py-5 text-center">
-                          <div className="inline-flex flex-col items-center">
-                             <div className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-tighter border border-emerald-100">
-                                {Math.round((record.totalPresent / (record.totalPresent + record.totalAbsent)) * 100)}% PRESENCE
-                             </div>
-                             <p className="text-[8px] font-bold text-slate-300 mt-1 uppercase tracking-[0.2em]">{record.totalPresent} Verified / {record.totalPresent + record.totalAbsent} Enrolled</p>
-                          </div>
+                          {(() => {
+                            const total = record.totalPresent + record.totalAbsent;
+                            const rate = total > 0 ? Math.round((record.totalPresent / total) * 100) : 0;
+                            const rateColor = rate >= 80 ? 'bg-emerald-500' : rate >= 60 ? 'bg-amber-500' : 'bg-rose-500';
+                            const rateBg = rate >= 80 ? 'bg-emerald-50' : rate >= 60 ? 'bg-amber-50' : 'bg-rose-50';
+                            const rateText = rate >= 80 ? 'text-emerald-600' : rate >= 60 ? 'text-amber-600' : 'text-rose-500';
+                            return (
+                              <div className="inline-flex flex-col items-center gap-1 min-w-[100px]">
+                                <div className={`px-3 py-1 rounded-full ${rateBg} ${rateText} text-[10px] font-black uppercase tracking-tighter border border-current/10`}>
+                                  {rate}%
+                                </div>
+                                <div className="w-20 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                  <div className={`h-full rounded-full transition-all ${rateColor}`} style={{ width: `${rate}%` }} />
+                                </div>
+                                <p className="text-[8px] font-bold text-slate-300 uppercase tracking-[0.15em]">{record.totalPresent}/{total} present</p>
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-6 py-5 text-right">
                           <button 
@@ -288,59 +324,152 @@ export default function AttendancePage() {
       {isDetailOpen && selectedRecord && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-300" onClick={() => setIsDetailOpen(false)}></div>
-          <div className="relative w-full max-w-lg bg-white rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-             <div className="p-8 bg-slate-900 text-white relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 rounded-full blur-3xl -mr-16 -mt-16"></div>
-                <div className="relative z-10">
-                  <div className="flex justify-between items-start mb-6">
-                    <h3 className="text-xs font-black text-white/40 uppercase tracking-[0.3em]">Institutional Roll Call</h3>
-                    <button onClick={() => setIsDetailOpen(false)} className="p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-all text-white/60 hover:text-white">
-                      <XCircle className="w-5 h-5" />
-                    </button>
-                  </div>
-                  <h3 className="text-xl font-black mb-1">{selectedRecord.className}</h3>
-                  <p className="text-[10px] font-black text-white/60 uppercase tracking-[0.2em]">{selectedRecord.grade} • {selectedRecord.date}</p>
-                </div>
-              </div>
-
-              <div className="p-8">
-                <div className="grid grid-cols-2 gap-4 mb-8">
-                  <div className="p-5 rounded-2xl bg-emerald-50 border border-emerald-100 text-center">
-                    <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Present</p>
-                    <p className="text-2xl font-black text-emerald-700">{selectedRecord.totalPresent}</p>
-                  </div>
-                  <div className="p-5 rounded-2xl bg-rose-50 border border-rose-100 text-center">
-                    <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Absent</p>
-                    <p className="text-2xl font-black text-rose-700">{selectedRecord.totalAbsent}</p>
-                  </div>
-                </div>
-
-                <div className="space-y-2 max-h-[350px] overflow-y-auto pr-2 scrollbar-hide">
-                  {selectedRecord.records.map((student, idx) => (
-                    <div key={idx} className="p-3.5 rounded-xl border border-slate-50 bg-slate-50/30 flex items-center justify-between group hover:bg-white hover:shadow-sm transition-all">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black ${student.isPresent ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
-                          {student.studentName.charAt(0)}
-                        </div>
-                        <p className="text-xs font-bold text-slate-700">{student.studentName}</p>
-                      </div>
-                      <div className={`px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest ${student.isPresent ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'}`}>
-                        {student.isPresent ? 'Present' : 'Absent'}
-                      </div>
+          <div className="relative w-full max-w-5xl bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden transform transition-all duration-300 ease-out flex flex-col h-[85vh] animate-in zoom-in-95">
+            
+            {/* Header */}
+            <div className="px-8 py-6 border-b border-slate-100 flex items-center justify-between bg-white z-10 shrink-0">
+                <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 rounded-full bg-slate-50 border border-slate-100 flex items-center justify-center text-primary text-xl font-bold">
+                        {selectedRecord.className.charAt(0)}
                     </div>
-                  ))}
+                    <div>
+                        <h2 className="text-xl font-semibold text-slate-900 flex items-center gap-3 leading-none">
+                            Attendance Details
+                        </h2>
+                        <div className="flex items-center gap-3 mt-1.5">
+                             <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
+                                <Hash className="w-3.5 h-3.5" /> {selectedRecord.className}
+                             </span>
+                             <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                             <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">
+                                VERIFIED
+                             </span>
+                        </div>
+                    </div>
                 </div>
+                <button 
+                    onClick={() => setIsDetailOpen(false)}
+                    className="p-2.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-all group"
+                >
+                    <X className="w-5 h-5" />
+                </button>
+            </div>
 
-                <div className="mt-8 pt-8 border-t border-slate-100 flex items-center justify-between">
-                   <div>
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Faculty Member</p>
-                      <p className="text-xs font-bold text-slate-800">{selectedRecord.teacherName}</p>
-                   </div>
-                   <button onClick={() => setIsDetailOpen(false)} className="px-6 py-2.5 bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-black transition-all shadow-lg">
-                     Close Record
-                   </button>
+            {/* Tabs */}
+            <div className="px-8 bg-slate-50/50 border-b border-slate-100 flex items-center gap-1 shrink-0">
+                {(['info', 'students'] as const).map((tab) => (
+                    <button
+                        key={tab}
+                        type="button"
+                        onClick={() => setModalTab(tab)}
+                        className={`px-5 py-4 text-sm font-medium transition-all relative capitalize ${modalTab === tab ? 'text-primary' : 'text-slate-500 hover:text-slate-800'}`}
+                    >
+                        {tab === 'info' ? 'Summary' : 'Present Students'}
+                        {modalTab === tab && (
+                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full transition-all" />
+                        )}
+                    </button>
+                ))}
+            </div>
+
+            {/* Content Area */}
+            <div className="flex-1 overflow-y-auto p-8 scrollbar-hide bg-white">
+              {modalTab === 'info' && (
+                <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="p-6 rounded-2xl bg-emerald-50 border border-emerald-100">
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-emerald-600">
+                          <CheckCircle2 className="w-5 h-5" />
+                        </div>
+                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Present</p>
+                      </div>
+                      <p className="text-3xl font-black text-emerald-700">{selectedRecord.totalPresent}</p>
+                      <p className="text-xs text-emerald-600/60 mt-1 font-medium italic">Verified by {selectedRecord.teacherName}</p>
+                    </div>
+
+                    <div className="p-6 rounded-2xl bg-rose-50 border border-rose-100">
+                      <div className="flex items-center gap-4 mb-4">
+                        <div className="w-10 h-10 rounded-xl bg-white shadow-sm flex items-center justify-center text-rose-600">
+                          <XCircle className="w-5 h-5" />
+                        </div>
+                        <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Total Absent</p>
+                      </div>
+                      <p className="text-3xl font-black text-rose-700">{selectedRecord.totalAbsent}</p>
+                      <p className="text-xs text-rose-600/60 mt-1 font-medium italic">Missing institutional check-in</p>
+                    </div>
+                  </div>
+
+                  <div className="p-6 rounded-2xl border border-slate-100 bg-slate-50/30">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">Session Context</h4>
+                    <div className="grid grid-cols-2 gap-8">
+                       <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Class Subject</p>
+                          <p className="text-sm font-bold text-slate-800">{selectedRecord.className}</p>
+                       </div>
+                       <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Academic Level</p>
+                          <p className="text-sm font-bold text-slate-800">{selectedRecord.grade}</p>
+                       </div>
+                       <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Date Logged</p>
+                          <p className="text-sm font-bold text-slate-800">{selectedRecord.date}</p>
+                       </div>
+                       <div>
+                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">Assigned Faculty</p>
+                          <p className="text-sm font-bold text-slate-800">{selectedRecord.teacherName}</p>
+                       </div>
+                    </div>
+                  </div>
                 </div>
+              )}
+
+              {modalTab === 'students' && (
+                <div className="max-w-4xl mx-auto space-y-4 animate-in fade-in duration-500">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest">Enrollment Status List</h4>
+                    <span className="text-[10px] font-bold text-slate-400 px-2 py-1 bg-slate-50 rounded-lg">{selectedRecord.records.length} Students Total</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {selectedRecord.records.map((student, idx) => (
+                      <div key={idx} className="p-4 rounded-xl border border-slate-100 bg-slate-50/30 flex items-center justify-between group hover:bg-white hover:shadow-md transition-all">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black ${student.isPresent ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'}`}>
+                            {student.studentName.charAt(0)}
+                          </div>
+                          <p className="text-sm font-bold text-slate-700">{student.studentName}</p>
+                        </div>
+                        <div className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${student.isPresent ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white shadow-lg shadow-rose-100'}`}>
+                          {student.isPresent ? 'Present' : 'Absent'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="px-8 py-5 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between bg-slate-50/30 z-10 shrink-0">
+              <div className="hidden sm:flex items-center gap-3">
+                 <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse shadow-lg shadow-indigo-100"></div>
+                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Attendance Ledger View Only</p>
               </div>
+              <div className="flex items-center gap-4 w-full sm:w-auto">
+                <button 
+                  onClick={() => generateSingleAttendanceSessionPDF(selectedRecord)}
+                  className="px-6 py-3 bg-white text-slate-600 border border-slate-200 rounded-xl text-sm font-bold hover:bg-slate-50 transition-all shadow-sm flex items-center justify-center gap-2 w-full sm:w-auto"
+                >
+                  <Download className="w-4 h-4" /> Export PDF
+                </button>
+                <button 
+                  onClick={() => setIsDetailOpen(false)}
+                  className="px-10 py-3 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-black transition-all shadow-xl flex items-center justify-center gap-3 w-full sm:w-auto"
+                >
+                  Close Record
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

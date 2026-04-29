@@ -1,7 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import TeacherProfileModal from '@/components/admin/TeacherProfileModal';
+import React, { createContext, useContext, ReactNode } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 
 interface TeacherProfileContextType {
   openTeacherProfile: (teacherId: string) => void;
@@ -11,29 +11,22 @@ interface TeacherProfileContextType {
 const TeacherProfileContext = createContext<TeacherProfileContextType | undefined>(undefined);
 
 export function TeacherProfileProvider({ children }: { children: ReactNode }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [selectedTeacherId, setSelectedTeacherId] = useState<string | null>(null);
+  const router = useRouter();
+  const pathname = usePathname();
 
   const openTeacherProfile = (teacherId: string) => {
-    setSelectedTeacherId(teacherId);
-    setIsOpen(true);
+    // Determine the base path based on the current user's portal
+    const basePath = pathname?.startsWith('/teacher') ? '/teacher/teachers' : '/admin/teachers';
+    router.push(`${basePath}/${teacherId}`);
   };
 
   const closeTeacherProfile = () => {
-    setIsOpen(false);
-    setTimeout(() => setSelectedTeacherId(null), 300);
+    router.back();
   };
 
   return (
     <TeacherProfileContext.Provider value={{ openTeacherProfile, closeTeacherProfile }}>
       {children}
-      {selectedTeacherId && (
-        <TeacherProfileModal 
-          teacherId={selectedTeacherId} 
-          isOpen={isOpen} 
-          onClose={closeTeacherProfile} 
-        />
-      )}
     </TeacherProfileContext.Provider>
   );
 }

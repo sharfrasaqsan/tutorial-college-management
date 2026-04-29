@@ -7,7 +7,7 @@ import { Users, Search, BookOpen, Edit } from "lucide-react";
 import { Student, Class } from "@/types/models";
 import { useAuth } from "@/context/AuthContext";
 import StudentModal from "@/components/admin/StudentModal";
-import StudentProfileModal from "@/components/admin/StudentProfileModal";
+import { useStudentProfile } from "@/context/StudentProfileContext";
 import Skeleton from "@/components/ui/Skeleton";
 import toast from "react-hot-toast";
 
@@ -20,7 +20,7 @@ export default function MyStudentsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const { openStudentProfile } = useStudentProfile();
 
   const loadData = useCallback(async () => {
     if (!user?.uid) return;
@@ -78,7 +78,7 @@ export default function MyStudentsPage() {
   const openStudentDetails = (student: Student, mode: 'view' | 'edit' = 'view') => {
     setSelectedStudent(student);
     if (mode === 'view') {
-        setIsProfileOpen(true);
+        openStudentProfile(student.id);
     } else {
         setIsModalOpen(true);
     }
@@ -234,14 +234,7 @@ export default function MyStudentsPage() {
         teacherId={user?.uid}
       />
 
-      <StudentProfileModal 
-        isOpen={isProfileOpen}
-        onClose={() => {
-            setIsProfileOpen(false);
-            setSelectedStudent(null);
-        }}
-        studentId={selectedStudent?.id || ""}
-      />
+
     </div>
   );
 }

@@ -601,7 +601,6 @@ export default function ReportsHubPage() {
                                     <Wallet className="w-8 h-8" />
                                 </div>
                                 <div className="max-w-md">
-                                    {/* REDUCED FONT SIZE AS REQUESTED (from text-2xl to text-lg) */}
                                     <h3 className="font-black text-slate-900 text-lg tracking-tighter mb-3 uppercase">Institutional P&L Audit</h3>
                                     <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.15em] leading-relaxed opacity-70">
                                         Synthesize student revenue against faculty payroll obligations to generate a complete fiscal cycle analysis.

@@ -39,6 +39,9 @@ interface TeacherModalProps {
 
 export default function TeacherModal({ isOpen, onClose, onSuccess, initialData }: TeacherModalProps) {
   const [loading, setLoading] = useState(false);
+  const [metaLoading, setMetaLoading] = useState(false);
+  const [dbSubjects, setDbSubjects] = useState<Subject[]>([]);
+  const [dbGrades, setDbGrades] = useState<Grade[]>([]);
   const [activeTab, setActiveTab] = useState<'overview' | 'expertise' | 'security'>('overview');
 
   useEffect(() => {

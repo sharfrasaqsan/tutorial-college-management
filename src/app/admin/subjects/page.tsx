@@ -43,9 +43,9 @@ export default function SubjectsPage() {
     try {
         const newStatus = item.status === 'active' ? 'inactive' : 'active';
         await updateDoc(doc(db, "subjects", item.id), { status: newStatus });
-        toast.success(newStatus === 'active' ? "Subject Reactivated: Curriculum definition is now active." : "Subject Suspended: Curriculum definition has been successfully archived.");
+        toast.success(newStatus === 'active' ? "Subject restored and set to active." : "Subject archived successfully.");
     } catch {
-        toast.error("System Error: Failed to synchronize subject status updates.");
+        toast.error("Failed to update subject status. Please try again.");
     }
   };
 
@@ -80,12 +80,12 @@ export default function SubjectsPage() {
         batch.delete(doc(db, "subjects", subjectToDelete));
         
         await batch.commit();
-        toast.success("Purge Successful: Subject definition removed and related instructional classes suspended.");
+        toast.success("Subject removed. Associated classes have been suspended.");
         setIsDeleteOpen(false);
         setSubjectToDelete(null);
     } catch (error) {
         console.error("Error deleting subject:", error);
-        toast.error("Process Aborted: Failed to purge subject record from the registry.");
+        toast.error("Failed to remove subject. Please try again.");
     } finally {
         setDeleting(false);
     }
@@ -242,10 +242,10 @@ export default function SubjectsPage() {
                 <Hash className="w-3 h-3 text-primary" /> {item.subjectCode || 'No Code'}
             </div>
             <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
-                <p className="text-xs text-slate-500 font-medium">{item.studentCount || 0} Student{item.studentCount === 1 ? '' : 's'}</p>
-                <div className="flex -space-x-2">
-                    {[1, 2, 3].map(i => <div key={i} className="w-6 h-6 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] text-slate-400 font-bold saturate-50">{i}</div>)}
-                </div>
+                <p className="text-xs text-slate-500 font-medium">{item.studentCount || 0} Student{item.studentCount === 1 ? '' : 's'} Enrolled</p>
+                <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-md ${item.status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                    {item.status === 'active' ? 'Active' : 'Archived'}
+                </span>
             </div>
           </div>
         )) : (

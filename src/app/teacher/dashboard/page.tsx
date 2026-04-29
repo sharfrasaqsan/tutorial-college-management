@@ -343,7 +343,7 @@ export default function TeacherDashboard() {
     if (!user?.uid) return;
 
     if (classItem.isPaid) {
-      toast.error("Transactional integrity: This session is already settled and cannot be modified.");
+      toast.error("This session is already settled and cannot be modified.");
       return;
     }
 
@@ -550,7 +550,7 @@ export default function TeacherDashboard() {
     {
       title: "Done Today",
       value: stats.completedToday,
-      icon: Clock,
+      icon: CheckCircle2,
       color: "text-emerald-500",
       bg: "bg-emerald-50",
     },

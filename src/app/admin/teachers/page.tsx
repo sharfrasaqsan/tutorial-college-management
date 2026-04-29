@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { collection, query, getDocs, orderBy, doc, updateDoc, writeBatch, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle, X, Users, CreditCard, Briefcase, ArrowRight, Projector, AlertTriangle, History, Loader2 } from "lucide-react";
+import { Plus, Search, Filter, Edit, Eye, Trash2, Ban, CheckCircle, X, Users, CreditCard, Briefcase, ArrowRight, ArrowLeft, Projector, AlertTriangle, History, Loader2 } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
 import { Teacher, Subject } from "@/types/models";
 import Link from "next/link";
@@ -26,6 +26,10 @@ export default function TeachersPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 15;
 
   // Filters
   const [showFilters, setShowFilters] = useState(false);
@@ -374,11 +378,11 @@ export default function TeachersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredTeachers.length > 0 ? filteredTeachers.map((teacher) => (
-                  <tr key={teacher.id} className={`hover:bg-slate-50/50 transition-colors ${teacher.status === 'inactive' ? 'opacity-60 bg-slate-100/30' : ''}`}>
+                {filteredTeachers.length > 0 ? filteredTeachers.slice((currentPage-1)*itemsPerPage, currentPage*itemsPerPage).map((teacher) => (
+                  <tr key={teacher.id} className={`hover:bg-slate-50/50 transition-colors`}>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold overflow-hidden border border-slate-200 relative">
+                        <div className="w-11 h-11 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold overflow-hidden border-2 border-white ring-2 ring-slate-100 relative flex-shrink-0">
                           {teacher.photoURL ? (
                             <NextImage 
                                 src={teacher.photoURL} 
@@ -387,17 +391,26 @@ export default function TeachersPage() {
                                 className="object-cover" 
                             />
                           ) : (
-                            teacher.name.charAt(0)
+                            <span className="text-base">{teacher.name.charAt(0)}</span>
                           )}
                         </div>
                         <div>
                           <button 
                             onClick={() => openTeacherProfile(teacher.id)}
-                            className={`font-semibold text-left hover:text-primary transition-colors ${teacher.status === 'inactive' ? 'text-slate-500' : 'text-slate-800'}`}
+                            className="font-semibold text-left hover:text-primary transition-colors text-slate-800 text-sm"
                           >
                             {teacher.name}
                           </button>
-                          <p className="text-xs text-slate-500">Faculty ID: {teacher.teacherId || 'N/A'}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <p className="text-xs text-slate-400">ID: {teacher.teacherId || 'N/A'}</p>
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider ${
+                              teacher.status === 'active' 
+                                ? 'bg-emerald-50 text-emerald-600' 
+                                : 'bg-rose-50 text-rose-500'
+                            }`}>
+                              {teacher.status === 'active' ? 'Active' : 'Suspended'}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </td>
@@ -470,13 +483,42 @@ export default function TeachersPage() {
           )}
         </div>
         
-        <div className="p-4 border-t border-slate-100 flex items-center justify-between text-sm text-slate-500 bg-slate-50">
-          <p>Showing {filteredTeachers.length} faculty member{filteredTeachers.length === 1 ? '' : 's'}</p>
-          <div className="flex gap-1">
-            <button className="px-3 py-1 border border-slate-200 rounded hover:bg-slate-100" disabled>Previous</button>
-            <button className="px-3 py-1 bg-primary text-white rounded">1</button>
-            <button className="px-3 py-1 border border-slate-200 rounded hover:bg-slate-100" disabled>Next</button>
-          </div>
+        <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/30">
+          <p className="text-xs text-slate-500 font-medium">
+            Showing{" "}
+            <span className="font-bold text-slate-800">{Math.min((currentPage - 1) * itemsPerPage + 1, filteredTeachers.length)}</span> to{" "}
+            <span className="font-bold text-slate-800">{Math.min(currentPage * itemsPerPage, filteredTeachers.length)}</span> of{" "}
+            <span className="font-bold text-slate-800">{filteredTeachers.length}</span> faculty members
+          </p>
+          {filteredTeachers.length > itemsPerPage && (
+            <div className="flex items-center gap-2">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(p => p - 1)}
+                className="p-2 border border-slate-200 rounded-lg hover:bg-white text-slate-400 disabled:opacity-30 transition-all"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              {Array.from({ length: Math.ceil(filteredTeachers.length / itemsPerPage) }, (_, i) => i + 1).map(p => (
+                <button
+                  key={p}
+                  onClick={() => setCurrentPage(p)}
+                  className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                    currentPage === p ? 'bg-primary text-white shadow-md' : 'bg-white border border-slate-200 text-slate-600 hover:border-primary/30'
+                  }`}
+                >
+                  {p}
+                </button>
+              ))}
+              <button
+                disabled={currentPage === Math.ceil(filteredTeachers.length / itemsPerPage)}
+                onClick={() => setCurrentPage(p => p + 1)}
+                className="p-2 border border-slate-200 rounded-lg hover:bg-white text-slate-400 disabled:opacity-30 transition-all"
+              >
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -237,7 +237,7 @@ export default function ClassesPage() {
       {!selectedGradeId && !forceShowAll && (
           <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
               <div className="p-10 rounded-[2.5rem] border-2 border-dashed border-slate-100 bg-slate-50/50 flex flex-col items-center justify-center text-center">
-                  <div className="w-20 h-20 rounded-full bg-white shadow-xl flex items-center justify-center text-primary mb-6 animate-bounce transition-all duration-1000">
+                  <div className="w-20 h-20 rounded-full bg-white shadow-xl flex items-center justify-center text-primary mb-6 transition-all duration-1000">
                       <BookOpen className="w-10 h-10" />
                   </div>
                   <h3 className="text-xl font-bold text-slate-800">Select Academic Level</h3>
@@ -436,15 +436,15 @@ export default function ClassesPage() {
                         {/* Ledger Insights */}
                         <div className="bg-slate-50/50 rounded-xl p-3 border border-slate-100 flex items-center justify-between">
                             <div>
-                                <p className="text-[9px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">Ledger Progress</p>
+                                <p className="text-[9px] font-bold uppercase text-slate-400 tracking-wider mb-0.5">Session Progress</p>
                                 <p className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
-                                    <span className={sessionsPending >= 8 ? 'text-primary' : 'text-slate-600'}>{sessionsPending}</span> 
-                                    <span className="text-slate-300 font-medium">/ 8 Pending</span>
+                                    <span className={sessionsPending >= (item.sessionsPerCycle || 8) ? 'text-primary' : 'text-slate-600'}>{sessionsPending}</span> 
+                                    <span className="text-slate-300 font-medium">/ {item.sessionsPerCycle || 8} Pending</span>
                                 </p>
                             </div>
                             <div className="w-16 h-1.5 bg-white rounded-full overflow-hidden border border-slate-100">
                                 <div 
-                                    className={`h-full transition-all duration-1000 ease-out ${sessionsPending >= 8 ? 'bg-primary' : 'bg-slate-300'}`} 
+                                    className={`h-full transition-all duration-1000 ease-out ${sessionsPending >= (item.sessionsPerCycle || 8) ? 'bg-primary' : 'bg-slate-300'}`} 
                                     style={{ width: `${progressPercent}%` }}
                                 ></div>
                             </div>

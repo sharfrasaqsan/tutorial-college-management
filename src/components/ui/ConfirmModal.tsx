@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, CheckCircle, Info } from "lucide-react";
 import Modal from "./Modal";
 
 interface ConfirmModalProps {
@@ -21,59 +21,69 @@ export default function ConfirmModal({
   onConfirm,
   title,
   message,
-  confirmText = "Confirm Delete",
+  confirmText = "Confirm",
   cancelText = "Cancel",
   loading = false,
   variant = "danger",
 }: ConfirmModalProps) {
-  const variantStyles = {
+  const variantConfig = {
     danger: {
-      icon: "bg-red-100 text-red-600",
+      iconBg: "bg-red-50",
+      iconColor: "text-red-500",
+      glow: "shadow-red-100",
+      ring: "ring-red-100",
       button: "bg-red-600 hover:bg-red-700 shadow-red-200",
-      border: "border-red-100",
+      icon: AlertTriangle,
     },
     warning: {
-      icon: "bg-amber-100 text-amber-600",
+      iconBg: "bg-amber-50",
+      iconColor: "text-amber-500",
+      glow: "shadow-amber-100",
+      ring: "ring-amber-100",
       button: "bg-amber-600 hover:bg-amber-700 shadow-amber-200",
-      border: "border-amber-100",
+      icon: AlertTriangle,
     },
     info: {
-      icon: "bg-blue-100 text-blue-600",
+      iconBg: "bg-blue-50",
+      iconColor: "text-blue-500",
+      glow: "shadow-blue-100",
+      ring: "ring-blue-100",
       button: "bg-blue-600 hover:bg-blue-700 shadow-blue-200",
-      border: "border-blue-100",
+      icon: Info,
     },
   };
 
-  const style = variantStyles[variant];
+  const config = variantConfig[variant];
+  const Icon = config.icon;
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={title}>
-      <div className="flex flex-col items-center text-center space-y-4 py-4">
-        <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-2 ${style.icon} animate-pulse-subtle`}>
-          <AlertTriangle className="w-10 h-10" />
-        </div>
-        
-        <div className="space-y-2 px-4">
-          <h3 className="text-xl font-black text-slate-900 tracking-tight">{title}</h3>
-          <p className="text-slate-500 leading-relaxed font-medium">
-            {message}
-          </p>
+    <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
+      <div className="flex flex-col items-center text-center space-y-4 pt-2 pb-2">
+        {/* Icon — no glow duplication of title */}
+        <div className={`w-16 h-16 rounded-2xl flex items-center justify-center ${config.iconBg} ${config.iconColor} ring-8 ${config.ring} shadow-xl ${config.glow}`}>
+          <Icon className="w-8 h-8" />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full pt-6 border-t border-slate-50 mt-4 px-2">
-          <button 
-            type="button" 
+        {/* Message only — title already in Modal header */}
+        <p className="text-slate-500 leading-relaxed font-medium text-sm max-w-xs">
+          {message}
+        </p>
+
+        {/* Actions */}
+        <div className="grid grid-cols-2 gap-3 w-full pt-4 border-t border-slate-50 mt-2">
+          <button
+            type="button"
             onClick={onClose}
             disabled={loading}
-            className="px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl text-sm font-black uppercase tracking-widest hover:bg-slate-200 transition-all disabled:opacity-50"
+            className="px-4 py-3 bg-slate-100 text-slate-700 rounded-2xl text-sm font-bold hover:bg-slate-200 transition-all disabled:opacity-50 no-tap"
           >
             {cancelText}
           </button>
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={onConfirm}
             disabled={loading}
-            className={`px-6 py-3 text-white rounded-2xl text-sm font-black uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 ${style.button}`}
+            className={`px-4 py-3 text-white rounded-2xl text-sm font-bold transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 no-tap ${config.button}`}
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : confirmText}
           </button>

@@ -3,36 +3,197 @@
 @theme {
   --color-primary: #1D9E75;
   --color-primary-dark: #147A5A;
+  --color-primary-light: #E6F7F2;
   --color-accent: #0f766e;
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-danger: #ef4444;
+  --color-teacher: #4f39f6;
+  --color-teacher-light: #EEF2FF;
   
-  --font-sans: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  --font-sans: var(--font-geist-sans), "Inter", Arial, Helvetica, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular;
+  
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
 }
 
 :root {
   --background: #f8fafc;
   --foreground: #0f172a;
+  --primary-rgb: 29, 158, 117;
+  --teacher-rgb: 79, 57, 246;
+  --sidebar-width: 16rem;
 }
 
+/* ─── Base ─────────────────────────────────────────── */
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-/* Glassmorphism utilities */
+/* ─── Selection ─────────────────────────────────────── */
+::selection {
+  background: rgba(var(--primary-rgb), 0.15);
+  color: #0f172a;
+}
+
+/* ─── Scrollbar ─────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
+}
+
+/* ─── Focus Rings ───────────────────────────────────── */
+*:focus-visible {
+  outline: 2px solid rgba(var(--primary-rgb), 0.6);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* ─── Glassmorphism utilities ───────────────────────── */
 @utility glass {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
 }
 
 @utility glass-dark {
-  background: rgba(15, 23, 42, 0.7);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ─── Scrollbar hide ────────────────────────────────── */
+@utility scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ─── Text balance ──────────────────────────────────── */
+@utility text-balance {
+  text-wrap: balance;
+}
+
+/* ─── Tabular numbers ───────────────────────────────── */
+@utility tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* ─── No tap highlight (mobile) ─────────────────────── */
+@utility no-tap {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ─── Keyframe Animations ───────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes ping-slow {
+  75%, 100% { transform: scale(1.8); opacity: 0; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--primary-rgb), 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(var(--primary-rgb), 0); }
+}
+
+/* ─── Animation utilities ───────────────────────────── */
+@utility animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+@utility animate-fade-up {
+  animation: fade-up 0.4s ease-out both;
+}
+
+@utility animate-slide-down {
+  animation: slide-down 0.3s ease-out both;
+}
+
+@utility animate-scale-in {
+  animation: scale-in 0.2s ease-out both;
+}
+
+@utility animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+@utility animate-ping-slow {
+  animation: ping-slow 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* ─── Gradient text ─────────────────────────────────── */
+@utility text-gradient-primary {
+  background: linear-gradient(135deg, #1D9E75, #0f766e);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Card hover lift ───────────────────────────────── */
+@utility card-hover {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px -8px rgba(0,0,0,0.12);
+  }
+}
+
+/* ─── React Hot Toast Customization ─────────────────── */
+[data-hot-toast] {
+  font-family: var(--font-sans) !important;
+  font-size: 0.8125rem !important;
+  font-weight: 600 !important;
+  border-radius: 12px !important;
+  padding: 12px 16px !important;
+  box-shadow: 0 4px 24px -4px rgba(0,0,0,0.12), 0 0 0 1px rgba(0,0,0,0.04) !important;
 }

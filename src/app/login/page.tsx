@@ -9,7 +9,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import toast from "react-hot-toast";
 import Cookies from "js-cookie";
-import { Loader2, Mail, Lock, ShieldCheck } from "lucide-react";
+import { Loader2, Mail, Lock, ShieldCheck, Sparkles } from "lucide-react";
 import { auth, db } from "@/lib/firebase";
 import { loginSchema } from "@/lib/validators";
 import { useAuth } from "@/context/AuthContext";
@@ -19,6 +19,7 @@ type LoginForm = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { updateRole } = useAuth();
 
   const {
@@ -39,120 +40,177 @@ export default function LoginPage() {
       );
       const user = userCredential.user;
 
-      // Get user role from Firestore
       const userDoc = await getDoc(doc(db, "users", user.uid));
       
       if (!userDoc.exists()) {
-        throw new Error("User record not found in database.");
+        throw new Error("User record not found. Contact your administrator.");
       }
 
       const userData = userDoc.data();
       const role = userData.role;
       
       updateRole(role);
-      
-      // Store session securely with js-cookie to be read by Next.js middleware
       Cookies.set("session", JSON.stringify({ uid: user.uid, role }), { expires: 7 });
 
-      toast.success("Successfully logged in!");
+      toast.success("Signed in successfully!");
       
-      // Redirect based on role
       if (role === "admin") {
         router.push("/admin/dashboard");
       } else if (role === "teacher") {
         router.push("/teacher/dashboard");
       } else {
-        throw new Error("Invalid role assigned to user.");
+        throw new Error("Invalid role. Contact your administrator.");
       }
     } catch (err: unknown) {
       const error = err as Error;
-      toast.error(error.message || "Failed to log in.");
+      toast.error(error.message || "Failed to sign in.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 overflow-hidden relative">
-      {/* Dynamic Background Elements */}
-      <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-pulse"></div>
-      <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-accent/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s'}}></div>
+    <div className="min-h-screen flex items-center justify-center p-4 overflow-hidden relative bg-slate-950">
+      {/* Multi-layer animated background */}
+      <div className="absolute inset-0 overflow-hidden">
+        {/* Primary glow — bottom right */}
+        <div className="absolute -bottom-32 -right-32 w-[600px] h-[600px] bg-primary/15 rounded-full blur-[120px] animate-pulse" />
+        {/* Secondary glow — top left */}
+        <div className="absolute -top-32 -left-32 w-[400px] h-[400px] bg-primary-dark/10 rounded-full blur-[100px]" style={{ animationDelay: '1.5s' }} />
+        {/* Accent glow — center */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-emerald-600/5 rounded-full blur-[80px]" />
+        {/* Grid overlay */}
+        <div 
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
+            backgroundSize: '40px 40px'
+          }}
+        />
+      </div>
       
-      <div className="w-full max-w-md relative z-10">
-        <div className="glass-dark rounded-3xl p-8 shadow-2xl border border-slate-700/50">
+      <div className="w-full max-w-md relative z-10 animate-fade-up">
+        {/* Card */}
+        <div className="glass-dark rounded-3xl p-8 shadow-2xl shadow-black/40 border border-white/8">
+          
+          {/* Brand Header */}
           <div className="text-center mb-10">
-            <div className="mx-auto bg-primary/10 w-16 h-16 rounded-2xl flex items-center justify-center mb-6 ring-1 ring-primary/30 shadow-inner">
-              <ShieldCheck className="text-primary w-8 h-8" />
+            {/* Logo mark */}
+            <div className="relative inline-flex items-center justify-center mb-6">
+              {/* Outer glow ring */}
+              <div className="absolute w-20 h-20 rounded-3xl bg-primary/20 blur-lg" />
+              {/* Pulsing ring */}
+              <div className="absolute w-20 h-20 rounded-3xl border-2 border-primary/20 animate-ping-slow" />
+              {/* Icon container */}
+              <div className="relative w-16 h-16 bg-gradient-to-br from-primary to-primary-dark rounded-2xl flex items-center justify-center shadow-xl shadow-primary/30 ring-1 ring-white/10">
+                <ShieldCheck className="text-white w-8 h-8" />
+              </div>
             </div>
-            <h1 className="text-4xl font-extrabold text-white tracking-tight mb-2">
-              Welcome Back
-            </h1>
-            <p className="text-slate-400 text-sm">
-              Sign in to manage the tutorial college
-            </p>
+
+            <div className="space-y-1">
+              <p className="text-[10px] font-black text-primary uppercase tracking-[0.25em]">SmartAcademy</p>
+              <h1 className="text-3xl font-extrabold text-white tracking-tight">
+                Welcome Back
+              </h1>
+              <p className="text-slate-400 text-sm mt-2 font-medium">
+                Sign in to access your management portal
+              </p>
+            </div>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300 ml-1">Email Address</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Mail className="h-5 w-5 text-slate-500" />
-                </div>
+          {/* Form */}
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            {/* Email */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-400 ml-1 flex items-center gap-1.5">
+                <Mail className="w-3 h-3" />
+                Email Address
+              </label>
+              <div className="relative group">
                 <input
                   {...register("email")}
                   type="email"
-                  className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent text-white placeholder-slate-500 transition-all outline-none"
-                  placeholder="admin@tutorial.edu"
+                  id="email"
+                  autoComplete="email"
+                  aria-label="Email address"
+                  className="w-full px-4 py-3 bg-slate-800/60 border border-slate-700/80 rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary/60 text-white placeholder-slate-500 transition-all outline-none text-sm group-hover:border-slate-600"
+                  placeholder="admin@smartacademy.edu"
                 />
               </div>
               {errors.email && (
-                <p className="text-red-400 text-xs ml-1 mt-1">{errors.email.message}</p>
+                <p className="text-red-400 text-xs ml-1 flex items-center gap-1 mt-1">
+                  <span className="w-1 h-1 rounded-full bg-red-400 inline-block" />
+                  {errors.email.message}
+                </p>
               )}
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-300 ml-1">Password</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-slate-500" />
-                </div>
+            {/* Password */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-400 ml-1 flex items-center gap-1.5">
+                <Lock className="w-3 h-3" />
+                Password
+              </label>
+              <div className="relative group">
                 <input
                   {...register("password")}
-                  type="password"
-                  className="w-full pl-10 pr-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent text-white placeholder-slate-500 transition-all outline-none"
+                  type={showPassword ? "text" : "password"}
+                  id="password"
+                  autoComplete="current-password"
+                  aria-label="Password"
+                  className="w-full px-4 py-3 pr-12 bg-slate-800/60 border border-slate-700/80 rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary/60 text-white placeholder-slate-500 transition-all outline-none text-sm group-hover:border-slate-600"
                   placeholder="••••••••"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors text-xs font-bold px-1 no-tap"
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
               </div>
               {errors.password && (
-                <p className="text-red-400 text-xs ml-1 mt-1">{errors.password.message}</p>
+                <p className="text-red-400 text-xs ml-1 flex items-center gap-1 mt-1">
+                  <span className="w-1 h-1 rounded-full bg-red-400 inline-block" />
+                  {errors.password.message}
+                </p>
               )}
             </div>
 
+            {/* Submit */}
             <button
               type="submit"
+              id="sign-in-btn"
               disabled={loading}
-              className="w-full py-3 px-4 bg-gradient-to-r from-primary-dark to-primary hover:from-primary hover:to-primary-dark text-white rounded-xl font-semibold shadow-lg shadow-primary/25 transition-all outline-none transform active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center"
+              className="w-full py-3.5 px-4 bg-gradient-to-r from-primary-dark via-primary to-accent hover:brightness-110 text-white rounded-xl font-bold text-sm shadow-xl shadow-primary/25 transition-all outline-none active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
             >
               {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Authenticating...</span>
+                </>
               ) : (
-                "Sign In"
+                <>
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Sign In Securely</span>
+                </>
               )}
             </button>
           </form>
         </div>
 
-        <div className="mt-8 text-center animate-in fade-in slide-in-from-bottom-2 duration-700 delay-300">
-           <p className="text-[10px] font-black uppercase text-slate-600 tracking-[0.2em] mb-3">Software Architecture & Design</p>
-           <div className="flex flex-col items-center gap-1">
-              <p className="text-sm font-black text-slate-300 tracking-tight">AM. Sharfras Aqsan</p>
-              <div className="flex items-center gap-3 text-[9px] font-bold text-slate-500">
-                 <span>{`sharfrasaqsan@gmail.com`}</span>
-                 <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
-                 <span>0751230001</span>
-              </div>
-           </div>
+        {/* Attribution footer */}
+        <div className="mt-6 text-center animate-fade-up" style={{ animationDelay: '0.2s' }}>
+          <div className="flex items-center justify-center gap-2 text-slate-600">
+            <div className="h-px flex-1 bg-slate-800" />
+            <p className="text-[10px] font-bold uppercase tracking-widest text-slate-600 px-3">
+              SmartAcademy v2.4.0
+            </p>
+            <div className="h-px flex-1 bg-slate-800" />
+          </div>
+          <p className="text-[9px] text-slate-700 mt-2 font-medium">
+            Institutional Management Platform • Enterprise Grade Security
+          </p>
         </div>
       </div>
     </div>

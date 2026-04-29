@@ -405,8 +405,8 @@ export default function GradesPage() {
                       <p className="text-slate-500 font-medium">
                         No grade levels found in the system configuration.
                       </p>
-                      <button className="mt-2 text-primary hover:underline text-xs font-bold font-black tracking-widest uppercase">
-                        Initialize Default Grades
+                      <button onClick={handleAdd} className="mt-2 text-primary hover:underline text-xs font-bold font-black tracking-widest uppercase">
+                        Add Grade Level
                       </button>
                     </td>
                   </tr>
